@@ -34,6 +34,10 @@ Function cons(x As Variant, xs As TList)
 	cons = result
 End Function
 
+Function snoc(xs As TList, x As Variant)
+	snoc = cons(x, xs)
+End Function
+
 Function length(xs As TList)
 	length = xs.len
 End Function
@@ -125,15 +129,36 @@ Function foldr(fn As String, acc As Variant, xs As Variant)
 	foldr = result
 End Function
 
+Function reverse(xs As TList)
+	Dim result As TList
+	If xs.len &lt;= 1 Then
+		result = xs
+	Else
+		result = foldl(&quot;snoc&quot;, nil, xs)
+	End If
+	reverse = result
+End Function
+
 
 &apos;= tests ============================================================
 
 Function test_List()
+	test_List_fn()
+	test_List_typeOfAndToString()
+	test_List_reverse()
+End Function
+
+Function test_List_fn()
+	assertEqual(arityF(&quot;snoc&quot;), 2).x
+End Function
+
+Function test_List_typeOfAndToString()
 	assertEqual(typeOf(nil), &quot;Object/TList&quot;).x
 	assertEqual(toString(nil), &quot;[]&quot;).x
 	
 	Dim lst As TList
 	Set lst = cons(5, nil)
+	assertEqual(typeOf(lst), &quot;Object/TList&quot;).x
 	assertEqual(toString(lst), &quot;[5]&quot;).x
 
 	Dim a As Variant
@@ -156,6 +181,18 @@ Function test_List()
 	assertEqual(toString(lst), &quot;[&apos;b&apos;, []]&quot;).x
 	Set lst = cons(cons(&quot;a&quot;, nil), lst)
 	assertEqual(toString(lst), &quot;[[&apos;a&apos;], &apos;b&apos;, []]&quot;).x
+End Function
+
+
+Function test_List_reverse()
+	assertEqual(toString(reverse(nil)), toString(nil)).x
+	Dim lst As TList
+	Set lst = cons(1, nil)
+	assertEqual(toString(reverse(lst)), toString(lst)).x
+	Set lst = cons(2, lst)
+	assertEqual(toString(reverse(lst)), &quot;[1, 2]&quot;).x
+	Set lst = cons(3, lst)
+	assertEqual(toString(reverse(lst)), &quot;[1, 2, 3]&quot;).x
 End Function
 
 </script:module>

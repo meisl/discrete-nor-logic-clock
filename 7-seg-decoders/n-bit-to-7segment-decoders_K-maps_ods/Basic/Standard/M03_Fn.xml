@@ -23,6 +23,8 @@ Function arityF(fName As String) As Integer
 			result = 2
 		Case &quot;toString&quot;
 			result = 1
+		Case &quot;snoc&quot;
+			result = 2
 		Case &quot;pWs&quot;
 			result = 0
 		Case &quot;pBinDigit&quot;
@@ -78,6 +80,8 @@ Function applyF(fName As String, Optional arguments As Array, Optional argN As V
 			result = concat(args(k), args(k + 1))
 		Case &quot;toString&quot;
 			result = toString(args(k))
+		Case &quot;snoc&quot;
+			result = snoc(args(k), args(k + 1))
 		Case &quot;pWs&quot;
 			result = pWs
 		Case &quot;pBinDigit&quot;
