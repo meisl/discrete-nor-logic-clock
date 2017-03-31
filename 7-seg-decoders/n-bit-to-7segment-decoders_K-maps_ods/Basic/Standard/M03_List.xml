@@ -15,6 +15,20 @@ Sub Main
 End Sub
 
 
+Function TList_toString(xs As TList)
+	Dim result As String
+	If isNil(xs) Then
+		result = &quot;[]&quot;
+	Else
+		result = &quot;[&quot; &amp; toString(car(xs))
+		If length(xs) &gt; 1 Then
+			result = result &amp; &quot;, &quot; &amp; Join(toArray(map(&quot;toString&quot;, cdr(xs))), &quot;, &quot;)
+		End If
+		result = result &amp; &quot;]&quot;
+	End If
+	TList_toString = result
+End Function
+
 Function nil()
 	Static result As New TList	&apos; uninitialized instance at first
 	result.tyname = &quot;TList&quot;
@@ -139,7 +153,7 @@ Function reverse(xs As TList)
 	reverse = result
 End Function
 
-
+				
 &apos;= tests ============================================================
 
 Function test_List()
@@ -149,6 +163,7 @@ Function test_List()
 End Function
 
 Function test_List_fnApp()
+	assertEqual(arityF(&quot;TList_toString&quot;), 1).x
 	assertEqual(arityF(&quot;cons&quot;), 2).x
 	assertEqual(arityF(&quot;snoc&quot;), 2).x
 	assertEqual(arityF(&quot;reverse&quot;), 1).x

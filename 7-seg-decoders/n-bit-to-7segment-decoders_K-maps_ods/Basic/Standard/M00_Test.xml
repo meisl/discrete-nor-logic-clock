@@ -19,15 +19,21 @@ Sub Main
 	test_Test()
 End Sub
 
-Function assertThrows(fn As String, args As Array, Optional errNo As Integer)
+Function assertThrows(fName As String, args As Array, Optional errNo As Integer)
 	testRun = True
 	Dim result As Object
+	Dim argsStr As String
+	If fName = &quot;toString&quot; Then	&apos; we cannot use toString if we were just called from there
+		argsStr = &quot; some &quot; &amp; typeOf(args)
+	Else
+		argsStr = toString(args)
+	End If
 	On Local Error Goto Boom
-	applyF(fn, args)
+	applyF(fName, args)
 	result = New TTestFail
 	result.expected = IIf(IsMissing(errNo), &quot;an error&quot;, &quot;error &quot; &amp; errNo)
 	result.actual = &quot;no error&quot;
-	MsgBox(&quot;FAIL: expected fn &quot; &amp; toString(fn) &amp; &quot; to yield an error on args&quot; &amp; chr(13) &amp; toString(args))
+	MsgBox(&quot;FAIL: expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield an error on args&quot; &amp; chr(13) &amp; argsStr)
 	assertThrows = result
 	Exit Function
 Boom:
@@ -36,11 +42,11 @@ Boom:
 			result = New TTestFail
 			result.expected = &quot;error &quot; &amp; errNo &amp; &quot;: &quot; &amp; toString(Error(errNo))
 			result.actual   = &quot;error &quot; &amp; Err &amp; &quot;: &quot; &amp; toString(Error$)
-			MsgBox(&quot;FAIL: expected fn &quot; &amp; toString(fn) &amp; &quot; to yield&quot; _
+			MsgBox(&quot;FAIL: expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield&quot; _
 				&amp; chr(13) &amp; &quot;       &quot; &amp; result.expected _
 				&amp; chr(13) &amp; &quot; not &quot; &amp; result.actual _
 				&amp; chr(13) &amp; &quot;on args:&quot; _
-				&amp; chr(13) &amp; toString(args))
+				&amp; chr(13) &amp; argsStr
 		Else
 			result = New TTestPass
 			result.x = Err &amp; &quot;: &quot; &amp; Error$
@@ -79,7 +85,7 @@ Function test_Test()
 	assertEqual(arityF(&quot;i_will_throw0&quot;), 0).x
 	assertThrows(&quot;i_will_throw0&quot;, Array()).x
 	assertThrows(&quot;i_will_throw0&quot;, Array(), 91).x
-	assertThrows(&quot;i_will_throw0&quot;, Array(5), 5).x
+	assertThrows(&quot;i_will_throw0&quot;, Array(5)).x
 End Function
 
 </script:module>

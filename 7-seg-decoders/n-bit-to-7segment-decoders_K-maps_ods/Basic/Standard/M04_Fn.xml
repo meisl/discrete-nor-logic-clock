@@ -6,6 +6,13 @@ Sub Main
 	test_Fn()
 End Sub
 
+
+Function existsF(fName As String) As Boolean
+	Dim result As Boolean
+	result = (arityF(fName) &gt;= 0)
+	existsF = result
+End Function
+
 Function arityF(fName As String) As Integer
 	Dim result As Integer
 	Select Case fName
@@ -24,6 +31,8 @@ Function arityF(fName As String) As Integer
 		Case &quot;concat&quot;
 			result = 2
 		Case &quot;toString&quot;
+			result = 1
+		Case &quot;TList_toString&quot;
 			result = 1
 		Case &quot;cons&quot;
 			result = 2
@@ -46,10 +55,6 @@ Function arityF(fName As String) As Integer
 	arityF = result
 End Function
 
-Function existsF(fName As String) As Boolean
-	existsF = (arityF(fName) &gt;= 0)
-End Function
-
 Function applyF(fName As String, Optional arguments As Array, Optional argN As Variant)
 	Dim result As Variant
 	Dim args As Variant
@@ -60,8 +65,14 @@ Function applyF(fName As String, Optional arguments As Array, Optional argN As V
 		If Not(IsMissing(argN)) Then
 			croak(&quot;applyF: got surplus 3rd arg &quot; &amp; toString(argN))
 		End If
+		Dim msg As String
+		msg = &quot;applyF: expecting fn args in 1-dim Array - got instead &quot;
 		If Not(IsArray(arguments)) Then
-			croak(&quot;applyF: expecting fn args in Array - got instead &quot; &amp; toString(arguments))
+			&apos;Do not call toString here - it might call applyF with same args again!
+			croak(msg &amp; typeOf(arguments))
+		ElseIf getDim(arguments) &lt;&gt; 1 Then
+			&apos;Do not call toString here - it might call applyF with same args again!
+			croak(msg &amp; &quot;a &quot; &amp; getDim(arguments) &amp; &quot;-dim Array&quot;)
 		End If
 		args = arguments
 	End If
@@ -92,6 +103,8 @@ Function applyF(fName As String, Optional arguments As Array, Optional argN As V
 			result = concat(args(k), args(k + 1))
 		Case &quot;toString&quot;
 			result = toString(args(k))
+		Case &quot;TList_toString&quot;
+			result = TList_toString(args(k))
 		Case &quot;cons&quot;
 			result = cons(args(k), args(k + 1))
 		Case &quot;snoc&quot;

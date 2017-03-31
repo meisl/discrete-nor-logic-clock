@@ -88,20 +88,16 @@ Function toString(ByVal v As Variant) As String
 			End If
 		Case Else
 			If IsObject(v) Then
-				Select Case Mid(tp, Len(&quot;Object&quot;) + 2)
-					Case &quot;TList&quot;
-						If isNil(v) Then &apos; DONT access fields in here!
-							result = &quot;[]&quot;
-						Else
-							result = &quot;[&quot; &amp; toString(car(v))
-							If length(v) &gt; 1 Then
-								result = result &amp; &quot;, &quot; &amp; Join(toArray(map(&quot;toString&quot;, cdr(v))), &quot;, &quot;)
-							End If
-							result = result &amp; &quot;]&quot;
-						End If
-					Case Else
-						result = tp &amp; &quot;(...)&quot;
-				End Select
+				Dim tyName As String, toStrFn As String
+				tyName = Mid(tp, Len(&quot;Object&quot;) + 2)
+				toStrFnName = tyName &amp; &quot;_toString&quot;
+				&apos;We&apos;ve got an Object with .tyName, so we insist on its _toString to exist
+				&apos;Note: We test ourselves since applyF/croak call toString again...
+				If Not(existsF(toStrFnName)) Then
+					croak(&quot;toString: unknown fn &apos;&quot; &amp; toStrFnName &amp; &quot;&apos;&quot;)
+				Else
+					result = applyF(toStrFnName, Array(v))
+				End If
 			Else
 				result = v &amp; &quot;&quot;
 			End If
@@ -149,6 +145,8 @@ End Function
 Function test_Common()
 	test_typeOf()
 	test_toString()
+	test_fst()
+	test_snd()
 	test_readHex()
 End Function
 
@@ -209,11 +207,35 @@ Function test_toString()
 
 	Dim t2 As New TTest_TyName
 	t2.tyname = &quot;foobar&quot;
-	assertEqual(toString(t2), &quot;Object/foobar(...)&quot;).x
+	assertThrows(&quot;toString&quot;, Array(t2)).x
+End Function
+
+Function test_fst()
+	assertEqual(arityF(&quot;fst&quot;), 2).x
+
+	assertThrows(&quot;fst&quot;, Array()).x
+	assertThrows(&quot;fst&quot;, Array(1)).x
+
+	assertEqual(fst(1, 2), 1).x
+	assertEqual(fst(2, 1), 2).x
+	assertEqual(fst(&quot;a&quot;, &quot;b&quot;), &quot;a&quot;).x
+	assertEqual(fst(&quot;b&quot;, &quot;a&quot;), &quot;b&quot;).x
+End Function
+
+Function test_snd()
+	assertEqual(arityF(&quot;snd&quot;), 2).x
+
+	assertThrows(&quot;snd&quot;, Array()).x
+	assertThrows(&quot;snd&quot;, Array(1)).x
+
+	assertEqual(snd(1, 2), 2).x
+	assertEqual(snd(2, 1), 1).x
+	assertEqual(snd(&quot;a&quot;, &quot;b&quot;), &quot;b&quot;).x
+	assertEqual(snd(&quot;b&quot;, &quot;a&quot;), &quot;a&quot;).x
 End Function
 
 Function test_readHex()
-	assertEqual(arityF(&quot;readHex&quot;), 1)
+	assertEqual(arityF(&quot;readHex&quot;), 1).x
 	
 	assertEqual(readHex( &quot;0&quot;),    0).x
 	assertEqual(readHex( &quot;1&quot;),    1).x
