@@ -13,12 +13,14 @@ Type TTestFail
 	actual As Variant
 End Type
 
+Global testrun As Boolean
 
 Sub Main
 	test_Test()
 End Sub
 
 Function assertThrows(fn As String, args As Array, Optional errNo As Integer)
+	testRun = True
 	Dim result As Object
 	On Local Error Goto Boom
 	applyF(fn, args)
@@ -48,9 +50,11 @@ Boom:
 		result.x = Err &amp; &quot;: &quot; &amp; Error$
 	End If
 	assertThrows = result
+	testRun = False
 End Function
 
 Function assertEqual(actual As Variant, expected As Variant)
+	testRun = True
 	Dim result As Object
 	If Not(actual = expected) Then
 		Set result = New TTestFail
@@ -62,6 +66,7 @@ Function assertEqual(actual As Variant, expected As Variant)
 		Set result = New TTestPass
 	End If
 	assertEqual = result
+	testRun = False
 End Function
 
 

@@ -38,7 +38,9 @@ End Function
 
 Sub croak(msg As String)
 	Dim provoke As Object
-	MsgBox(msg)
+	If Not(testRun) Then
+		MsgBox(msg)
+	End If
 	MsgBox(provoke.AnError)
 End Sub
 
@@ -107,25 +109,38 @@ Function toString(ByVal v As Variant) As String
 	toString = result
 End Function
 
-Function readHex(arg As Variant)
-	Dim result As Integer, d As Integer, x As Integer, digits As String
-	If IsArray(arg) Then
-		digits = Join(arg, &quot;&quot;)
-	Else
-		digits = arg
-	End If
-	result = 0
-	For i = 1 To Len(digits)
-		d = Asc(Mid(digits, i, 1))
-		If d &lt;= Asc(&quot;9&quot;) Then
-			x = d - Asc(&quot;0&quot;)
-		ElseIf d &lt;= Asc(&quot;F&quot;) Then
-			x = d - Asc(&quot;A&quot;) + 10
-		Else
-			x = d - Asc(&quot;a&quot;) + 10
-		End If
-		result = (result * 16) + x
-	Next
+Function readHex(arg As Variant) As Integer
+	Dim result As Integer, t As String
+	t = typeOf(arg)
+	Select Case t
+		Case &quot;Array&quot;
+			result = readHex(Join(arg))
+		Case &quot;String&quot;
+			Dim l As Integer
+			l = Len(arg)
+			If l = 0 Then
+				croak(&quot;readHex: got empty String&quot;)
+			Else
+				Dim digits As String, d As Integer, x As Integer
+				digits = arg
+				result = 0
+				For i = 1 To Len(digits)
+					d = Asc(Mid(digits, i, 1))
+					If (d &gt;= Asc(&quot;0&quot;)) And (d &lt;= Asc(&quot;9&quot;)) Then
+						x = d - Asc(&quot;0&quot;)
+					ElseIf (d &gt;= Asc(&quot;A&quot;)) And (d &lt;= Asc(&quot;F&quot;)) Then
+						x = d - Asc(&quot;A&quot;) + 10
+					ElseIf (d &gt;= Asc(&quot;a&quot;)) And (d &lt;= Asc(&quot;f&quot;)) Then
+						x = d - Asc(&quot;a&quot;) + 10
+					Else
+						croak(&quot;readHex: invalid hex digit &apos;&quot; &amp; chr(d) &amp; &quot;&apos; in &quot; &amp; toString(arg))
+					End If
+					result = (result * 16) + x
+				Next i
+			End If
+		Case Else
+			croak(&quot;readHex: expected Array or String - got &quot; &amp; t &amp; &quot;:&quot; &amp; chr(13) &amp; toString(arg))
+	End Select
 	readHex = result
 End Function
 
@@ -228,7 +243,15 @@ Function test_readHex()
 	assertEqual(readHex( &quot;ff&quot;), 255).x
 	assertEqual(readHex( &quot;Ff&quot;), 255).x
 
-	assertEqual(readHex( &quot;z&quot;), 255).x
+	assertThrows(&quot;readHex&quot;, Array(3)).x
+	assertThrows(&quot;readHex&quot;, Array(&quot;&quot;)).x
+	assertThrows(&quot;readHex&quot;, Array(&quot; &quot;)).x
+	assertThrows(&quot;readHex&quot;, Array(&quot;g&quot;)).x
+	assertThrows(&quot;readHex&quot;, Array(&quot;G&quot;)).x
+	assertThrows(&quot;readHex&quot;, Array(&quot;z&quot;)).x
+	assertThrows(&quot;readHex&quot;, Array(&quot;Z&quot;)).x
+
+	assertThrows(&quot;readHex&quot;, Array(&quot;014Z&quot;)).x
 End Function
 
 </script:module>
