@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="M00_Test" script:language="StarBasic">REM  *****  BASIC  *****
+
+Type TTestPass
+	n As Integer
+	x As String
+End Type
+
+Type TTestFail
+	n As Integer
+	expected As Variant
+	actual As Variant
+End Type
+
+
+Sub Main
+	test_Test()
+End Sub
+
+Function assertThrows(fn As String, args As Array, Optional errNo As Integer)
+	Dim result As Object
+	On Local Error Goto Boom
+	applyF(fn, args)
+	result = New TTestFail
+	result.expected = IIf(IsMissing(errNo), &quot;an error&quot;, &quot;error &quot; &amp; errNo)
+	result.actual = &quot;no error&quot;
+	MsgBox(&quot;FAIL: expected fn &quot; &amp; toString(fn) &amp; &quot; to yield an error on args&quot; &amp; chr(13) &amp; toString(args))
+	assertThrows = result
+	Exit Function
+Boom:
+	If Not(IsMissing(errNo)) Then
+		If (errNo &lt;&gt; Err) Then
+			result = New TTestFail
+			result.expected = &quot;error &quot; &amp; errNo &amp; &quot;: &quot; &amp; toString(Error(errNo))
+			result.actual   = &quot;error &quot; &amp; Err &amp; &quot;: &quot; &amp; toString(Error$)
+			MsgBox(&quot;FAIL: expected fn &quot; &amp; toString(fn) &amp; &quot; to yield&quot; _
+				&amp; chr(13) &amp; &quot;       &quot; &amp; result.expected _
+				&amp; chr(13) &amp; &quot; not &quot; &amp; result.actual _
+				&amp; chr(13) &amp; &quot;on args:&quot; _
+				&amp; chr(13) &amp; toString(args))
+		Else
+			result = New TTestPass
+			result.x = Err &amp; &quot;: &quot; &amp; Error$
+		End If
+	Else
+		result = New TTestPass
+		result.x = Err &amp; &quot;: &quot; &amp; Error$
+	End If
+	assertThrows = result
+End Function
+
+Function assertEqual(actual As Variant, expected As Variant)
+	Dim result As Object
+	If Not(actual = expected) Then
+		Set result = New TTestFail
+		result.expected = expected
+		result.actual = actual
+		MsgBox(&quot;FAIL: expected &quot; &amp; toString(actual) &amp; chr(13) &amp; &quot;     to equal &quot; &amp; toString(expected))
+		assertEqual = result
+	Else
+		Set result = New TTestPass
+	End If
+	assertEqual = result
+End Function
+
+
+Function i_will_throw0()
+	Dim foo As Object
+	i_will_throw0 = foo.provoke.an.error
+End Function
+
+Function test_Test()
+	assertEqual(arityF(&quot;i_will_throw0&quot;), 0).x
+	assertThrows(&quot;i_will_throw0&quot;, Array()).x
+	assertThrows(&quot;i_will_throw0&quot;, Array(), 91).x
+	assertThrows(&quot;i_will_throw0&quot;, Array(5), 5).x
+End Function
+
+</script:module>

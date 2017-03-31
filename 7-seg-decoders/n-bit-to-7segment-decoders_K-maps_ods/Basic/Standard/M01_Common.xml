@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
-<script:module xmlns:script="http://openoffice.org/2000/script" script:name="M00_Common" script:language="StarBasic">REM  *****  BASIC  *****
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="M01_Common" script:language="StarBasic">REM  *****  BASIC  *****
 
 Type TTest_NoTyname
 
@@ -10,16 +10,6 @@ Type TTest_Tyname
 	tyname As String
 End Type
 
-Type TTestPass
-	n As Integer
-	x As String
-End Type
-
-Type TTestFail
-	n As Integer
-	expected As Variant
-	actual As Variant
-End Type
 
 Sub Main
 	test_Common()
@@ -64,19 +54,6 @@ Function concat(a As String, b As String) As String
 	concat = a &amp; b
 End Function
 
-Function assertEqual(actual As Variant, expected As Variant)
-	Dim result As Object
-	If Not(actual = expected) Then
-		Set result = New TTestFail
-		result.expected = expected
-		result.actual = actual
-		MsgBox(&quot;FAIL: expected &quot; &amp; toString(actual) &amp; chr(13) &amp; &quot;     to equal &quot; &amp; toString(expected))
-		assertEqual = result
-	Else
-		Set result = New TTestPass
-	End If
-	assertEqual = result
-End Function
 
 Function toString(ByVal v As Variant) As String
 	Dim result As String
@@ -184,9 +161,24 @@ Function test_typeOf()
 End Function
 
 Function test_toString()
-	assertEqual(toString(0), &quot;0&quot;).x
-	assertEqual(toString(&quot;0&quot;), &quot;&apos;0&apos;&quot;).x
-	assertEqual(toString(&quot;&quot;), &quot;&apos;&apos;&quot;).x
+	assertEqual(toString(&quot;&quot;),                  &quot;&apos;&apos;&quot;).x
+	assertEqual(toString(&quot; &quot;),                 &quot;&apos; &apos;&quot;).x
+	assertEqual(toString(&quot;abc&quot;),               &quot;&apos;abc&apos;&quot;).x
+	assertEqual(toString(0),                   &quot;0&quot;).x
+	assertEqual(toString(&quot;0&quot;),                 &quot;&apos;0&apos;&quot;).x
+	assertEqual(toString(1),                   &quot;1&quot;).x
+	assertEqual(toString(&quot;1&quot;),                 &quot;&apos;1&apos;&quot;).x
+	assertEqual(toString(&quot; 1&quot;),                &quot;&apos; 1&apos;&quot;).x
+	assertEqual(toString(&quot;01&quot;),                &quot;&apos;01&apos;&quot;).x
+	assertEqual(toString(01),                  &quot;1&quot;).x
+	assertEqual(toString(chr(13)),             &quot;&apos;\n&apos;&quot;).x
+	assertEqual(toString(chr( 9)),             &quot;&apos;\t&apos;&quot;).x
+	assertEqual(toString(chr( 9) &amp; &quot;x&quot;),       &quot;&apos;\tx&apos;&quot;).x
+	assertEqual(toString(&quot;x&quot; &amp; chr( 9)),       &quot;&apos;x\t&apos;&quot;).x
+	assertEqual(toString(&quot;x&quot; &amp; chr(13)),       &quot;&apos;x\n&apos;&quot;).x
+	assertEqual(toString(&quot;x&quot; &amp; chr( 9) &amp; &quot;y&quot;), &quot;&apos;x\ty&apos;&quot;).x
+	assertEqual(toString(&quot;x&quot; &amp; chr(13) &amp; &quot;y&quot;), &quot;&apos;x\ny&apos;&quot;).x
+	assertEqual(toString(chr(9) &amp; chr(13) &amp; &quot;y&quot;), &quot;&apos;\t\ny&apos;&quot;).x
 
 	assertEqual(toString(Nothing), &quot;Nothing&quot;).x
 	assertEqual(toString(Empty), &quot;Empty&quot;).x
@@ -235,6 +227,8 @@ Function test_readHex()
 	assertEqual(readHex( &quot;1f&quot;),  31).x
 	assertEqual(readHex( &quot;ff&quot;), 255).x
 	assertEqual(readHex( &quot;Ff&quot;), 255).x
+
+	assertEqual(readHex( &quot;z&quot;), 255).x
 End Function
 
 </script:module>

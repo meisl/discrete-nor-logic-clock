@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
-<script:module xmlns:script="http://openoffice.org/2000/script" script:name="M03_Fn" script:language="StarBasic">REM  *****  BASIC  *****
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="M04_Fn" script:language="StarBasic">REM  *****  BASIC  *****
 
 Sub Main
 	test_Fn()
@@ -15,6 +15,8 @@ Function arityF(fName As String) As Integer
 			result = 1
 		Case &quot;applyF&quot;
 			result = 2
+		Case &quot;i_will_throw0&quot;
+			result = 0
 		Case &quot;fst&quot;
 			result = 2
 		Case &quot;snd&quot;
@@ -66,8 +68,12 @@ Function applyF(fName As String, Optional arguments As Array, Optional argN As V
 	arity = arityF(fName)
 	k = LBound(args)
 	n = UBound(args) - k + 1
-	If Not(n = arity) Then
-		croak(&quot;applyF &quot; &amp; toString(fName) &amp; &quot;: has arity &quot; &amp; arity &amp; &quot;, got &quot; &amp; n &amp; chr(13) &amp; toString(args)
+	If (n &lt;&gt; arity) Then
+		If (arity &lt; 0) Then
+			croak(&quot;applyF: unknown function &quot; &amp; toString(fName))
+		Else
+			croak(&quot;applyF &quot; &amp; toString(fName) &amp; &quot;: has arity &quot; &amp; arity &amp; &quot;, got &quot; &amp; n &amp; chr(13) &amp; toString(args)
+		End If
 	End If
 	Select Case fName
 		Case &quot;arityF&quot;
@@ -76,6 +82,8 @@ Function applyF(fName As String, Optional arguments As Array, Optional argN As V
 			result = existsF(args(k))
 		Case &quot;applyF&quot;
 			result = applyF(args(k), args(k + 1))
+		Case &quot;i_will_throw0&quot;
+			result = i_will_throw0()
 		Case &quot;fst&quot;
 			result = fst(args(k), args(k + 1))
 		Case &quot;snd&quot;

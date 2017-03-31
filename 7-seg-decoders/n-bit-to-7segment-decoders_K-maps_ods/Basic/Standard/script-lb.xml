@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE library:library PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "library.dtd">
 <library:library xmlns:library="http://openoffice.org/2000/library" library:name="Standard" library:readonly="false" library:passwordprotected="false">
- <library:element library:name="M01_Array"/>
- <library:element library:name="M00_Common"/>
- <library:element library:name="M02_List"/>
- <library:element library:name="M04_Parser"/>
- <library:element library:name="M03_Fn"/>
+ <library:element library:name="M03_List"/>
+ <library:element library:name="M02_Array"/>
+ <library:element library:name="M04_Fn"/>
+ <library:element library:name="M05_Parser"/>
+ <library:element library:name="M01_Common"/>
+ <library:element library:name="M00_Test"/>
 </library:library>
