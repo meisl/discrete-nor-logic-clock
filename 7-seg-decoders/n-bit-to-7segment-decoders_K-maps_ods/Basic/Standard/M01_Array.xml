@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="M01_Array" script:language="StarBasic">REM  *****  BASIC  *****
+
+Sub Main
+
+End Sub
+
+
+Function getDim(a As Array)
+	Dim result As Integer
+	result = 0
+	On Local Error Goto ErrorHandler
+	While True
+		result = result + 1
+		LBound(a, result)
+	Wend
+	ErrorHandler:
+		getDim = result - 1
+End Function
+
+
+</script:module>

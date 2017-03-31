@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="M02_List" script:language="StarBasic">REM  *****  BASIC  *****
+
+
+Type TList
+	tyname As String
+	head As Variant
+	tail As TList
+	len As Integer
+End Type
+
+Sub Main
+	test_List()
+End Sub
+
+
+Function nil()
+	Static result As New TList	&apos; uninitialized instance at first
+	result.tyname = &quot;TList&quot;
+	nil = result
+End Function
+
+Function isNil(xs As TList)
+	isNil = (xs.len = 0)
+End Function
+
+Function cons(x As Variant, xs As TList)
+	Dim result As New TList
+	result.tyname = xs.tyname
+	result.head = x
+	result.tail = xs
+	result.len = xs.len + 1
+	cons = result
+End Function
+
+Function toList(a As Array)
+	Dim result As TList
+	Set result = nil
+	Dim i As Integer, k As Integer
+	Select Case getDim(a)
+		Case 1
+			For i = UBound(a) To LBound(a) Step -1
+				result = cons(a(i), result)
+			Next i
+		Case 2
+			For i = UBound(a, 1) To LBound(a, 1) Step -1
+				Dim inner As TList
+				Set inner = nil
+				For k = UBound(a, 2) To LBound(a, 2) Step -1
+					inner = cons(a(i, k), inner)
+				Next k
+				result = cons(inner, result)
+			Next i
+		Case Else
+			croak(&quot;cannot handle &quot; &amp; getDim(a) &amp; &quot;-dimensional arrays&quot;)
+	End Select
+	toList = result
+End Function
+
+Function foldl(fn As String, acc As Variant, xs As Variant)
+	Dim result As Variant
+	If IsNil(xs) Then
+		result = acc
+	ElseIf IsArray(xs) Then
+		result = foldl(fn, acc, toList(xs))
+	Else
+		result = foldl(fn, applyF(fn, Array(acc, xs.head)), xs.tail)
+	End If
+	foldl = result
+End Function
+
+Function foldr(fn As String, acc As Variant, xs As Variant)
+	Dim result As Variant
+	If IsNil(xs) Then
+		result = acc
+	ElseIf IsArray(xs) Then
+		result = foldr(fn, acc, toList(xs))
+	Else
+		result = applyF(fn, Array(xs.head, foldr(fn, acc, xs.tail)))
+	End If
+	foldr = result
+End Function
+
+
+&apos;= tests ============================================================
+
+Function test_List()
+	assertEqual(toString(nil), &quot;[]&quot;)
+	dim t1 As TList, t2 As Object
+	Set t1 = nil
+	Set t2 = cons(&quot;a&quot;, nil)
+	MsgBox(&quot;typeOf(Array(2,3))=&quot; &amp; typeOf(Array(2,3)))
+	MsgBox(&quot;typeOf(t2)=&quot; &amp; typeOf(t2))
+	Stop
+	MsgBox(typeOf(nil))
+	MsgBox(isType(&quot;TList&quot;, 5))
+	MsgBox(isType(&quot;TList&quot;, Nothing))
+End Function
+
+</script:module>

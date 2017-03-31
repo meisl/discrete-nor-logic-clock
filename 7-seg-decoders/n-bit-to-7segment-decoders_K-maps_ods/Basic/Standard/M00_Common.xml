@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="M00_Common" script:language="StarBasic">REM  *****  BASIC  *****
+
+
+Sub Main
+	Stop
+End Sub
+
+
+Function typeOf(x As Variant)
+	Dim result As String
+	result = TypeName(x)
+	If result = &quot;Object&quot; Then
+		result = _typeOf(x)
+	End If
+	typeOf = result
+End Function
+
+Function _typeOf(o As Object)
+	Dim result As String
+	result = &quot;Object&quot;
+&apos;	On Local Error Goto ErrorHandler
+	result = o.tyname
+ErrorHandler:
+	_typeOf = result
+End Function
+
+Sub croak(msg As String)
+	Dim provoke As Object
+	MsgBox(msg)
+	MsgBox(provoke.AnError)
+End Sub
+
+Function fst(x As Variant, y As Variant)
+	fst = x
+End Function
+
+Function snd(x As Variant, y As Variant)
+	snd = y
+End Function
+
+Function concat(a As String, b As String) As String
+	concat = a &amp; b
+End Function
+
+Function assertEqual(actual As Variant, expected As Variant)
+	If Not(actual = expected) Then
+		croak(&quot;FAIL: expected &quot; &amp; toString(actual) &amp; chr(13) &amp; &quot;     to equal &quot; &amp; toString(expected))
+	End If
+End Function
+
+Function toString(ByVal x As Variant) As String
+	Dim result As String
+	If IsNull(x) Then
+		result = &quot;Nothing&quot;
+	ElseIf IsEmpty(x) Then
+		result = &quot;Empty&quot;
+	ElseIf IsArray(x) Then
+		result = &quot;Array(&quot;
+		Dim i As Integer
+		For i = LBound(x) To UBound(x)
+			If i &gt; LBound(x) Then
+				result = result &amp; &quot;, &quot;
+			End If
+			result = result &amp; toString(x(i))
+		Next i
+		result = result &amp; &quot;)&quot;
+	ElseIf IsObject(x) Then
+		result = &quot;Object&quot;
+	Else
+		Dim t As String
+		t = x &amp; &quot;&quot;
+		t = Join(Split(t, chr(13)), &quot;\n&quot;)
+		t = Join(Split(t, chr(9)), &quot;\t&quot;)
+		If TypeName(x) = &quot;String&quot; Then
+			result = &quot;&apos;&quot; &amp; t &amp; &quot;&apos;&quot;
+		Else
+			result = t
+		End If
+	End If
+	toString = result
+End Function
+
+</script:module>

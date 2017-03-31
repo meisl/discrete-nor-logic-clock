@@ -1,0 +1,522 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="M04_Parser" script:language="StarBasic">REM  *****  BASIC  *****
+
+
+Type KeyValuePair
+	key As String
+	val As Variant
+	nxt As Object
+End Type
+
+Type Env
+	daddy As Object
+	mappings As Object
+End Type
+
+Type Parser
+	tp As String
+	st As Variant
+End Type
+
+Sub Main
+	dim test1 As Object, test2 As Object
+	set test1 = Nil
+	test2 = cons(&quot;a&quot;, Nil)
+	test2.len = 0
+	MsgBox(tostring(blah))
+	Stop
+	Dim s As String
+	Dim pDigit As Parser, pHexDigit As Parser, pHexNum As Parser, pHexLit As Parser
+	Set pDigit = mkChoice(mkChoice(mkChoice(mkStr(&quot;0&quot;), mkStr(&quot;1&quot;)), mkStr(&quot;2&quot;)), mkStr(&quot;3&quot;))
+	Set pHexDigit = mkChoice(pDigit, mkChoice(mkChoice(mkChoice(mkChoice(mkChoice(mkStr(&quot;A&quot;), mkStr(&quot;B&quot;)), mkStr(&quot;C&quot;)), mkStr(&quot;D&quot;)), mkStr(&quot;E&quot;)), mkStr(&quot;F&quot;)))
+	Set pHexNum = mkSeq(Array(mkMany(pHexDigit)), &quot;readHex&quot;)
+	Set pHexLit = mkSeq(Array(mkStr(&quot;0x&quot;), pHexNum), &quot;snd&quot;)
+	Dim p As Parser 
+	&apos;mkChoice(mkItem(), mkReturn(&quot;bar&quot;))
+	Set p = mkSeq(Array(pHexLit, mkMany(pWs)), &quot;fst&quot;)
+	s = &quot;FF 0x1F __µ 0&quot;
+
+	MsgBox( _
+		&quot;applying parser &apos;&quot; &amp; p.tp &amp; &quot;&apos; to &quot; &amp; toString(s) &amp; &quot;: &quot; &amp; chr(13) _
+		&amp; toString(applyP(p, s)) _
+	)
+	Stop
+	
+	MsgBox(&quot;&apos;&quot; &amp; s &amp; &quot;&apos;&quot; &amp; chr(13) &amp; evalNorExpr(s))
+	
+	
+	Dim e0 As Object
+	Dim e1 As Object
+	Dim lu As Variant
+	Set e0 = Env_new()
+	Set e1 = Env_new(e0)
+
+	lu = Env_lookup(e1, &quot;A&quot;)
+	MsgBox(Env_show(e1) &amp; Chr(13) &amp; &quot;lookup(&apos;A&apos;) ~&gt; &quot; &amp; toString(lu))	
+
+	Env_add(e0, &quot;A&quot;, 1)
+	Env_add(e1, &quot;B&quot;, 2)
+	Env_add(e1, &quot;C&quot;, 3)
+
+	lu = Env_lookup(e1, &quot;A&quot;)
+	MsgBox(Env_show(e1) &amp; Chr(13) &amp; &quot;lookup(&apos;A&apos;) ~&gt; &quot; &amp; toString(lu))	
+
+	Env_add(e1, &quot;A&quot;, &quot;abc&quot;)
+
+	lu = Env_lookup(e1, &quot;A&quot;)
+	MsgBox(Env_show(e1) &amp; Chr(13) &amp; &quot;lookup(&apos;A&apos;) ~&gt; &quot; &amp; toString(lu))
+End Sub
+
+&apos;================================================================================
+
+
+Function inspect(o As Object)
+	On Local Error Goto ErrorHandler
+	Dim result As Variant
+	result = o.tp
+		MsgBox(&quot;property &apos;tp&apos; equals &quot; &amp; toString(result))
+	Exit Function
+	ErrorHandler:
+		croak(&quot;property &apos;tp&apos; not found in &quot; &amp; toString(o))
+End Function
+
+
+
+
+
+Function arityF(fName As String)
+	Dim result As Integer
+	Select Case fName
+		Case &quot;pWs&quot;
+			result = 0
+		Case &quot;pBinDigit&quot;
+			result = 0
+		Case &quot;pDecDigit&quot;
+			result = 0
+		Case &quot;readHex&quot;
+			result = 1
+		Case &quot;fst&quot;
+			result = 2
+		Case &quot;snd&quot;
+			result = 2
+		Case &quot;concat&quot;
+			result = 2
+		Case &quot;applyF&quot;
+			result = 2
+		Case Else
+			croak(&quot;arityF: unknown function &quot; &amp; toString(fName))
+	End Select
+	arityF = result
+End Function
+
+Function existsF(fName As String)
+	existsF = Not(IsNull(arityF(fName)))
+End Function
+
+Function applyF(fName As String, Optional arguments As Array, Optional argN As Variant)
+	Dim result As Variant
+	Dim args As Variant
+	Dim arity As Integer, k As Integer, n As Integer
+	If IsMissing(arguments) Then
+		args = Array()
+	Else
+		If Not(IsMissing(argN)) Then
+			croak(&quot;applyF: got surplus 3rd arg &quot; &amp; toString(argN))
+		End If
+		If Not(IsArray(arguments)) Then
+			croak(&quot;applyF: expecting fn args in Array - got instead &quot; &amp; toString(arguments))
+		End If
+		args = arguments
+	End If
+	arity = arityF(fName)
+	k = LBound(args)
+	n = UBound(args) - k + 1
+	If Not(n = arity) Then
+		croak(&quot;applyF &quot; &amp; toString(fName) &amp; &quot;: has arity &quot; &amp; arity &amp; &quot;, got &quot; &amp; n &amp; chr(13) &amp; toString(args)
+	End If
+	Select Case fName
+		Case &quot;pWs&quot;
+			result = pWs
+		Case &quot;pBinDigit&quot;
+			result = pBinDigit
+		Case &quot;pDecDigit&quot;
+			result = pDecDigit
+		Case &quot;readHex&quot;
+			result = readHex(args(k))
+		Case &quot;fst&quot;
+			result = fst(args(k), args(k + 1))
+		Case &quot;snd&quot;
+			result = snd(args(k), args(k + 1))
+		Case &quot;applyF&quot;
+			result = applyF(args(k), args(k + 1))
+		Case &quot;concat&quot;
+			result = concat(args(k), args(k + 1))
+		Case Else
+			croak(&quot;applyF: unknown function &quot; &amp; toString(fName))
+	End Select	
+	applyF = result
+End Function
+
+&apos;==================================================================
+
+Function mkParser(tp As String, st As Variant)
+	Dim result As New Parser
+	result.tp = tp
+	result.st = st
+	mkParser = result
+End Function
+
+Function mkReturn(node As Variant)
+	mkReturn = mkParser(&quot;return&quot;, Array(node))
+End Function
+
+Function mkFailure()
+	mkFailure = mkParser(&quot;failure&quot;, Array())
+End Function
+
+Function mkItem()
+	mkItem = mkParser(&quot;item&quot;, Array())
+End Function
+
+Function mkChoice(p1 As Parser, p2 As Parser)
+	mkChoice = mkParser(&quot;choice&quot;, Array(p1, p2))
+End Function
+
+Function mkStr(t As String)
+	If (Len(t) = 0) Then
+		croak(&quot;mkStr: cannot match &apos;exactly&apos; the empty string t=&apos;&apos;&quot;)
+	Else
+		mkStr = mkParser(&quot;str&quot;, Array(t))
+	End If
+End Function
+
+Function mkMany(p As Parser)
+	mkMany = mkParser(&quot;many&quot;, Array(p))
+End Function
+
+Function mkBind(fName As String, p As Parser)
+	If Not existsF(fName) Then
+		croak(&quot;mkBind: unknown function &quot; &amp; toString(fName))
+	Else
+		mkBind = mkParser(&quot;bind&quot;, Array(p, fName))
+	End If
+End Function
+
+Function mkSeq(ps As Array, fName As String)
+	If Not existsF(fName) Then
+		croak(&quot;mkSeq: unknown function &quot; &amp; toString(fName))
+	Else
+		mkSeq = mkParser(&quot;seq&quot;, Array(ps, fName))
+	End If
+End Function
+
+&apos;==================================================================
+
+Function pWs()
+	Static result As Parser	&apos; an uninitialized instance of Parser at first
+	If result.tp = &quot;&quot; Then
+		result = mkChoice(mkStr(&quot; &quot;), mkStr(Chr(9))
+	End If
+	pWs = result
+End Function
+
+Function pBinDigit()
+	Static result As Parser	&apos; an uninitialized instance of Parser at first
+	If result.tp = &quot;&quot; Then
+		result = mkChoice(mkStr(&quot;0&quot;), mkStr(&quot;1&quot;))
+	End If
+	pBinDigit = result
+End Function
+
+Function pDecDigit()
+	Static result As Parser	&apos; an uninitialized instance of Parser at first
+	If result.tp = &quot;&quot; Then
+		result = mkChoice(pBinDigit, mkChoice(mkStr(&quot;2&quot;), mkStr(&quot;3&quot;))
+	End If
+	pDecDigit = result
+End Function
+
+&apos;==================================================================
+
+Function parse(pName As String, s As String)
+	Dim result As Variant
+	result = applyP(pName, s)
+	parse = toString(result)
+End Function
+
+Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
+	Dim p As Parser
+	If IsNull(parser) Or IsEmpty(parser) Then
+		croak(&quot;applyP: parser p = &quot; &amp; toString(parser))
+	ElseIf TypeName(parser) = &quot;String&quot; Then
+		Set p = applyF(parser)
+	ElseIf TypeName(parser) = &quot;Object&quot; Then
+		Set p = parser
+	Else
+		croak(&quot;applyP: invalid arg parser - &quot; &amp; toString(parser))
+	End If
+&apos;	MsgBox(toString(p.tp))
+	Dim result As Variant
+	If IsMissing(pos) Then
+		pos = 1
+	End If
+	If p.tp = &quot;return&quot; Then
+		result = Array(p.st(0), pos)
+	ElseIf p.tp = &quot;failure&quot; Then
+		result = Empty
+	ElseIf p.tp = &quot;item&quot; Then
+		If pos &lt;= Len(s) Then
+			result = Array(Mid(s, pos, 1), pos + 1)
+		Else
+			result = Empty
+		End If
+	ElseIf p.tp = &quot;choice&quot; Then
+		result = applyP(p.st(0), s, pos)
+		If IsEmpty(result) Then
+			result = applyP(p.st(1), s, pos)
+		End If
+	ElseIf p.tp = &quot;str&quot; Then
+		Dim match As String
+		Dim matchLen As Integer
+		match = p.st(0)
+		matchLen = Len(match)
+		If (Mid(s, pos, matchLen) = match) Then
+			result = Array(match, pos + matchLen)
+		Else
+			result = Empty
+		End If
+		&apos;MsgBox(&quot;str(&quot; &amp; toString(match) &amp; &quot;), s=&quot; &amp; toString(s) &amp; &quot;, pos=&quot; &amp; toString(pos) &amp; &quot;, matchLen=&quot; &amp; toString(matchLen)_
+		&apos;	&amp; chr(13) &amp; &quot;~&gt;&quot; &amp; toString(result))
+	ElseIf p.tp = &quot;many&quot; Then
+		Dim nxtPos As Integer
+		Dim lst As Object
+		Dim lstLen As Integer
+		nxtPos = pos
+		lstLen = 0
+		Set lst = nil
+		result = applyP(p.st(0), s, nxtPos)
+		While Not(IsEmpty(result))
+			nxtPos = result(1)
+			Set lst = cons(result(0), lst)
+			lstLen = lstLen + 1
+			result = applyP(p.st(0), s, nxtPos)
+		Wend
+		If lstLen = 0 Then
+			result = Array(Array(), nxtPos)
+		Else
+			ReDim things(0 To lstLen-1) As Variant
+			While lstLen &gt; 0
+				lstLen = lstLen - 1
+				things(lstLen) = lst.head
+				Set lst = lst.tail
+			Wend
+			result = Array(things, nxtPos)
+		End If
+	ElseIf p.tp = &quot;bind&quot; Then
+		result = applyP(p.st(0), s, pos)
+		If Not IsEmpty(result) Then
+			Dim fResult As Variant
+			fResult = applyF(p.st(1), result(0))
+			result(0) = fResult
+		End If
+	ElseIf p.tp = &quot;seq&quot; Then
+		Dim innerParsers As Variant, t As Variant
+		Dim i As Integer, j As Integer, k As Integer
+&apos;		Dim nxtPos As Integer
+		innerParsers = p.st(0)
+		i = LBound(innerParsers)
+		k = UBound(innerParsers)
+		j = 0
+		nxtPos = pos
+		Dim iResults(0 To k-i) As Variant
+		Do
+			t = applyP(innerParsers(i), s, nxtPos)
+			If Not IsEmpty(t) Then
+				iResults(j) = t(0)
+				nxtPos = t(1)
+				i = i + 1
+				j = j + 1
+			End If
+		Loop Until (i &gt; k) Or IsEmpty(t)
+		If Not IsEmpty(t) Then
+&apos;			Dim fResult As Variant
+			fResult = applyF(p.st(1), iResults)
+			result = t
+			result(0) = fResult
+		End If
+		MsgBox(&quot;seq/&quot; &amp; p.st(1) &amp; &quot;: &quot; &amp; toString(result))
+	Else
+		result = &quot;unknown Parser &apos;&quot; &amp; p.tp &amp; &quot;&apos;&quot;
+		MsgBox(&quot;Error in applyP: &quot; &amp; result)
+	End If
+	applyP = result
+End Function
+
+Function readHex(arg As Variant)
+	Dim result As Integer, d As Integer, x As Integer, digits As String
+	If IsArray(arg) Then
+		digits = Join(arg, &quot;&quot;)
+	Else
+		digits = arg
+	End If
+	result = 0
+	For i = 1 To Len(digits)
+		d = Asc(Mid(digits, i, 1))
+		If d &lt;= Asc(&quot;9&quot;) Then
+			x = d - Asc(&quot;0&quot;)
+		ElseIf d &lt;= Asc(&quot;F&quot;) Then
+			x = d - Asc(&quot;A&quot;) + 10
+		Else
+			x = d - Asc(&quot;a&quot;) + 10
+		End If
+		result = (result * 16) + x
+	Next
+	readHex = result
+End Function
+
+Function KeyValuePair_new(ByVal k As String, ByVal v As Variant)
+	Dim result As New KeyValuePair
+	result.key = k
+	result.val = v
+	Set result.nxt = Nothing
+	KeyValuePair_new = result
+End Function
+
+Function KeyValuePair_show(hd As KeyValuePair, Optional sep As String)
+	Dim result As String
+	result = &quot;&quot;
+	If IsMissing(sep) Then
+		sep = &quot;, &quot;
+	End If
+	If Not(IsNull(hd)) Then
+		result = result &amp; indent &amp; &quot;&apos;&quot; &amp; hd.key &amp; &quot;&apos; -&gt; &quot; &amp; hd.val
+		If Not(IsNull(hd.nxt)) Then
+			result = result &amp; sep &amp; KeyValuePair_show(hd.nxt, sep)
+		End If
+	End If
+	KeyValuePair_show = result
+End Function
+
+Function Env_new(Optional p As Object)
+	Dim result As New Env
+	If IsMissing(p) Then
+		Set result.daddy = Nothing
+	Else
+		Set result.daddy = p
+	End If
+	Set result.mappings = Nothing
+	Env_new = result
+End Function
+
+Function Env_show(e As Env, Optional indent As String)
+	Dim nl As String
+	Dim result As String
+	Dim mappingsStr As String
+	nl = Chr(13)
+	If IsMissing(indent) Then
+		indent = &quot;&quot;
+	End If
+	If IsNull(e) Then
+		result = &quot;null&quot;
+	Else
+		mappingsStr = KeyValuePair_show(e.mappings, &quot;, &quot; &amp; nl &amp; indent &amp; Space(2 + 4))
+		result = &quot;{&quot; _
+			&amp; nl &amp; indent &amp; &quot;  mappings: [&quot; _
+				&amp; IIf(IsNull(e.mappings), &quot;&quot;, nl &amp; indent &amp; Space(2 + 4) &amp; mappingsStr) _
+				&amp; nl &amp; indent &amp; &quot;  ],&quot; _
+			&amp; nl &amp; indent &amp; &quot;  daddy: &quot; &amp; Env_show(e.daddy, indent &amp; Space(4)) _
+			&amp; nl &amp; indent &amp; &quot;}&quot;
+	End If
+	Env_show = result
+End Function
+
+Function Env_add(e As Env, key As String, val As Variant)
+	Dim kvp As KeyValuePair
+	Set kvp = KeyValuePair_new(key, val)
+	Set kvp.nxt = e.mappings
+	Set e.mappings = kvp
+	Env_add = e
+End Function
+
+Function Env_lookup(e As Env, k As String)
+	Dim kvp As KeyValuePair
+	Dim result As Variant
+	Set kvp = e.mappings
+	Set result = Nothing
+	While (IsNull(result) And Not(IsNull(kvp)))
+		If (kvp.key = k) Then
+			result = kvp.val
+		Else
+			kvp = kvp.nxt
+		End If
+	Wend
+	If IsNull(result) And Not(IsNull(e.daddy)) Then
+		result = Env_lookup(e.daddy, k)
+	End If
+	Env_lookup = result
+End Function
+
+
+&apos;========================================================
+
+Function NOR(a0, Optional a1, Optional a2, Optional a3, Optional a4, Optional a5, Optional a6, Optional a7)
+	If Not IsMissing(a7) Then
+		NOR = CVErr(&quot;NOR: cannot handle more than 7 arguments&quot;)
+	Else
+		If a0 Then
+			NOR = 0
+		ElseIf IsMissing(a1) Then
+			NOR = 1
+		   Else
+		   	NOR = NOR(a1, a2, a3, a4, a5, a6)
+		End If
+	End If
+End Function
+
+Function evalArgs(s As String, e As Variant)
+	Dim args As Variant
+	s = LTrim(s)
+	If Len(s) = 0 Then
+		evalArgs = Array(&quot;xxx&quot;)
+	Else
+		evalArgs = Array()
+	End If
+End Function
+
+Function evalNorExpr(s As String, Optional e As Variant)
+	Dim args As Variant
+	Dim result As Variant
+	If IsMissing(e) Then
+		e = Array()
+	End If
+	s = LTrim(s)
+	If Left(s, 1) = &quot;-&quot; Then
+		s = Right(s, Len(s) - 1)
+		result = NOR(evalNorExpr(s, e))
+	ElseIf IsNumeric(s) Then
+	 	result = IIf(s, 1, 0)
+	Else
+		If Left(s, 1) = &quot;µ&quot; Then
+			s = Right(s, Len(s) - 1)
+			args = evalArgs(s, e)
+			result = &quot;NOR(args &quot; &amp; LBound(args) &amp; &quot;...&quot; &amp; UBound(args) &amp; &quot;)&quot;
+		Else
+			result = Empty
+		End If
+	End If
+	evalNorExpr = result
+End Function
+
+Function foo(x As Variant)
+	If IsArray(x) Then
+		foo = &quot;size(WxH): &quot; &amp; UBound(x, 1) &amp; &quot; x &quot; &amp; UBound(x, 2)
+	Else
+		foo = TypeName(x)
+	End If
+End Function
+
+Sub Macro1
+
+End Sub
+</script:module>
