@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="M03_Fn" script:language="StarBasic">REM  *****  BASIC  *****
+
+Sub Main
+	test_Fn()
+End Sub
+
+Function arityF(fName As String) As Integer
+	Dim result As Integer
+	Select Case fName
+		Case &quot;arityF&quot;	
+			result = 1
+		Case &quot;existsF&quot;
+			result = 1
+		Case &quot;applyF&quot;
+			result = 2
+		Case &quot;fst&quot;
+			result = 2
+		Case &quot;snd&quot;
+			result = 2
+		Case &quot;concat&quot;
+			result = 2
+		Case &quot;toString&quot;
+			result = 1
+		Case &quot;pWs&quot;
+			result = 0
+		Case &quot;pBinDigit&quot;
+			result = 0
+		Case &quot;pDecDigit&quot;
+			result = 0
+		Case &quot;readHex&quot;
+			result = 1
+		Case Else
+			&apos;croak(&quot;arityF: unknown function &quot; &amp; toString(fName))
+			result = -1
+	End Select
+	arityF = result
+End Function
+
+Function existsF(fName As String) As Boolean
+	existsF = (arityF(fName) &gt;= 0)
+End Function
+
+Function applyF(fName As String, Optional arguments As Array, Optional argN As Variant)
+	Dim result As Variant
+	Dim args As Variant
+	Dim arity As Integer, k As Integer, n As Integer
+	If IsMissing(arguments) Then
+		args = Array()
+	Else
+		If Not(IsMissing(argN)) Then
+			croak(&quot;applyF: got surplus 3rd arg &quot; &amp; toString(argN))
+		End If
+		If Not(IsArray(arguments)) Then
+			croak(&quot;applyF: expecting fn args in Array - got instead &quot; &amp; toString(arguments))
+		End If
+		args = arguments
+	End If
+	arity = arityF(fName)
+	k = LBound(args)
+	n = UBound(args) - k + 1
+	If Not(n = arity) Then
+		croak(&quot;applyF &quot; &amp; toString(fName) &amp; &quot;: has arity &quot; &amp; arity &amp; &quot;, got &quot; &amp; n &amp; chr(13) &amp; toString(args)
+	End If
+	Select Case fName
+		Case &quot;arityF&quot;
+			result = arityF(args(k))
+		Case &quot;existsF&quot;
+			result = existsF(args(k))
+		Case &quot;applyF&quot;
+			result = applyF(args(k), args(k + 1))
+		Case &quot;fst&quot;
+			result = fst(args(k), args(k + 1))
+		Case &quot;snd&quot;
+			result = snd(args(k), args(k + 1))
+		Case &quot;concat&quot;
+			result = concat(args(k), args(k + 1))
+		Case &quot;toString&quot;
+			result = toString(args(k))
+		Case &quot;pWs&quot;
+			result = pWs
+		Case &quot;pBinDigit&quot;
+			result = pBinDigit
+		Case &quot;pDecDigit&quot;
+			result = pDecDigit
+		Case &quot;readHex&quot;
+			result = readHex(args(k))
+		Case Else
+			croak(&quot;applyF: unknown function &quot; &amp; toString(fName))
+	End Select	
+	applyF = result
+End Function
+
+&apos;= tests ============================================================
+
+Function test_Fn()
+	assertEqual(existsF(&quot;i do not exist&quot;), False).x
+	assertEqual(existsF(&quot;existsF&quot;), True).x
+	assertEqual(existsF(&quot;arityF&quot;), True).x
+	assertEqual(existsF(&quot;applyF&quot;), True).x
+
+	assertEqual(arityF(&quot;existsF&quot;), 1).x
+	assertEqual(arityF(&quot;arityF&quot;), 1).x
+	assertEqual(arityF(&quot;applyF&quot;), 2).x
+
+	assertEqual(applyF(&quot;existsF&quot;, Array(&quot;foo&quot;)),         False).x
+	assertEqual(applyF(&quot;existsF&quot;, Array(&quot;existsF&quot;)),     True).x
+	assertEqual(applyF(&quot;arityF&quot;, Array(&quot;foo&quot;)),          -1).x
+	assertEqual(applyF(&quot;arityF&quot;, Array(&quot;existsF&quot;)),       1).x
+	assertEqual(applyF(&quot;arityF&quot;, Array(&quot;arityF&quot;)),        1).x
+	assertEqual(applyF(&quot;arityF&quot;, Array(&quot;applyF&quot;)),        2).x
+
+	assertEqual(applyF(&quot;toString&quot;, Array(&quot;abcd&quot;)), &quot;&apos;abcd&apos;&quot;).x
+
+End Function
+
+</script:module>

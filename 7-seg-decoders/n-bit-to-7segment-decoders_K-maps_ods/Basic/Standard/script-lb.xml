@@ -5,4 +5,5 @@
  <library:element library:name="M00_Common"/>
  <library:element library:name="M02_List"/>
  <library:element library:name="M04_Parser"/>
+ <library:element library:name="M03_Fn"/>
 </library:library>

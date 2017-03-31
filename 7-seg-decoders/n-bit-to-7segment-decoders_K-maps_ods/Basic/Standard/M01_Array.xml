@@ -3,7 +3,7 @@
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M01_Array" script:language="StarBasic">REM  *****  BASIC  *****
 
 Sub Main
-
+	test_Array()
 End Sub
 
 
@@ -20,4 +20,11 @@ Function getDim(a As Array)
 End Function
 
 
+&apos;= tests ============================================================
+
+Function test_Array()
+	assertEqual(getDim(Array()), 1).x
+	assertEqual(getDim(DimArray(1, 4)), 2).x
+	assertEqual(getDim(DimArray(1, 5, 3)), 3).x
+End Function
 </script:module>
