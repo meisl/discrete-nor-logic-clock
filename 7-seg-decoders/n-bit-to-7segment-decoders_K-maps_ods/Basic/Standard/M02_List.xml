@@ -34,6 +34,26 @@ Function cons(x As Variant, xs As TList)
 	cons = result
 End Function
 
+Function length(xs As TList)
+	length = xs.len
+End Function
+
+Function car(xs As TList) As Variant
+	If isNil(xs) Then
+		croak(&quot;car: nil&quot;)
+	Else
+		car = xs.head
+	End If
+End Function
+
+Function cdr(xs As TList) As TList
+	If isNil(xs) Then
+		croak(&quot;cdr: nil&quot;)
+	Else
+		cdr = xs.tail
+	End If
+End Function
+
 Function toList(a As Array)
 	Dim result As TList
 	Set result = nil
@@ -58,9 +78,32 @@ Function toList(a As Array)
 	toList = result
 End Function
 
+Function map(fn As String, xs As Variant)
+	Dim result As TList
+	If isNil(xs) Then
+		result = nil
+	ElseIf isArray(xs) Then
+		result = map(fn, toList(xs))
+	Else
+		result = cons(applyF(fn, Array(xs.head)), map(fn, xs.tail))
+	End If
+	map = result
+End Function
+
+Function toArray(xs As TList)
+	Dim result(0 To xs.len - 1)
+	Dim t As TList
+	Set t = xs
+	For i = 0 To xs.len - 1
+		result(i) = t.head
+		Set t = t.tail
+	Next i
+	toArray = result
+End Function
+
 Function foldl(fn As String, acc As Variant, xs As Variant)
 	Dim result As Variant
-	If IsNil(xs) Then
+	If isNil(xs) Then
 		result = acc
 	ElseIf IsArray(xs) Then
 		result = foldl(fn, acc, toList(xs))
@@ -87,7 +130,32 @@ End Function
 
 Function test_List()
 	assertEqual(typeOf(nil), &quot;Object/TList&quot;).x
-&apos;	assertEqual(toString(nil), &quot;[]&quot;).x
+	assertEqual(toString(nil), &quot;[]&quot;).x
+	
+	Dim lst As TList
+	Set lst = cons(5, nil)
+	assertEqual(toString(lst), &quot;[5]&quot;).x
+
+	Dim a As Variant
+	a = Array(7)
+	assertEqual(Join(a, &quot;, &quot;), &quot;7&quot;)
+
+	a = Array(7, 5)
+	assertEqual(Join(a, &quot;, &quot;), &quot;7, 5&quot;)
+
+	Set lst = cons(7, lst)
+	assertEqual(toString(lst), &quot;[7, 5]&quot;).x
+	Set lst = cons(&quot;a&quot;, lst)
+	assertEqual(toString(lst), &quot;[&apos;a&apos;, 7, 5]&quot;).x
+	Set lst = cons(&quot;xxx&quot;, nil)
+	assertEqual(toString(lst), &quot;[&apos;xxx&apos;]&quot;).x
+
+	Set lst = cons(nil, nil)
+	assertEqual(toString(lst), &quot;[[]]&quot;).x
+	Set lst = cons(&quot;b&quot;, lst)
+	assertEqual(toString(lst), &quot;[&apos;b&apos;, []]&quot;).x
+	Set lst = cons(cons(&quot;a&quot;, nil), lst)
+	assertEqual(toString(lst), &quot;[[&apos;a&apos;], &apos;b&apos;, []]&quot;).x
 End Function
 
 </script:module>

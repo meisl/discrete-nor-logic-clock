@@ -30,7 +30,9 @@ Function typeOf(x As Variant)
 	Dim result As String
 	result = TypeName(x)
 	If result = &quot;Object&quot; Then
-		result = _typeOf(x)
+		result = _typeOf(x) &apos; DONT access fields in here!
+	ElseIf IsArray(x) Then
+		result = &quot;Array&quot;
 	End If
 	typeOf = result
 End Function
@@ -76,41 +78,66 @@ Function assertEqual(actual As Variant, expected As Variant)
 	assertEqual = result
 End Function
 
-Function toString(ByVal x As Variant) As String
+Function toString(ByVal v As Variant) As String
 	Dim result As String
-	If IsNull(x) Then
-		result = &quot;Nothing&quot;
-	ElseIf IsEmpty(x) Then
-		result = &quot;Empty&quot;
-	ElseIf IsArray(x) Then
-		result = &quot;Array(&quot;
-		Dim i As Integer
-		For i = LBound(x) To UBound(x)
-			If i &gt; LBound(x) Then
-				result = result &amp; &quot;, &quot;
-			End If
-			result = result &amp; toString(x(i))
-		Next i
-		result = result &amp; &quot;)&quot;
-	ElseIf IsObject(x) Then
-		result = &quot;Object&quot;
-	Else
-		Dim t As String
-		t = x &amp; &quot;&quot;
-		t = Join(Split(t, chr(13)), &quot;\n&quot;)
-		t = Join(Split(t, chr(9)), &quot;\t&quot;)
-		If TypeName(x) = &quot;String&quot; Then
+	Dim tp As String
+	tp = typeOf(v)
+	Select Case tp
+		Case &quot;Array&quot;
+			result = &quot;Array(&quot;
+			Dim i As Integer
+			For i = LBound(v) To UBound(v)
+				If i &gt; LBound(v) Then
+					result = result &amp; &quot;, &quot;
+				End If
+				result = result &amp; toString(v(i))
+			Next i
+			result = result &amp; &quot;)&quot;
+		Case &quot;String&quot;
+			Dim t As String
+			t = v &amp; &quot;&quot;
+			t = Join(Split(t, chr(13)), &quot;\n&quot;)
+			t = Join(Split(t, chr(9)), &quot;\t&quot;)
 			result = &quot;&apos;&quot; &amp; t &amp; &quot;&apos;&quot;
-		Else
-			result = t
-		End If
-	End If
+		Case &quot;Empty&quot;
+			result = tp
+		Case &quot;Object&quot;
+			If IsNull(v) Then
+				result = &quot;Nothing&quot;
+			Else
+				result = tp &amp; &quot;(...)&quot;
+			End If
+		Case Else
+			If IsObject(v) Then
+				Select Case Mid(tp, Len(&quot;Object&quot;) + 2)
+					Case &quot;TList&quot;
+						If isNil(v) Then &apos; DONT access fields in here!
+							result = &quot;[]&quot;
+						Else
+							result = &quot;[&quot; &amp; toString(car(v))
+							If length(v) &gt; 1 Then
+								result = result &amp; &quot;, &quot; &amp; Join(toArray(map(&quot;toString&quot;, cdr(v))), &quot;, &quot;)
+							End If
+							result = result &amp; &quot;]&quot;
+						End If
+					Case Else
+						result = tp &amp; &quot;(...)&quot;
+				End Select
+			Else
+				result = v &amp; &quot;&quot;
+			End If
+	End Select
 	toString = result
 End Function
 
 &apos;= tests ============================================================
 
 Function test_Common()
+	test_typeOf()
+	test_toString()
+End Function
+
+Function test_typeOf()
 	assertEqual(typeOf(0), &quot;Integer&quot;).x
 	assertEqual(typeOf(1), &quot;Integer&quot;).x
 	assertEqual(typeOf(-42), &quot;Integer&quot;).x
@@ -120,7 +147,7 @@ Function test_Common()
 	
 	assertEqual(typeOf(3.14), &quot;Double&quot;).x
 
-&apos;	assertEqual(typeOf(Array()), &quot;Array&quot;).x
+	assertEqual(typeOf(Array()), &quot;Array&quot;).x
 
 	assertEqual(typeOf(Empty), &quot;Empty&quot;).x
 	assertEqual(typeOf(Nothing), &quot;Object&quot;).x
@@ -131,7 +158,28 @@ Function test_Common()
 	Dim t2 As New TTest_TyName
 	t2.tyname = &quot;foobar&quot;
 	assertEqual(typeOf(t2), &quot;Object/foobar&quot;).x
-
 End Function
 
+Function test_toString()
+	assertEqual(toString(0), &quot;0&quot;).x
+	assertEqual(toString(&quot;0&quot;), &quot;&apos;0&apos;&quot;).x
+	assertEqual(toString(&quot;&quot;), &quot;&apos;&apos;&quot;).x
+
+	assertEqual(toString(Nothing), &quot;Nothing&quot;).x
+	assertEqual(toString(Empty), &quot;Empty&quot;).x
+
+	assertEqual(toString(Array()), &quot;Array()&quot;).x
+	assertEqual(toString(Array(3, 2, &quot;one&quot;)), &quot;Array(3, 2, &apos;one&apos;)&quot;).x
+
+	assertEqual(toString(Array(Array(1, 2, 3, 4), &quot;five&quot;)), &quot;Array(Array(1, 2, 3, 4), &apos;five&apos;)&quot;).x
+
+
+	Dim t1 As New TTest_NoTyName
+	assertEqual(toString(t1), &quot;Object(...)&quot;).x
+
+	Dim t2 As New TTest_TyName
+	t2.tyname = &quot;foobar&quot;
+	assertEqual(toString(t2), &quot;Object/foobar(...)&quot;).x
+
+End Function
 </script:module>

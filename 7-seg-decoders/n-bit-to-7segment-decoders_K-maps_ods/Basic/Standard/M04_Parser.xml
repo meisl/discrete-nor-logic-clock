@@ -100,10 +100,12 @@ Function arityF(fName As String)
 			result = 2
 		Case &quot;snd&quot;
 			result = 2
-		Case &quot;concat&quot;
-			result = 2
 		Case &quot;applyF&quot;
 			result = 2
+		Case &quot;concat&quot;
+			result = 2
+		Case &quot;toString&quot;
+			result = 1
 		Case Else
 			croak(&quot;arityF: unknown function &quot; &amp; toString(fName))
 	End Select
@@ -152,6 +154,8 @@ Function applyF(fName As String, Optional arguments As Array, Optional argN As V
 			result = applyF(args(k), args(k + 1))
 		Case &quot;concat&quot;
 			result = concat(args(k), args(k + 1))
+		Case &quot;toString&quot;
+			result = toString(args(k))
 		Case Else
 			croak(&quot;applyF: unknown function &quot; &amp; toString(fName))
 	End Select	
