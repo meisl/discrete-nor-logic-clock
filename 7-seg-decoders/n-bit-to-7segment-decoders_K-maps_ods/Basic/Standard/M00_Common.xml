@@ -2,9 +2,27 @@
 <!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M00_Common" script:language="StarBasic">REM  *****  BASIC  *****
 
+Type TTest_NoTyname
+
+End Type
+
+Type TTest_Tyname
+	tyname As String
+End Type
+
+Type TTestPass
+	n As Integer
+	x As String
+End Type
+
+Type TTestFail
+	n As Integer
+	expected As Variant
+	actual As Variant
+End Type
 
 Sub Main
-	Stop
+	test_Common()
 End Sub
 
 
@@ -20,8 +38,8 @@ End Function
 Function _typeOf(o As Object)
 	Dim result As String
 	result = &quot;Object&quot;
-&apos;	On Local Error Goto ErrorHandler
-	result = o.tyname
+	On Local Error Goto ErrorHandler
+	result = result &amp; &quot;/&quot; &amp; o.tyname
 ErrorHandler:
 	_typeOf = result
 End Function
@@ -45,9 +63,17 @@ Function concat(a As String, b As String) As String
 End Function
 
 Function assertEqual(actual As Variant, expected As Variant)
+	Dim result As Object
 	If Not(actual = expected) Then
-		croak(&quot;FAIL: expected &quot; &amp; toString(actual) &amp; chr(13) &amp; &quot;     to equal &quot; &amp; toString(expected))
+		Set result = New TTestFail
+		result.expected = expected
+		result.actual = actual
+		MsgBox(&quot;FAIL: expected &quot; &amp; toString(actual) &amp; chr(13) &amp; &quot;     to equal &quot; &amp; toString(expected))
+		assertEqual = result
+	Else
+		Set result = New TTestPass
 	End If
+	assertEqual = result
 End Function
 
 Function toString(ByVal x As Variant) As String
@@ -80,6 +106,32 @@ Function toString(ByVal x As Variant) As String
 		End If
 	End If
 	toString = result
+End Function
+
+&apos;= tests ============================================================
+
+Function test_Common()
+	assertEqual(typeOf(0), &quot;Integer&quot;).x
+	assertEqual(typeOf(1), &quot;Integer&quot;).x
+	assertEqual(typeOf(-42), &quot;Integer&quot;).x
+	
+	assertEqual(typeOf(&quot;&quot;), &quot;String&quot;).x
+	assertEqual(typeOf(&quot;1&quot;), &quot;String&quot;).x
+	
+	assertEqual(typeOf(3.14), &quot;Double&quot;).x
+
+&apos;	assertEqual(typeOf(Array()), &quot;Array&quot;).x
+
+	assertEqual(typeOf(Empty), &quot;Empty&quot;).x
+	assertEqual(typeOf(Nothing), &quot;Object&quot;).x
+
+	Dim t1 As New TTest_NoTyName
+	assertEqual(typeOf(t1), &quot;Object&quot;).x
+
+	Dim t2 As New TTest_TyName
+	t2.tyname = &quot;foobar&quot;
+	assertEqual(typeOf(t2), &quot;Object/foobar&quot;).x
+
 End Function
 
 </script:module>

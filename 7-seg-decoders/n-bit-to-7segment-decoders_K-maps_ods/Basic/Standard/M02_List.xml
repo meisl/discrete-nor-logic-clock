@@ -86,16 +86,8 @@ End Function
 &apos;= tests ============================================================
 
 Function test_List()
-	assertEqual(toString(nil), &quot;[]&quot;)
-	dim t1 As TList, t2 As Object
-	Set t1 = nil
-	Set t2 = cons(&quot;a&quot;, nil)
-	MsgBox(&quot;typeOf(Array(2,3))=&quot; &amp; typeOf(Array(2,3)))
-	MsgBox(&quot;typeOf(t2)=&quot; &amp; typeOf(t2))
-	Stop
-	MsgBox(typeOf(nil))
-	MsgBox(isType(&quot;TList&quot;, 5))
-	MsgBox(isType(&quot;TList&quot;, Nothing))
+	assertEqual(typeOf(nil), &quot;Object/TList&quot;).x
+&apos;	assertEqual(toString(nil), &quot;[]&quot;).x
 End Function
 
 </script:module>
