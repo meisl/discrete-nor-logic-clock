@@ -281,27 +281,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 	applyP = result
 End Function
 
-Function readHex(arg As Variant)
-	Dim result As Integer, d As Integer, x As Integer, digits As String
-	If IsArray(arg) Then
-		digits = Join(arg, &quot;&quot;)
-	Else
-		digits = arg
-	End If
-	result = 0
-	For i = 1 To Len(digits)
-		d = Asc(Mid(digits, i, 1))
-		If d &lt;= Asc(&quot;9&quot;) Then
-			x = d - Asc(&quot;0&quot;)
-		ElseIf d &lt;= Asc(&quot;F&quot;) Then
-			x = d - Asc(&quot;A&quot;) + 10
-		Else
-			x = d - Asc(&quot;a&quot;) + 10
-		End If
-		result = (result * 16) + x
-	Next
-	readHex = result
-End Function
+
 
 Function KeyValuePair_new(ByVal k As String, ByVal v As Variant)
 	Dim result As New KeyValuePair

@@ -130,11 +130,34 @@ Function toString(ByVal v As Variant) As String
 	toString = result
 End Function
 
+Function readHex(arg As Variant)
+	Dim result As Integer, d As Integer, x As Integer, digits As String
+	If IsArray(arg) Then
+		digits = Join(arg, &quot;&quot;)
+	Else
+		digits = arg
+	End If
+	result = 0
+	For i = 1 To Len(digits)
+		d = Asc(Mid(digits, i, 1))
+		If d &lt;= Asc(&quot;9&quot;) Then
+			x = d - Asc(&quot;0&quot;)
+		ElseIf d &lt;= Asc(&quot;F&quot;) Then
+			x = d - Asc(&quot;A&quot;) + 10
+		Else
+			x = d - Asc(&quot;a&quot;) + 10
+		End If
+		result = (result * 16) + x
+	Next
+	readHex = result
+End Function
+
 &apos;= tests ============================================================
 
 Function test_Common()
 	test_typeOf()
 	test_toString()
+	test_readHex()
 End Function
 
 Function test_typeOf()
@@ -180,6 +203,38 @@ Function test_toString()
 	Dim t2 As New TTest_TyName
 	t2.tyname = &quot;foobar&quot;
 	assertEqual(toString(t2), &quot;Object/foobar(...)&quot;).x
-
 End Function
+
+Function test_readHex()
+	assertEqual(arityF(&quot;readHex&quot;), 1)
+	
+	assertEqual(readHex( &quot;0&quot;),    0).x
+	assertEqual(readHex( &quot;1&quot;),    1).x
+	assertEqual(readHex( &quot;2&quot;),    2).x
+	assertEqual(readHex( &quot;3&quot;),    3).x
+	assertEqual(readHex( &quot;4&quot;),    4).x
+	assertEqual(readHex( &quot;5&quot;),    5).x
+	assertEqual(readHex( &quot;6&quot;),    6).x
+	assertEqual(readHex( &quot;7&quot;),    7).x
+	assertEqual(readHex( &quot;8&quot;),    8).x
+	assertEqual(readHex( &quot;9&quot;),    9).x
+	assertEqual(readHex( &quot;a&quot;),   10).x
+	assertEqual(readHex( &quot;A&quot;),   10).x
+	assertEqual(readHex( &quot;b&quot;),   11).x
+	assertEqual(readHex( &quot;B&quot;),   11).x
+	assertEqual(readHex( &quot;c&quot;),   12).x
+	assertEqual(readHex( &quot;C&quot;),   12).x
+	assertEqual(readHex( &quot;d&quot;),   13).x
+	assertEqual(readHex( &quot;D&quot;),   13).x
+	assertEqual(readHex( &quot;e&quot;),   14).x
+	assertEqual(readHex( &quot;E&quot;),   14).x
+	assertEqual(readHex( &quot;f&quot;),   15).x
+	assertEqual(readHex( &quot;F&quot;),   15).x
+
+	assertEqual(readHex( &quot;1F&quot;),  31).x
+	assertEqual(readHex( &quot;1f&quot;),  31).x
+	assertEqual(readHex( &quot;ff&quot;), 255).x
+	assertEqual(readHex( &quot;Ff&quot;), 255).x
+End Function
+
 </script:module>

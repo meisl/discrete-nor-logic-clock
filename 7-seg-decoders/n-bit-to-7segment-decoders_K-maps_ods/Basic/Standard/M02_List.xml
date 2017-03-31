@@ -143,13 +143,15 @@ End Function
 &apos;= tests ============================================================
 
 Function test_List()
-	test_List_fn()
+	test_List_fnApp()
 	test_List_typeOfAndToString()
 	test_List_reverse()
 End Function
 
-Function test_List_fn()
+Function test_List_fnApp()
+	assertEqual(arityF(&quot;cons&quot;), 2).x
 	assertEqual(arityF(&quot;snoc&quot;), 2).x
+	assertEqual(arityF(&quot;reverse&quot;), 1).x
 End Function
 
 Function test_List_typeOfAndToString()
