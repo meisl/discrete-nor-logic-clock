@@ -24,6 +24,7 @@ Function arityF(fName As String) As Integer
 		Case &quot;fst&quot;:				result = 2
 		Case &quot;snd&quot;:				result = 2
 		Case &quot;concat&quot;:			result = 2
+		Case &quot;equ&quot;:				result = 2
 		Case &quot;toString&quot;:		result = 1
 		Case &quot;TList_toString&quot;:	result = 1
 		Case &quot;cons&quot;:			result = 2
@@ -85,6 +86,7 @@ Function applyF(fName As String, Optional arguments As Array, Optional argN As V
 		Case &quot;fst&quot;:				result = fst(			args(k), args(k + 1))
 		Case &quot;snd&quot;:				result = snd(			args(k), args(k + 1))
 		Case &quot;concat&quot;:			result = concat(		args(k), args(k + 1))
+		Case &quot;equ&quot;:				result = equ(			args(k), args(k + 1))
 		Case &quot;toString&quot;:		result = toString(		args(k)				)
 		Case &quot;TList_toString&quot;:	result = TList_toString(args(k)				)
 		Case &quot;cons&quot;:			result = cons(			args(k), args(k + 1))

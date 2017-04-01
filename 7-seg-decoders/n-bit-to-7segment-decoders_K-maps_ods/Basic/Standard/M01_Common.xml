@@ -31,9 +31,13 @@ Function _typeOf(o As Object)
 	Dim result As String
 	result = &quot;Object&quot;
 	On Local Error Goto ErrorHandler
-	result = result &amp; &quot;/&quot; &amp; o.tyname
+	result = result &amp; &quot;/&quot; &amp; _tyname(o)
 ErrorHandler:
 	_typeOf = result
+End Function
+
+Function _tyname(o As Object)
+	_tyname = o.tyname
 End Function
 
 Sub croak(msg As String)
@@ -56,6 +60,41 @@ Function concat(a As String, b As String) As String
 	concat = a &amp; b
 End Function
 
+Function equ(a As Variant, b As Variant) As Boolean
+	Dim ta As String, tb As String
+	Dim result as Boolean
+	ta = typeOf(a)
+	tb = typeOf(b)
+	If Not(ta = tb) Then
+		If ((ta = &quot;Object&quot;) And (Mid(tb, 1, Len(ta)) = ta)) Then
+			MsgBox(&quot;equ&quot; &amp; toString(List(a, b)))
+		ElseIf ((tb = &quot;Object&quot;) And (Mid(ta, 1, Len(tb)) = tb)) Then
+			MsgBox(&quot;equ&quot; &amp; toString(List(a, b)))
+		Else
+			croak(&quot;equ: incompatible types &quot; &amp; ta &amp; &quot; and &quot; &amp; tb)
+		End If
+	Else &apos; ta = tb
+		Select Case ta
+			Case &quot;Object&quot;	&apos; Object without a .tyname field
+				result = (isNull(a) And isNull(b))
+				If Not(result) Then
+					croak(&quot;equ: cannot compare values of underspecified type &quot; &amp; ta)
+				End If
+			Case &quot;Object/&quot;	&apos; Object with a uninitialized .tyname field
+				croak(&quot;equ: cannot compare (uninitialized) values of type &quot; &amp; ta)
+			Case &quot;Empty&quot;:	result = True
+			&apos;Case &quot;&quot;: result = 
+			Case Else
+				If isObject(a) Then	&apos;they are instances of the same custom type (with non-empty.tyname)
+					&apos; ATTENTION: do NOT access .tyname directly!
+					result = applyF(_tyname(a) &amp; &quot;_equ&quot;, Array(a, b))
+				Else
+					result = (a = b)
+				End If
+		End Select
+	End If
+	equ = result
+End Function
 
 Function toString(ByVal v As Variant) As String
 	Dim result As String
@@ -70,25 +109,29 @@ Function toString(ByVal v As Variant) As String
 			result = &quot;&apos;&quot; &amp; t &amp; &quot;&apos;&quot;
 		Case &quot;Empty&quot;
 			result = tp
-		Case &quot;Object&quot;
+		Case &quot;Array&quot;
+			result = Array_toString(v)
+		Case &quot;Object&quot;	&apos; Object without a .tyname field
 			If IsNull(v) Then
 				result = &quot;Nothing&quot;
 			Else
 				result = tp &amp; &quot;(...)&quot;
 			End If
-		Case &quot;Array&quot;
-			result = Array_toString(v)
 		Case Else
-			If IsObject(v) Then
+			If IsObject(v) Then	&apos; Object with a .tyname field
 				Dim tyName As String, toStrFn As String
 				tyName = Mid(tp, Len(&quot;Object&quot;) + 2)
-				toStrFnName = tyName &amp; &quot;_toString&quot;
-				&apos;We&apos;ve got an Object with .tyName, so we insist on its _toString to exist
-				&apos;Note: We test ourselves since applyF/croak call toString again...
-				If Not(existsF(toStrFnName)) Then
-					croak(&quot;toString: unknown fn &apos;&quot; &amp; toStrFnName &amp; &quot;&apos;&quot;)
+				If (tyname = &quot;&quot;) Then
+					result = &quot;Object(tyname=&apos;&apos;)&quot;
 				Else
-					result = applyF(toStrFnName, Array(v))
+					toStrFnName = tyName &amp; &quot;_toString&quot;
+					&apos;We&apos;ve got an Object with .tyName, so we insist on its _toString to exist
+					&apos;Note: We test ourselves since applyF/croak call toString again...
+					If Not(existsF(toStrFnName)) Then
+						croak(&quot;toString: unknown fn &apos;&quot; &amp; toStrFnName &amp; &quot;&apos;&quot;)
+					Else
+						result = applyF(toStrFnName, Array(v))
+					End If
 				End If
 			Else
 				result = v &amp; &quot;&quot;
@@ -139,6 +182,7 @@ Function test_Common()
 	test_toString()
 	test_fst()
 	test_snd()
+	test_equ()
 	test_readHex()
 End Function
 
@@ -192,6 +236,7 @@ Function test_toString()
 	assertEqual(toString(t1), &quot;Object(...)&quot;).x
 
 	Dim t2 As New TTest_TyName
+	assertEqual(toString(t2), &quot;Object(tyname=&apos;&apos;)&quot;).x
 	t2.tyname = &quot;foobar&quot;
 	assertThrows(&quot;toString&quot;, Array(t2)).x
 End Function
@@ -218,6 +263,35 @@ Function test_snd()
 	assertEqual(snd(2, 1), 1).x
 	assertEqual(snd(&quot;a&quot;, &quot;b&quot;), &quot;b&quot;).x
 	assertEqual(snd(&quot;b&quot;, &quot;a&quot;), &quot;a&quot;).x
+End Function
+
+Function test_equ()
+	assertThrows(&quot;equ&quot;, Array(0, &quot;one&quot;)).x
+	
+	assertEqual(equ(0, 0), True).x
+	assertEqual(equ(0, 1), False).x
+	assertEqual(equ(1, 0), False).x
+	
+	assertEqual(equ(&quot;a&quot;, &quot;a&quot;), True).x
+	assertEqual(equ(&quot;a&quot;, &quot;b&quot;), False).x
+	assertEqual(equ(&quot;b&quot;, &quot;a&quot;), False).x
+	assertEqual(equ(&quot;x&quot;, &quot;xx&quot;), False).x
+	assertEqual(equ(&quot;xx&quot;, &quot;x&quot;), False).x
+	assertEqual(equ(&quot;xx&quot;, &quot;xx&quot;), True).x
+	assertEqual(equ(&quot; xx&quot;, &quot;xx&quot;), False).x
+	
+	assertEqual(equ(Empty, Empty), True).x
+	assertEqual(equ(Nothing, Nothing), True).x
+	Dim aVariant As Variant, anObject As Object
+	assertThrows(&quot;equ&quot;, Array(aVariant, anObject)).x
+	Set anObject = New TTest_TyName
+	assertThrows(&quot;equ&quot;, Array(aVariant, anObject)).x
+	aVariant = anObject
+	&apos;assertThrows(equ(aVariant, anObject), True).x
+	anObject.tyname = &quot;foobar&quot;
+	assertThrows(&quot;equ&quot;, Array(aVariant, anObject)).x
+		
+&apos;	assertEqual(equ(nil, nil), True).x
 End Function
 
 Function test_readHex()

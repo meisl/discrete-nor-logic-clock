@@ -149,7 +149,7 @@ End Function
 
 Function List(Optional a0, Optional a1, Optional a2, Optional a3, Optional a4, Optional a5, Optional a6, Optional a7, Optional a8, Optional a9, Optional a10)
 	If Not(IsMissing(a10)) Then
-		croak(&quot;listify: cannot handle more than 10 args&quot;)
+		croak(&quot;List(...): cannot handle more than 10 args&quot;)
 	End If
 	Dim result As TList
 	If isMissing(a0) Then

@@ -19,24 +19,31 @@ Sub Main
 	test_Test()
 End Sub
 
-Function assertThrows(fName As String, args As Array, Optional errNo As Integer)
-	testRun = True
-	Dim result As Object
-	Dim argsStr As String
+Function _argsStr(fName As String, args As Array)
+On Local Error Goto JustSomething
 	If fName = &quot;toString&quot; Then	&apos; we cannot use toString if we were just called from there
-		argsStr = &quot; some &quot; &amp; typeOf(args)
-	Else
-		argsStr = toString(args)
+		Goto JustSomething
 	End If
-	On Local Error Goto Boom
+	_argsStr = toString(args)
+	Exit Function
+JustSomething:
+	_argsStr = &quot; some &quot; &amp; typeOf(args)
+End Function
+
+Function assertThrows(fName As String, args As Array, Optional errNo As Integer)
+	Dim result As Object
+On Local Error Goto Boom
+	testRun = True
 	applyF(fName, args)
+	testRun = False
 	result = New TTestFail
 	result.expected = IIf(IsMissing(errNo), &quot;an error&quot;, &quot;error &quot; &amp; errNo)
 	result.actual = &quot;no error&quot;
-	MsgBox(&quot;FAIL: expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield an error on args&quot; &amp; chr(13) &amp; argsStr)
+	MsgBox(&quot;FAIL: expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield an error on args&quot; &amp; chr(13) &amp; _argsStr(fName, args))
 	assertThrows = result
 	Exit Function
 Boom:
+	testRun = False
 	If Not(IsMissing(errNo)) Then
 		If (errNo &lt;&gt; Err) Then
 			result = New TTestFail
@@ -46,7 +53,7 @@ Boom:
 				&amp; chr(13) &amp; &quot;       &quot; &amp; result.expected _
 				&amp; chr(13) &amp; &quot; not &quot; &amp; result.actual _
 				&amp; chr(13) &amp; &quot;on args:&quot; _
-				&amp; chr(13) &amp; argsStr
+				&amp; chr(13) &amp; _argsStr(fName, args)
 		Else
 			result = New TTestPass
 			result.x = Err &amp; &quot;: &quot; &amp; Error$
@@ -56,7 +63,6 @@ Boom:
 		result.x = Err &amp; &quot;: &quot; &amp; Error$
 	End If
 	assertThrows = result
-	testRun = False
 End Function
 
 Function assertEqual(actual As Variant, expected As Variant)
