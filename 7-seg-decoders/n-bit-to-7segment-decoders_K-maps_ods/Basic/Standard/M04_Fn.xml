@@ -28,6 +28,10 @@ Function arityF(fName As String) As Integer
 		Case &quot;TList_toString&quot;:	result = 1
 		Case &quot;cons&quot;:			result = 2
 		Case &quot;snoc&quot;:			result = 2
+		Case &quot;car&quot;:				result = 1
+		Case &quot;cdr&quot;:				result = 1
+		Case &quot;cadr&quot;:			result = 1
+		Case &quot;caddr&quot;:			result = 1
 		Case &quot;adjoin&quot;:			result = 2
 		Case &quot;flatten&quot;:			result = 1
 		Case &quot;reverse&quot;:			result = 1
@@ -85,6 +89,10 @@ Function applyF(fName As String, Optional arguments As Array, Optional argN As V
 		Case &quot;TList_toString&quot;:	result = TList_toString(args(k)				)
 		Case &quot;cons&quot;:			result = cons(			args(k), args(k + 1))
 		Case &quot;snoc&quot;:			result = snoc(			args(k), args(k + 1))
+		Case &quot;car&quot;:				result = car(			args(k))
+		Case &quot;cdr&quot;:				result = cdr(			args(k))
+		Case &quot;cadr&quot;:			result = cadr(			args(k))
+		Case &quot;caddr&quot;:			result = caddr(			args(k))
 		Case &quot;adjoin&quot;:			result = adjoin(		args(k), args(k + 1))
 		Case &quot;flatten&quot;:			result = flatten(		args(k)				)
 		Case &quot;reverse&quot;:			result = reverse(		args(k)				)

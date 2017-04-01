@@ -72,6 +72,14 @@ Function cdr(xs As TList) As TList
 	End If
 End Function
 
+Function cadr(xs As TList)
+	cadr = car(cdr(xs))
+End Function
+
+Function caddr(xs As TList)
+	caddr = cadr(cdr(xs))
+End Function
+
 Function toList(a As Array)
 	Dim result As TList
 	Set result = nil
