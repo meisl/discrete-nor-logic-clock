@@ -80,30 +80,6 @@ Function caddr(xs As TList)
 	caddr = cadr(cdr(xs))
 End Function
 
-Function toList(a As Array)
-	Dim result As TList
-	Set result = nil
-	Dim i As Integer, k As Integer
-	Select Case getDim(a)
-		Case 1
-			For i = UBound(a) To LBound(a) Step -1
-				result = cons(a(i), result)
-			Next i
-		Case 2
-			For i = UBound(a, 1) To LBound(a, 1) Step -1
-				Dim inner As TList
-				Set inner = nil
-				For k = UBound(a, 2) To LBound(a, 2) Step -1
-					inner = cons(a(i, k), inner)
-				Next k
-				result = cons(inner, result)
-			Next i
-		Case Else
-			croak(&quot;cannot handle &quot; &amp; getDim(a) &amp; &quot;-dimensional arrays&quot;)
-	End Select
-	toList = result
-End Function
-
 Function map(fn As String, xs As Variant)
 	Dim result As TList
 	If isNil(xs) Then
@@ -114,17 +90,6 @@ Function map(fn As String, xs As Variant)
 		result = cons(applyF(fn, Array(xs.head)), map(fn, xs.tail))
 	End If
 	map = result
-End Function
-
-Function toArray(xs As TList)
-	Dim result(0 To xs.len - 1)
-	Dim t As TList
-	Set t = xs
-	For i = 0 To xs.len - 1
-		result(i) = t.head
-		Set t = t.tail
-	Next i
-	toArray = result
 End Function
 
 Function foldl(fn As String, acc As Variant, xs As Variant)
@@ -171,12 +136,60 @@ Function reverse(xs As TList)
 	reverse = result
 End Function
 
+Function toArray(xs As TList)
+	Dim result(0 To xs.len - 1)
+	Dim t As TList
+	Set t = xs
+	For i = 0 To xs.len - 1
+		result(i) = t.head
+		Set t = t.tail
+	Next i
+	toArray = result
+End Function
+
+Function List(Optional a0, Optional a1, Optional a2, Optional a3, Optional a4, Optional a5, Optional a6, Optional a7, Optional a8, Optional a9, Optional a10)
+	If Not(IsMissing(a10)) Then
+		croak(&quot;listify: cannot handle more than 10 args&quot;)
+	End If
+	Dim result As TList
+	If isMissing(a0) Then
+		result = nil
+	Else
+		result = cons(a0, List(a1, a2, a3, a4, a5, a6, a7, a8, a9))
+	End If
+	List = result
+End Function
+
+Function toList(a As Array)
+	Dim result As TList
+	Set result = nil
+	Dim i As Integer, k As Integer
+	Select Case getDim(a)
+		Case 1
+			For i = UBound(a) To LBound(a) Step -1
+				result = cons(a(i), result)
+			Next i
+		Case 2
+			For i = UBound(a, 1) To LBound(a, 1) Step -1
+				Dim inner As TList
+				Set inner = nil
+				For k = UBound(a, 2) To LBound(a, 2) Step -1
+					inner = cons(a(i, k), inner)
+				Next k
+				result = cons(inner, result)
+			Next i
+		Case Else
+			croak(&quot;cannot handle &quot; &amp; getDim(a) &amp; &quot;-dimensional arrays&quot;)
+	End Select
+	toList = result
+End Function
 				
 &apos;= tests ============================================================
 
 Function test_List()
 	test_List_fnApp()
 	test_List_typeOfAndToString()
+	test_List_List()
 	test_List_car()
 	test_List_cdr()
 	test_List_adjoin()
@@ -222,16 +235,31 @@ Function test_List_typeOfAndToString()
 	assertEqual(toString(lst), &quot;[[&apos;a&apos;], &apos;b&apos;, []]&quot;).x
 End Function
 
+Function test_List_List()
+	assertEqual(toString(List()), &quot;[]&quot;).x
+	assertEqual(toString(List(0)), &quot;[0]&quot;).x
+	assertEqual(toString(List(0, 1)), &quot;[0, 1]&quot;).x
+	assertEqual(toString(List(0, 1, 2)), &quot;[0, 1, 2]&quot;).x
+	assertEqual(toString(List(0, 1, 2, 3)), &quot;[0, 1, 2, 3]&quot;).x
+	assertEqual(toString(List(0, 1, 2, 3, 4)), &quot;[0, 1, 2, 3, 4]&quot;).x
+	assertEqual(toString(List(0, 1, 2, 3, 4, 5)), &quot;[0, 1, 2, 3, 4, 5]&quot;).x
+	assertEqual(toString(List(0, 1, 2, 3, 4, 5, 6)), &quot;[0, 1, 2, 3, 4, 5, 6]&quot;).x
+	assertEqual(toString(List(0, 1, 2, 3, 4, 5, 6, 7)), &quot;[0, 1, 2, 3, 4, 5, 6, 7]&quot;).x
+	assertEqual(toString(List(0, 1, 2, 3, 4, 5, 6, 7, 8)), &quot;[0, 1, 2, 3, 4, 5, 6, 7, 8]&quot;).x
+	assertEqual(toString(List(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)), &quot;[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]&quot;).x
+	&apos;assertThrows(&quot;List&quot;, Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)).x
+End Function
+
 Function test_List_car()
 	assertThrows(&quot;car&quot;, nil).x
-	assertEqual(car(cons(1, nil)), 1).x
-	assertEqual(car(cons(2, cons(1, nil))), 2).x
+	assertEqual(car(List(1   )), 1).x
+	assertEqual(car(List(2, 1)), 2).x
 End Function
 
 Function test_List_cdr()
 	assertThrows(&quot;cdr&quot;, nil).x
-	assertEqual(toString(cdr(cons(1, nil))), &quot;[]&quot;).x
-	assertEqual(toString(cdr(cons(2, cons(1, nil)))), &quot;[1]&quot;).x
+	assertEqual(toString(cdr(List(1   ))), &quot;[]&quot;).x
+	assertEqual(toString(cdr(List(2, 1))), &quot;[1]&quot;).x
 End Function
 
 Function test_List_adjoin()

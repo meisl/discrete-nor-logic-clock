@@ -15,7 +15,7 @@ Function getBounds(a As Array)
 	While True
 		lo = LBound(a, i)
 		hi = UBound(a, i)
-		result = cons(cons(lo, cons(hi, cons(hi - lo + 1, nil))), result)
+		result = cons(List(lo, hi, hi - lo + 1), result)
 		i = i + 1
 	Wend
 	ErrorHandler:
