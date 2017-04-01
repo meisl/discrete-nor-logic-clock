@@ -148,6 +148,11 @@ Function adjoin(xs As TList, ys As TList)
 	adjoin = foldr(&quot;cons&quot;, ys, xs)
 End Function
 
+&apos; Normally this is called &quot;concat&quot; but we already have that for Strings
+Function flatten(xs As TList)
+	flatten = foldl(&quot;adjoin&quot;, nil, xs)
+End Function
+
 Function reverse(xs As TList)
 	Dim result As TList
 	If xs.len &lt;= 1 Then
@@ -165,6 +170,7 @@ Function test_List()
 	test_List_fnApp()
 	test_List_typeOfAndToString()
 	test_List_adjoin()
+	test_List_flatten()
 	test_List_reverse()
 End Function
 
@@ -223,6 +229,24 @@ Function test_List_adjoin()
 	Set lst = cons(0, lst)
 	assertEqual(toString(adjoin(lst, lst2)), &quot;[0, 1, 3, 2]&quot;).x
 	assertEqual(toString(adjoin(lst2, lst)), &quot;[3, 2, 0, 1]&quot;).x
+End Function
+
+Function test_List_flatten()
+	assertEqual(toString(flatten(nil)), &quot;[]&quot;).x
+	Dim lst As TList
+	Set lst = cons(1, nil)
+	assertThrows(&quot;flatten&quot;, Array(lst)).x
+	Set lst = cons(lst, nil)	&apos; [[1]]
+	assertEqual(toString(flatten(lst)), &quot;[1]&quot;).x
+	Set lst = cons(nil, lst)	&apos; [[], [1]]
+	assertEqual(toString(flatten(lst)), &quot;[1]&quot;).x
+	Dim lst2 As TList
+	Set lst2 = cons(&quot;a&quot;, cons(&quot;b&quot;, nil))
+	Set lst = cons(lst2, lst)	&apos; [[&apos;a&apos;, &apos;b&apos;], [], [1]]
+	assertEqual(toString(flatten(lst)), &quot;[&apos;a&apos;, &apos;b&apos;, 1]&quot;).x
+	Set lst2 = cons(lst2, nil)
+	Set lst = cons(lst2, lst)	&apos; [[[&apos;a&apos;, &apos;b&apos;]], [&apos;a&apos;, &apos;b&apos;], [], [1]]
+	assertEqual(toString(flatten(lst)), &quot;[[&apos;a&apos;, &apos;b&apos;], &apos;a&apos;, &apos;b&apos;, 1]&quot;).x
 End Function
 
 Function test_List_reverse()

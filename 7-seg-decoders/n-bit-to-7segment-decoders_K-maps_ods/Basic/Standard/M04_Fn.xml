@@ -38,6 +38,10 @@ Function arityF(fName As String) As Integer
 			result = 2
 		Case &quot;snoc&quot;
 			result = 2
+		Case &quot;adjoin&quot;
+			result = 2
+		Case &quot;flatten&quot;
+			result = 1
 		Case &quot;reverse&quot;
 			result = 1
 		Case &quot;pWs&quot;
@@ -109,6 +113,10 @@ Function applyF(fName As String, Optional arguments As Array, Optional argN As V
 			result = cons(args(k), args(k + 1))
 		Case &quot;snoc&quot;
 			result = snoc(args(k), args(k + 1))
+		Case &quot;adjoin&quot;
+			result = adjoin(args(k), args(k + 1))
+		Case &quot;flatten&quot;
+			result = flatten(args(k))
 		Case &quot;reverse&quot;
 			result = reverse(args(k))
 		Case &quot;pWs&quot;
