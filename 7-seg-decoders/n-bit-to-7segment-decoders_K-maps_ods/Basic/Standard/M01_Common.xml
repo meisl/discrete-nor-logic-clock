@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M01_Common" script:language="StarBasic">REM  *****  BASIC  *****
+Option Explicit
 
 Type TTest_NoTyname
 
@@ -60,16 +61,18 @@ Function concat(a As String, b As String) As String
 	concat = a &amp; b
 End Function
 
+Function startsWith(s As String, prefix As String) 
+	startsWith = ((Len(prefix) &lt;= Len(s)) And (Mid(s, 1, Len(prefix)) = prefix))
+End Function
+
 Function equ(a As Variant, b As Variant) As Boolean
-	Dim ta As String, tb As String
+	Dim ta As String, tb As String, tmp As String
 	Dim result as Boolean
 	ta = typeOf(a)
 	tb = typeOf(b)
 	If Not(ta = tb) Then
-		If ((ta = &quot;Object&quot;) And (Mid(tb, 1, Len(ta)) = ta)) Then
-			MsgBox(&quot;equ&quot; &amp; toString(List(a, b)))
-		ElseIf ((tb = &quot;Object&quot;) And (Mid(ta, 1, Len(tb)) = tb)) Then
-			MsgBox(&quot;equ&quot; &amp; toString(List(a, b)))
+		If (isNull(a) And startsWith(tb, ta)) Or (isNull(b) And startsWith(ta, tb)) Then
+			result = False
 		Else
 			croak(&quot;equ: incompatible types &quot; &amp; ta &amp; &quot; and &quot; &amp; tb)
 		End If
@@ -87,7 +90,11 @@ Function equ(a As Variant, b As Variant) As Boolean
 			Case Else
 				If isObject(a) Then	&apos;they are instances of the same custom type (with non-empty.tyname)
 					&apos; ATTENTION: do NOT access .tyname directly!
-					result = applyF(_tyname(a) &amp; &quot;_equ&quot;, Array(a, b))
+					Dim fName As String
+					fName = _tyname(a) &amp; &quot;_equ&quot;
+					result = applyF(fName, Array(a, b))
+				ElseIf isArray(a) Then
+					croak(&quot;equ: NYI - comparing arrays&quot;)
 				Else
 					result = (a = b)
 				End If
@@ -119,8 +126,9 @@ Function toString(ByVal v As Variant) As String
 			End If
 		Case Else
 			If IsObject(v) Then	&apos; Object with a .tyname field
-				Dim tyName As String, toStrFn As String
-				tyName = Mid(tp, Len(&quot;Object&quot;) + 2)
+				Dim tyName As String, toStrFnName As String
+				&apos; ATTENTION: do NOT access .tyname directly!
+				tyName = _tyName(v)
 				If (tyname = &quot;&quot;) Then
 					result = &quot;Object(tyname=&apos;&apos;)&quot;
 				Else
@@ -152,7 +160,7 @@ Function readHex(arg As Variant) As Integer
 			If l = 0 Then
 				croak(&quot;readHex: got empty String&quot;)
 			Else
-				Dim digits As String, d As Integer, x As Integer
+				Dim digits As String, d As Integer, x As Integer, i As Integer
 				digits = arg
 				result = 0
 				For i = 1 To Len(digits)
@@ -282,16 +290,68 @@ Function test_equ()
 	
 	assertEqual(equ(Empty, Empty), True).x
 	assertEqual(equ(Nothing, Nothing), True).x
-	Dim aVariant As Variant, anObject As Object
-	assertThrows(&quot;equ&quot;, Array(aVariant, anObject)).x
-	Set anObject = New TTest_TyName
-	assertThrows(&quot;equ&quot;, Array(aVariant, anObject)).x
-	aVariant = anObject
-	&apos;assertThrows(equ(aVariant, anObject), True).x
-	anObject.tyname = &quot;foobar&quot;
-	assertThrows(&quot;equ&quot;, Array(aVariant, anObject)).x
+	
+	Dim vEmpty          As Variant
+	assertEqual(typeOf(vEmpty), &quot;Empty&quot;).x
+	
+	Dim vNothing		As Variant
+	vNothing = Nothing
+	assertEqual(typeOf(vNothing), &quot;Object&quot;).x
 		
-&apos;	assertEqual(equ(nil, nil), True).x
+	Dim oNothing        As Object
+	assertEqual(typeOf(oNothing), &quot;Object&quot;).x
+	
+	Dim oUninitTyName   As Object
+	Set oUninitTyName = New TTest_Tyname
+	assertEqual(typeOf(oUninitTyName), &quot;Object/&quot;).x
+	
+	Dim vUninitTyName As Variant
+	vUninitTyName = oUninitTyName
+	assertEqual(typeOf(vUninitTyName), &quot;Object/&quot;).x
+	
+	Dim oInitTyName     As Object
+	Set oInitTyName = New TTest_Tyname
+	oInitTyName.tyname = &quot;foobar&quot;
+	assertEqual(typeOf(oInitTyName), &quot;Object/foobar&quot;).x
+
+	Dim vInitTyName As Variant
+	vInitTyName = oInitTyName
+	assertEqual(typeOf(vInitTyName), &quot;Object/foobar&quot;).x
+	
+	Dim oUninitNoTyName As Object
+	oUninitNoTyName = New TTest_NoTyname
+	assertEqual(typeOf(oUninitNoTyName), &quot;Object&quot;).x
+
+	Dim vUninitNoTyName As Variant
+	vUninitNoTyName = oUninitNoTyName
+	assertEqual(typeOf(vUninitNoTyName), &quot;Object&quot;).x
+	
+	&apos;---------------
+	
+	assertThrows(&quot;equ&quot;, Array(vEmpty, oNothing)).x		&apos; incompatible types Empty and Object
+
+	assertThrows(&quot;equ&quot;, Array(vEmpty, oUninitTyName)).x	&apos; incompatible types Empty and Object/
+
+	assertThrows(&quot;equ&quot;, Array(vUninitTyName, oUninitTyName)).x	&apos; cannot compare uninitialized instances of type Object/
+
+	assertThrows(&quot;equ&quot;, Array(vUninitTyName, oInitTyName)).x	&apos; missing fn &quot;foobar_equ&quot;
+	
+	assertThrows(&quot;equ&quot;, Array(Array(), Array())).x	&apos; NYI
+	
+	assertEqual(equ(Nothing,		oNothing), 		True ).x
+	assertEqual(equ(oNothing,		Nothing), 		True ).x
+	assertEqual(equ(Nothing,		oUninitTyName), False).x
+	assertEqual(equ(oUninitTyName,	Nothing),		False).x
+	assertEqual(equ(Nothing,		oInitTyName),	False).x
+	assertEqual(equ(oInitTyName,	Nothing),		False).x
+
+	assertThrows(&quot;equ&quot;, Array(vEmpty, oUninitNoTyName)).x	&apos; incompatible types Empty and Object
+	assertThrows(&quot;equ&quot;, Array(oUninitNoTyName, vEmpty)).x	&apos; incompatible types Object and Empty
+
+	assertThrows(&quot;equ&quot;, Array(vUninitNoTyName, oUninitNoTyName)).x	&apos; cannot compare values of underspecified type Object
+	assertThrows(&quot;equ&quot;, Array(oUninitNoTyName, vUninitNoTyName)).x	&apos; cannot compare values of underspecified type Object
+
+	assertThrows(&quot;equ&quot;, Array(nil, oUninitNoTyName)).x	&apos; incompatible types Object/TList and Object
 End Function
 
 Function test_readHex()

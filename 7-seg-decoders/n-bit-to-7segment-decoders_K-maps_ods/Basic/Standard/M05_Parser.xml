@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M05_Parser" script:language="StarBasic">REM  *****  BASIC  *****
-
+Option Explicit
 
 Type KeyValuePair
 	key As String
@@ -24,7 +24,7 @@ Sub Main
 	set test1 = Nil
 	test2 = cons(&quot;a&quot;, Nil)
 	test2.len = 0
-	MsgBox(tostring(blah))
+&apos;	MsgBox(tostring(blah))
 	Stop
 	Dim s As String
 	Dim pDigit As Parser, pHexDigit As Parser, pHexNum As Parser, pHexLit As Parser

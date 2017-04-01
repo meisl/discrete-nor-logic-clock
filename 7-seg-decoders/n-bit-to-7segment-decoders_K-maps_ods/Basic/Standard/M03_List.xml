@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M03_List" script:language="StarBasic">REM  *****  BASIC  *****
-
+Option Explicit
 
 Type TList
 	tyname As String
@@ -27,6 +27,25 @@ Function TList_toString(xs As TList)
 		result = result &amp; &quot;]&quot;
 	End If
 	TList_toString = result
+End Function
+
+Function TList_equ(xs As TList, ys As TList) As Boolean
+	Dim result As Boolean
+	If xs.len &lt;&gt; ys.len Then
+		result = False
+	ElseIf (isNil(xs) And isNil(ys)) Then
+		result = True
+	Else
+		On Local Error Goto IncompatibleCars
+		If equ(car(xs), car(ys)) Then
+			result = TList_equ(cdr(xs), cdr(ys))
+			TList_equ = result
+			Exit Function
+		End If
+IncompatibleCars:
+		result = False	
+	End If
+	TList_equ = result
 End Function
 
 Function nil()
@@ -140,6 +159,7 @@ Function toArray(xs As TList)
 	Dim result(0 To xs.len - 1)
 	Dim t As TList
 	Set t = xs
+	Dim i As Integer
 	For i = 0 To xs.len - 1
 		result(i) = t.head
 		Set t = t.tail
@@ -195,6 +215,7 @@ Function test_List()
 	test_List_adjoin()
 	test_List_flatten()
 	test_List_reverse()
+	test_List_equ()
 End Function
 
 Function test_List_fnApp()
@@ -270,6 +291,7 @@ Function test_List_adjoin()
 	assertEqual(toString(adjoin(nil, lst)), &quot;[1]&quot;).x
 
 	assertEqual(toString(adjoin(lst, lst)), &quot;[1, 1]&quot;).x
+	Dim lst2 As TList
 	Set lst2 = cons(2, nil)
 	assertEqual(toString(adjoin(lst, lst2)), &quot;[1, 2]&quot;).x
 	assertEqual(toString(adjoin(lst2, lst)), &quot;[2, 1]&quot;).x
@@ -308,6 +330,31 @@ Function test_List_reverse()
 	assertEqual(toString(reverse(lst)), &quot;[1, 2]&quot;).x
 	Set lst = cons(3, lst)
 	assertEqual(toString(reverse(lst)), &quot;[1, 2, 3]&quot;).x
+End Function
+
+Function test_List_equ()
+	assertThrows(&quot;equ&quot;, Array(nil, Empty)).x	&apos; incompatible types Object/TList and Empty
+	assertThrows(&quot;equ&quot;, Array(Empty, nil)).x	&apos; incompatible types Empty and Object/TList
+
+	assertEqual(equ(nil,		Nothing),		False).x
+	assertEqual(equ(Nothing,	nil),			False).x
+
+	assertEqual(equ(nil,		nil),			True).x
+	
+	assertEqual(equ(List(1), 	nil),			False).x
+	assertEqual(equ(nil, 		List(1)),		False).x
+	
+	assertEqual(equ(List(1), 	List(1)),		True).x
+	assertEqual(equ(List(2), 	List(1)),		False).x
+	assertEqual(equ(List(1), 	List(2)),		False).x
+	
+	assertEqual(equ(List(&quot;1&quot;), 	List(1)),		False).x
+	assertEqual(equ(List(1, 2), List(1)),		False).x
+	assertEqual(equ(List(1), 	List(1, 2)),	False).x
+	assertEqual(equ(List(1, 2), List(1, 2)),	True).x
+	assertEqual(equ(List(2, 2), List(1, 2)),	False).x
+	assertEqual(equ(List(2, 1), List(1, 2)),	False).x
+
 End Function
 
 </script:module>

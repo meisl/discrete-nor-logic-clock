@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M04_Fn" script:language="StarBasic">REM  *****  BASIC  *****
+Option Explicit
 
 Sub Main
 
@@ -27,6 +28,7 @@ Function arityF(fName As String) As Integer
 		Case &quot;equ&quot;:				result = 2
 		Case &quot;toString&quot;:		result = 1
 		Case &quot;TList_toString&quot;:	result = 1
+		Case &quot;TList_equ&quot;:		result = 2
 		Case &quot;cons&quot;:			result = 2
 		Case &quot;snoc&quot;:			result = 2
 		Case &quot;car&quot;:				result = 1
@@ -89,6 +91,7 @@ Function applyF(fName As String, Optional arguments As Array, Optional argN As V
 		Case &quot;equ&quot;:				result = equ(			args(k), args(k + 1))
 		Case &quot;toString&quot;:		result = toString(		args(k)				)
 		Case &quot;TList_toString&quot;:	result = TList_toString(args(k)				)
+		Case &quot;TList_equ&quot;:		result = TList_equ(		args(k), args(k + 1))
 		Case &quot;cons&quot;:			result = cons(			args(k), args(k + 1))
 		Case &quot;snoc&quot;:			result = snoc(			args(k), args(k + 1))
 		Case &quot;car&quot;:				result = car(			args(k))

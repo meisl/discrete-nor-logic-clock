@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M00_Test" script:language="StarBasic">REM  *****  BASIC  *****
+Option Explicit
 
 Type TTestPass
 	n As Integer
@@ -32,14 +33,19 @@ End Function
 
 Function assertThrows(fName As String, args As Array, Optional errNo As Integer)
 	Dim result As Object
+	Dim fResult As Variant
 On Local Error Goto Boom
 	testRun = True
-	applyF(fName, args)
+	fResult = applyF(fName, args)
 	testRun = False
 	result = New TTestFail
 	result.expected = IIf(IsMissing(errNo), &quot;an error&quot;, &quot;error &quot; &amp; errNo)
 	result.actual = &quot;no error&quot;
-	MsgBox(&quot;FAIL: expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield an error on args&quot; &amp; chr(13) &amp; _argsStr(fName, args))
+	MsgBox(_
+		&quot;FAIL: expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield an error on args&quot; &amp; chr(13)_
+		&amp; _argsStr(fName, args) &amp; chr(13)_
+		&amp; &quot;returned &quot; &amp; _argsStr(fName, fResult)_
+	)
 	assertThrows = result
 	Exit Function
 Boom:
