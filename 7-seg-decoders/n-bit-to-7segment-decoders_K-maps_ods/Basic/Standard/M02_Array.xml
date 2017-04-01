@@ -20,6 +20,21 @@ Function getBounds(a As Array)
 		getBounds = reverse(result)
 End Function
 
+Function getSizes(a As Array)
+	&apos;map(&quot;\bs.cadr(bs) - car(bs) + 1&quot;, getBounds(a))
+	Dim bounds As Variant, result As Variant
+	bounds = getBounds(a)
+	result = nil
+	While Not(isNil(bounds))
+		Dim bs As Variant, s As Integer
+		bs = car(bounds)
+		s = car(cdr(bs)) - car(bs) + 1
+		result = cons(s, result)
+		bounds = cdr(bounds)
+	Wend
+	getSizes = reverse(result)
+End Function
+
 Function getDim(a As Array)
 	getDim = length(getBounds(a))
 End Function
@@ -42,6 +57,7 @@ End Function
 
 Function test_Array()
 	test_getBounds()
+	test_getSizes()
 	test_getDim()
 	test_Array_toString()
 End Function
@@ -68,8 +84,32 @@ Function test_getBounds()
 	bs = getBounds(a)
 	assertEqual(typeOf(bs), &quot;Object/TList&quot;).x
 	assertEqual(toString(bs), &quot;[[1, 5], [-7, 2]]&quot;).x
-
 End Function
+
+Function test_getSizes()
+	Dim bs As Variant
+	bs = getSizes(Array())
+	assertEqual(typeOf(bs), &quot;Object/TList&quot;).x
+	assertEqual(toString(bs), &quot;[0]&quot;).x
+
+	bs = getSizes(Array(1, 2, 3))
+	assertEqual(typeOf(bs), &quot;Object/TList&quot;).x
+	assertEqual(toString(bs), &quot;[3]&quot;).x
+
+	bs = getSizes(Array(1, Array(2, 3)))
+	assertEqual(typeOf(bs), &quot;Object/TList&quot;).x
+	assertEqual(toString(bs), &quot;[2]&quot;).x
+
+	bs = getSizes(DimArray(1, 2, 3))
+	assertEqual(typeOf(bs), &quot;Object/TList&quot;).x
+	assertEqual(toString(bs), &quot;[2, 3, 4]&quot;).x
+
+	Dim a(1 To 5, -7 To 2)
+	bs = getSizes(a)
+	assertEqual(typeOf(bs), &quot;Object/TList&quot;).x
+	assertEqual(toString(bs), &quot;[5, 10]&quot;).x
+End Function
+
 
 Function test_getDim()
 	assertEqual(getDim(Array()), 1).x
