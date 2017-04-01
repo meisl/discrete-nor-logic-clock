@@ -19,12 +19,38 @@ Function getDim(a As Array)
 		getDim = result - 1
 End Function
 
+Function Array_toString(v As Variant) As String
+	Dim result As String
+	result = &quot;Array(&quot;
+	Dim i As Integer
+	For i = LBound(v) To UBound(v)
+		If i &gt; LBound(v) Then
+			result = result &amp; &quot;, &quot;
+		End If
+		result = result &amp; toString(v(i))
+	Next i
+	result = result &amp; &quot;)&quot;
+	Array_toString = result
+End Function
 
 &apos;= tests ============================================================
 
 Function test_Array()
+	test_getDim()
+	test_Array_toString()
+End Function
+
+Function test_getDim()
 	assertEqual(getDim(Array()), 1).x
 	assertEqual(getDim(DimArray(1, 4)), 2).x
 	assertEqual(getDim(DimArray(1, 5, 3)), 3).x
 End Function
+
+Function test_Array_toString()
+	assertEqual(toString(Array()), &quot;Array()&quot;).x
+	assertEqual(toString(Array(3, 2, &quot;one&quot;)), &quot;Array(3, 2, &apos;one&apos;)&quot;).x
+	assertEqual(toString(Array(Array(1, 2, 3, 4), &quot;five&quot;)), &quot;Array(Array(1, 2, 3, 4), &apos;five&apos;)&quot;).x
+End Function
+
+
 </script:module>

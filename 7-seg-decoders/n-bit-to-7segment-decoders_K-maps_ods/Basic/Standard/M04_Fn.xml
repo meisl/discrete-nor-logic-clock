@@ -3,6 +3,7 @@
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M04_Fn" script:language="StarBasic">REM  *****  BASIC  *****
 
 Sub Main
+
 	test_Fn()
 End Sub
 
@@ -16,42 +17,24 @@ End Function
 Function arityF(fName As String) As Integer
 	Dim result As Integer
 	Select Case fName
-		Case &quot;arityF&quot;	
-			result = 1
-		Case &quot;existsF&quot;
-			result = 1
-		Case &quot;applyF&quot;
-			result = 2
-		Case &quot;i_will_throw0&quot;
-			result = 0
-		Case &quot;fst&quot;
-			result = 2
-		Case &quot;snd&quot;
-			result = 2
-		Case &quot;concat&quot;
-			result = 2
-		Case &quot;toString&quot;
-			result = 1
-		Case &quot;TList_toString&quot;
-			result = 1
-		Case &quot;cons&quot;
-			result = 2
-		Case &quot;snoc&quot;
-			result = 2
-		Case &quot;adjoin&quot;
-			result = 2
-		Case &quot;flatten&quot;
-			result = 1
-		Case &quot;reverse&quot;
-			result = 1
-		Case &quot;pWs&quot;
-			result = 0
-		Case &quot;pBinDigit&quot;
-			result = 0
-		Case &quot;pDecDigit&quot;
-			result = 0
-		Case &quot;readHex&quot;
-			result = 1
+		Case &quot;arityF&quot;:			result = 1
+		Case &quot;existsF&quot;:			result = 1
+		Case &quot;applyF&quot;:			result = 2
+		Case &quot;i_will_throw0&quot;:	result = 0
+		Case &quot;fst&quot;:				result = 2
+		Case &quot;snd&quot;:				result = 2
+		Case &quot;concat&quot;:			result = 2
+		Case &quot;toString&quot;:		result = 1
+		Case &quot;TList_toString&quot;:	result = 1
+		Case &quot;cons&quot;:			result = 2
+		Case &quot;snoc&quot;:			result = 2
+		Case &quot;adjoin&quot;:			result = 2
+		Case &quot;flatten&quot;:			result = 1
+		Case &quot;reverse&quot;:			result = 1
+		Case &quot;pWs&quot;:				result = 0
+		Case &quot;pBinDigit&quot;:		result = 0
+		Case &quot;pDecDigit&quot;:		result = 0
+		Case &quot;readHex&quot;:			result = 1
 		Case Else
 			&apos;croak(&quot;arityF: unknown function &quot; &amp; toString(fName))
 			result = -1
@@ -91,42 +74,24 @@ Function applyF(fName As String, Optional arguments As Array, Optional argN As V
 		End If
 	End If
 	Select Case fName
-		Case &quot;arityF&quot;
-			result = arityF(args(k))
-		Case &quot;existsF&quot;
-			result = existsF(args(k))
-		Case &quot;applyF&quot;
-			result = applyF(args(k), args(k + 1))
-		Case &quot;i_will_throw0&quot;
-			result = i_will_throw0()
-		Case &quot;fst&quot;
-			result = fst(args(k), args(k + 1))
-		Case &quot;snd&quot;
-			result = snd(args(k), args(k + 1))
-		Case &quot;concat&quot;
-			result = concat(args(k), args(k + 1))
-		Case &quot;toString&quot;
-			result = toString(args(k))
-		Case &quot;TList_toString&quot;
-			result = TList_toString(args(k))
-		Case &quot;cons&quot;
-			result = cons(args(k), args(k + 1))
-		Case &quot;snoc&quot;
-			result = snoc(args(k), args(k + 1))
-		Case &quot;adjoin&quot;
-			result = adjoin(args(k), args(k + 1))
-		Case &quot;flatten&quot;
-			result = flatten(args(k))
-		Case &quot;reverse&quot;
-			result = reverse(args(k))
-		Case &quot;pWs&quot;
-			result = pWs
-		Case &quot;pBinDigit&quot;
-			result = pBinDigit
-		Case &quot;pDecDigit&quot;
-			result = pDecDigit
-		Case &quot;readHex&quot;
-			result = readHex(args(k))
+		Case &quot;arityF&quot;:			result = arityF(		args(k)				)
+		Case &quot;existsF&quot;:			result = existsF(		args(k)				)
+		Case &quot;applyF&quot;:			result = applyF(		args(k), args(k + 1))
+		Case &quot;i_will_throw0&quot;:	result = i_will_throw0()
+		Case &quot;fst&quot;:				result = fst(			args(k), args(k + 1))
+		Case &quot;snd&quot;:				result = snd(			args(k), args(k + 1))
+		Case &quot;concat&quot;:			result = concat(		args(k), args(k + 1))
+		Case &quot;toString&quot;:		result = toString(		args(k)				)
+		Case &quot;TList_toString&quot;:	result = TList_toString(args(k)				)
+		Case &quot;cons&quot;:			result = cons(			args(k), args(k + 1))
+		Case &quot;snoc&quot;:			result = snoc(			args(k), args(k + 1))
+		Case &quot;adjoin&quot;:			result = adjoin(		args(k), args(k + 1))
+		Case &quot;flatten&quot;:			result = flatten(		args(k)				)
+		Case &quot;reverse&quot;:			result = reverse(		args(k)				)
+		Case &quot;pWs&quot;:				result = pWs
+		Case &quot;pBinDigit&quot;:		result = pBinDigit
+		Case &quot;pDecDigit&quot;:		result = pDecDigit
+		Case &quot;readHex&quot;:			result = readHex(		args(k)				)
 		Case Else
 			croak(&quot;applyF: unknown function &quot; &amp; toString(fName))
 	End Select	

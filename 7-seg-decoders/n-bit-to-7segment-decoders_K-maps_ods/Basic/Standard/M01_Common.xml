@@ -62,16 +62,6 @@ Function toString(ByVal v As Variant) As String
 	Dim tp As String
 	tp = typeOf(v)
 	Select Case tp
-		Case &quot;Array&quot;
-			result = &quot;Array(&quot;
-			Dim i As Integer
-			For i = LBound(v) To UBound(v)
-				If i &gt; LBound(v) Then
-					result = result &amp; &quot;, &quot;
-				End If
-				result = result &amp; toString(v(i))
-			Next i
-			result = result &amp; &quot;)&quot;
 		Case &quot;String&quot;
 			Dim t As String
 			t = v &amp; &quot;&quot;
@@ -86,6 +76,8 @@ Function toString(ByVal v As Variant) As String
 			Else
 				result = tp &amp; &quot;(...)&quot;
 			End If
+		Case &quot;Array&quot;
+			result = Array_toString(v)
 		Case Else
 			If IsObject(v) Then
 				Dim tyName As String, toStrFn As String
@@ -195,12 +187,6 @@ Function test_toString()
 
 	assertEqual(toString(Nothing), &quot;Nothing&quot;).x
 	assertEqual(toString(Empty), &quot;Empty&quot;).x
-
-	assertEqual(toString(Array()), &quot;Array()&quot;).x
-	assertEqual(toString(Array(3, 2, &quot;one&quot;)), &quot;Array(3, 2, &apos;one&apos;)&quot;).x
-
-	assertEqual(toString(Array(Array(1, 2, 3, 4), &quot;five&quot;)), &quot;Array(Array(1, 2, 3, 4), &apos;five&apos;)&quot;).x
-
 
 	Dim t1 As New TTest_NoTyName
 	assertEqual(toString(t1), &quot;Object(...)&quot;).x
