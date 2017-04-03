@@ -5,13 +5,15 @@ Option Explicit
 
 Type TTestPass
 	n As Integer
+	isFail As Boolean	
 	x As String
 End Type
 
 Type TTestFail
 	n As Integer
-	expected As Variant
+	isFail As Boolean	
 	actual As Variant
+	expected As Variant
 	msg As String
 End Type
 
@@ -32,61 +34,101 @@ JustSomething:
 	_argsStr = &quot; some &quot; &amp; typeOf(args)
 End Function
 
-Function assertThrows(fName As String, args As Array, Optional errNo As Integer)
+Function mkFail(actual As Variant, expected As Variant, msg As String)
 	Dim result As Object
+	Set result = new TTestFail
+	result.isFail = True
+	result.actual = actual
+	result.expected = expected
+	result.msg = msg
+	If (testLevel = 0) Then
+		MsgBox(&quot;FAIL: &quot; &amp; msg)
+	End If
+	mkFail = result
+End Function
+
+Function mkPass()
+	Dim result As Object
+	Set result = New TTestPass
+	result.isFail = False
+	mkPass = result
+End Function
+
+Function assertThrows(fName As String, args As Array, Optional errNo As Integer)
+	Dim result As Object, a As String, x As String
 	Dim fResult As Variant
 On Local Error Goto Boom
 	testLevel = testLevel + 1
 	fResult = applyF(fName, args)
 	testLevel = testLevel - 1
-	result = New TTestFail
-	result.expected = IIf(IsMissing(errNo), &quot;an error&quot;, &quot;error &quot; &amp; errNo)
-	result.actual = &quot;no error&quot;
-	result.msg = &quot;expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield an error on args&quot; &amp; chr(13)_
-		&amp; _argsStr(fName, args) &amp; chr(13)_
-		&amp; &quot;returned &quot; &amp; _argsStr(fName, fResult)
-	MsgBox(&quot;FAIL: &quot; &amp; result.msg)
+	a = &quot;no error&quot;
+	x = IIf(IsMissing(errNo), &quot;an error&quot;, &quot;error &quot; &amp; errNo)
+	Set result = mkFail(a, x, _
+		&quot;expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield &quot; &amp; x &amp; &quot; on args&quot; _
+			&amp; chr(13) &amp; _argsStr(fName, args) _
+			&amp; chr(13) &amp; &quot;returned &quot; &amp; _argsStr(fName, fResult) _
+	)
 	assertThrows = result
 	Exit Function
 Boom:
 	testLevel = testLevel - 1
-	If Not(IsMissing(errNo)) Then
-		If (errNo &lt;&gt; Err) Then
-			result = New TTestFail
-			result.expected = &quot;error &quot; &amp; errNo &amp; &quot;: &quot; &amp; toString(Error(errNo))
-			result.actual   = &quot;error &quot; &amp; Err &amp; &quot;: &quot; &amp; toString(Error$)
-			result.msg = &quot;expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield&quot; _
-				&amp; chr(13) &amp; &quot;       &quot; &amp; result.expected _
-				&amp; chr(13) &amp; &quot; not &quot; &amp; result.actual _
+	If Not(IsMissing(errNo)) And (errNo &lt;&gt; Err) Then
+		a = &quot;error &quot; &amp; Err &amp; &quot;: &quot; &amp; toString(Error$)
+		x = &quot;error &quot; &amp; errNo &amp; &quot;: &quot; &amp; toString(Error(errNo))
+		Set result = mkFail(a, x, _
+			&quot;expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield&quot; _
+				&amp; chr(13) &amp; &quot;       &quot; &amp; x _
+				&amp; chr(13) &amp; &quot; not &quot; &amp; a _
 				&amp; chr(13) &amp; &quot;on args:&quot; _
-				&amp; chr(13) &amp; _argsStr(fName, args)
-			MsgBox(&quot;FAIL: &quot; &amp; result.msg)
-		Else
-			result = New TTestPass
-			result.x = Err &amp; &quot;: &quot; &amp; Error$
-		End If
+				&amp; chr(13) &amp; _argsStr(fName, args) _
+		)
 	Else
-		result = New TTestPass
+		Set result = mkPass()
 		result.x = Err &amp; &quot;: &quot; &amp; Error$
 	End If
 	assertThrows = result
 End Function
 
 Function assertEqual(actual As Variant, expected As Variant)
-	Dim result As Object
+	Dim result As Object, a As Variant, x As Variant
 	If Not(actual = expected) Then
-		Set result = New TTestFail
-		result.expected = expected
-		result.actual = actual
-		result.msg = &quot;expected &quot; &amp; toString(actual)_
-			&amp; chr(13) &amp; &quot;     to equal &quot; &amp; toString(expected)
-		MsgBox(&quot;FAIL: &quot; &amp; result.msg)
+		a = actual
+		x = expected
+		Set result = mkFail(a, x, _
+			&quot;expected &quot; &amp; toString(a) _
+				&amp; chr(13) &amp; &quot;     to equal &quot; &amp; toString(x) _
+		)
 	Else
-		Set result = New TTestPass
+		Set result = mkPass()
 	End If
 	assertEqual = result
 End Function
 
+Function assertPasses(assertionName As String, args As Array)
+	Dim result As Object, innerResult As Object
+	Select Case assertionName
+		Case &quot;assertEqual&quot;
+			testLevel = testLevel + 1
+			innerResult = assertEqual(args(0), args(1))
+			testLevel = testLevel - 1
+			If innerResult.isFail Then
+				Dim a As Object, x As String
+				a = innerResult
+				x = &quot;pass&quot;
+				Set result = mkFail(a, x, _
+					&quot;expected &quot; &amp; assertionName &amp; &quot; to pass on args &quot; _
+						&amp; chr(13) &amp; &quot;  &quot; &amp; _argsStr(assertionName, args) _
+						&amp; chr(13) &amp; &quot;but it failed:&quot; _
+						&amp; chr(13) &amp; a.msg _
+				)
+			Else
+				Set result = mkPass()
+			End If
+		Case Else
+			croak(&quot;assertPasses: unknown assertion &apos;&quot; &amp; assertionName &amp; &quot;&apos;&quot;)
+	End Select
+	assertPasses = result
+End Function
 
 Function i_will_throw0()
 	Dim foo As Object
@@ -94,7 +136,32 @@ Function i_will_throw0()
 End Function
 
 Function test_Test()
+	test_assertEqual()
+	test_assertThrows()
+End Function
+
+Function test_assertEqual()
+	assertEqual(0, 0).x
+	assertPasses(&quot;assertEqual&quot;, Array(0, 0)).x
+
+	assertEqual(&quot;0&quot;, &quot;0&quot;).x
+	assertPasses(&quot;assertEqual&quot;, Array(&quot;0&quot;, &quot;0&quot;)).x
+
+	assertEqual(&quot;a&quot;, &quot;a&quot;).x
+	assertPasses(&quot;assertEqual&quot;, Array(&quot;a&quot;, &quot;a&quot;)).x
+
+	assertEqual(Nothing, Nothing).x
+	assertPasses(&quot;assertEqual&quot;, Array(Nothing, Nothing)).x
+
+	assertEqual(Empty, Empty).x
+	assertPasses(&quot;assertEqual&quot;, Array(Empty, Empty)).x
+
+	assertPasses(&quot;assertEqual&quot;, Array(0, &quot;1&quot;)).x
+	
 	assertEqual(arityF(&quot;i_will_throw0&quot;), 0).x
+End Function
+
+Function test_assertThrows()
 	assertThrows(&quot;i_will_throw0&quot;, Array()).x
 	assertThrows(&quot;i_will_throw0&quot;, Array(), 91).x
 	assertThrows(&quot;i_will_throw0&quot;, Array(5)).x
