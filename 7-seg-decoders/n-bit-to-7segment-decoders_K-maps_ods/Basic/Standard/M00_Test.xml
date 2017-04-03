@@ -90,13 +90,25 @@ Boom:
 End Function
 
 Function assertEqual(actual As Variant, expected As Variant)
-	Dim result As Object, a As Variant, x As Variant
-	If Not(actual = expected) Then
-		a = actual
-		x = expected
-		Set result = mkFail(a, x, _
-			&quot;expected &quot; &amp; toString(a) _
-				&amp; chr(13) &amp; &quot;     to equal &quot; &amp; toString(x) _
+	Dim result As Object
+	Dim ta As Variant, tx As Variant
+	ta = typeOf(actual)
+	tx = typeOf(expected)
+	If Not(ta = tx) Then
+		Set result = mkFail(actual, expected, _
+			&quot;expected &quot; &amp; toString(actual) _
+				&amp; chr(13) &amp; &quot;     to equal &quot; &amp; toString(expected) _
+		)
+	ElseIf (isObject(actual) And isObject(expected)) Then
+		If (isNull(actual) And isNull(expected)) Then
+			Set result = mkPass()
+		Else
+			croak(&quot;NYI/assertEqual: compare Objects for equality&quot;)
+		End If
+	ElseIf Not(actual = expected) Then
+		Set result = mkFail(actual, expected, _
+			&quot;expected &quot; &amp; toString(actual) _
+				&amp; chr(13) &amp; &quot;     to equal &quot; &amp; toString(expected) _
 		)
 	Else
 		Set result = mkPass()
