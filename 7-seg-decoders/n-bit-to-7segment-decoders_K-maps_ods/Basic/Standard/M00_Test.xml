@@ -17,6 +17,9 @@ Type TTestFail
 	msg As String
 End Type
 
+Type TTest_Dummy
+End Type
+
 Global testLevel As Integer
 
 Sub Main
@@ -91,29 +94,33 @@ End Function
 
 Function assertEqual(actual As Variant, expected As Variant)
 	Dim result As Object
-	Dim ta As Variant, tx As Variant
+	Dim ta As String, tx As String
 	ta = typeOf(actual)
 	tx = typeOf(expected)
-	If Not(ta = tx) Then
-		Set result = mkFail(actual, expected, _
-			&quot;expected &quot; &amp; toString(actual) _
-				&amp; chr(13) &amp; &quot;     to equal &quot; &amp; toString(expected) _
-		)
+	If (ta &lt;&gt; tx) Then
+		Goto assertEqual_failed
 	ElseIf (isObject(actual) And isObject(expected)) Then
-		If (isNull(actual) And isNull(expected)) Then
-			Set result = mkPass()
-		Else
-			croak(&quot;NYI/assertEqual: compare Objects for equality&quot;)
+		If (isNull(actual) = isNull(expected)) Then &apos; either both null or both not
+			If (isNull(actual) And isNull(expected)) Then
+				Goto assertEqual_passed
+			Else
+				croak(&quot;NYI/assertEqual: compare Objects for equality&quot;)
+			End If
+		Else &apos; one null, the other not
+			Goto assertEqual_failed
 		End If
-	ElseIf Not(actual = expected) Then
-		Set result = mkFail(actual, expected, _
+	ElseIf (actual = expected) Then
+		Goto assertEqual_passed
+	End If
+assertEqual_failed:
+	assertEqual = mkFail(actual, expected, _
 			&quot;expected &quot; &amp; toString(actual) _
 				&amp; chr(13) &amp; &quot;     to equal &quot; &amp; toString(expected) _
 		)
-	Else
-		Set result = mkPass()
-	End If
-	assertEqual = result
+	Exit Function
+assertEqual_passed:
+	assertEqual = mkPass()
+	Exit Function
 End Function
 
 Function assertPasses(assertionName As String, args As Array)
@@ -142,6 +149,31 @@ Function assertPasses(assertionName As String, args As Array)
 	assertPasses = result
 End Function
 
+Function assertFails(assertionName As String, args As Array)
+	Dim result As Object, innerResult As Object
+	Select Case assertionName
+		Case &quot;assertEqual&quot;
+			testLevel = testLevel + 1
+			innerResult = assertEqual(args(0), args(1))
+			testLevel = testLevel - 1
+			If Not(innerResult.isFail) Then
+				Dim a As Object, x As String
+				a = innerResult
+				x = &quot;fail&quot;
+				Set result = mkFail(a, x, _
+					&quot;expected &quot; &amp; assertionName &amp; &quot; to fail on args &quot; _
+						&amp; chr(13) &amp; &quot;  &quot; &amp; _argsStr(assertionName, args) _
+						&amp; chr(13) &amp; &quot;but it passed.&quot; _
+				)
+			Else
+				Set result = mkPass()
+			End If
+		Case Else
+			croak(&quot;assertFails: unknown assertion &apos;&quot; &amp; assertionName &amp; &quot;&apos;&quot;)
+	End Select
+	assertFails = result
+End Function
+
 Function i_will_throw0()
 	Dim foo As Object
 	i_will_throw0 = foo.provoke.an.error
@@ -153,23 +185,126 @@ Function test_Test()
 End Function
 
 Function test_assertEqual()
+	Dim aName As String
+	aName = &quot;assertEqual&quot;
+	
+	assertEqual(False, False).x
+	assertPasses(aName, Array(False, False)).x
+
+	assertEqual(True, True).x
+	assertPasses(aName, Array(True, True)).x
+
 	assertEqual(0, 0).x
-	assertPasses(&quot;assertEqual&quot;, Array(0, 0)).x
+	assertPasses(aName, Array(0, 0)).x
 
 	assertEqual(&quot;0&quot;, &quot;0&quot;).x
-	assertPasses(&quot;assertEqual&quot;, Array(&quot;0&quot;, &quot;0&quot;)).x
+	assertPasses(aName, Array(&quot;0&quot;, &quot;0&quot;)).x
 
 	assertEqual(&quot;a&quot;, &quot;a&quot;).x
-	assertPasses(&quot;assertEqual&quot;, Array(&quot;a&quot;, &quot;a&quot;)).x
+	assertPasses(aName, Array(&quot;a&quot;, &quot;a&quot;)).x
 
 	assertEqual(Nothing, Nothing).x
-	assertPasses(&quot;assertEqual&quot;, Array(Nothing, Nothing)).x
+	assertPasses(aName, Array(Nothing, Nothing)).x
 
 	assertEqual(Empty, Empty).x
-	assertPasses(&quot;assertEqual&quot;, Array(Empty, Empty)).x
+	assertPasses(aName, Array(Empty, Empty)).x
 
-	assertPasses(&quot;assertEqual&quot;, Array(0, &quot;1&quot;)).x
+	assertFails(aName, Array(False, True)).x
+	assertFails(aName, Array(True, False)).x
 	
+	assertFails(aName, Array(False, Empty)).x
+	assertFails(aName, Array(Empty, False)).x
+
+	assertFails(aName, Array(True, Empty)).x
+	assertFails(aName, Array(Empty, True)).x
+
+	assertFails(aName, Array(False, Nothing)).x
+	assertFails(aName, Array(Nothing, False)).x
+
+	assertFails(aName, Array(True, Nothing)).x
+	assertFails(aName, Array(Nothing, True)).x
+
+	assertFails(aName, Array(False, &quot;&quot;)).x
+	assertFails(aName, Array(&quot;&quot;, False)).x
+
+	assertFails(aName, Array(True, &quot;&quot;)).x
+	assertFails(aName, Array(&quot;&quot;, True)).x
+
+	assertFails(aName, Array(False, 0)).x
+	assertFails(aName, Array(0, False)).x
+
+	assertFails(aName, Array(True, 0)).x
+	assertFails(aName, Array(0, True)).x
+
+	assertFails(aName, Array(False, 1)).x
+	assertFails(aName, Array(1, False)).x
+
+	assertFails(aName, Array(True, 1)).x
+	assertFails(aName, Array(1, True)).x
+
+	assertFails(aName, Array(False, &quot;&quot;)).x
+	assertFails(aName, Array(&quot;&quot;, False)).x
+
+	assertFails(aName, Array(True, &quot;&quot;)).x
+	assertFails(aName, Array(&quot;&quot;, True)).x
+
+	assertFails(aName, Array(False, &quot;a&quot;)).x
+	assertFails(aName, Array(&quot;a&quot;, False)).x
+
+	assertFails(aName, Array(True, &quot;a&quot;)).x
+	assertFails(aName, Array(&quot;a&quot;, True)).x
+
+
+	assertFails(aName, Array(Empty, &quot;&quot;)).x
+	assertFails(aName, Array(&quot;&quot;, Empty)).x
+
+	assertFails(aName, Array(Nothing, &quot;&quot;)).x
+	assertFails(aName, Array(&quot;&quot;, Nothing)).x
+	
+	assertFails(aName, Array(Empty, &quot;a&quot;)).x
+	assertFails(aName, Array(&quot;a&quot;, Empty)).x
+
+	assertFails(aName, Array(Nothing, &quot;a&quot;)).x
+	assertFails(aName, Array(&quot;a&quot;, Nothing)).x
+
+	Dim dummy As Object
+	assertFails(aName, Array(Empty, dummy)).x
+	assertFails(aName, Array(dummy, Empty)).x
+
+	assertPasses(aName, Array(Nothing, dummy)).x
+	assertPasses(aName, Array(dummy, Nothing)).x
+
+	Set dummy = New TTest_Dummy
+	assertFails(aName, Array(Empty, dummy)).x
+	assertFails(aName, Array(dummy, Empty)).x
+
+	assertFails(aName, Array(Nothing, dummy)).x
+	assertFails(aName, Array(dummy, Nothing)).x
+
+
+	assertFails(aName, Array(0, 1)).x
+	assertFails(aName, Array(0, &quot;1&quot;)).x
+	assertFails(aName, Array(0, False)).x
+	assertFails(aName, Array(0, True)).x
+	
+	assertFails(aName, Array(&quot;0&quot;, &quot;1&quot;)).x
+	assertFails(aName, Array(&quot;a&quot;, &quot;b&quot;)).x
+	assertFails(aName, Array(&quot;a&quot;, &quot;b&quot;)).x
+	
+	assertFails(aName, Array(Nothing, Empty)).x
+	assertFails(aName, Array(Empty, Nothing)).x
+	
+	assertFails(aName, Array(Empty, 0)).x
+	assertFails(aName, Array(0, Empty)).x
+	
+	assertFails(aName, Array(Empty, &quot;a&quot;)).x
+	assertFails(aName, Array(&quot;a&quot;, Empty)).x
+
+	assertFails(aName, Array(Nothing, 0)).x
+	assertFails(aName, Array(0, Nothing)).x
+
+	assertFails(aName, Array(&quot;a&quot;, Nothing)).x
+		
 	assertEqual(arityF(&quot;i_will_throw0&quot;), 0).x
 End Function
 
