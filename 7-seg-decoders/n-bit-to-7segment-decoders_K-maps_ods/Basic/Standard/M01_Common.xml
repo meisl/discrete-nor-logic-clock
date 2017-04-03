@@ -47,7 +47,7 @@ End Function
 
 Sub croak(msg As String)
 	Dim provoke As Object
-	If Not(testRun) Then
+	If (testLevel = 0) Then
 		MsgBox(msg)
 	End If
 	MsgBox(provoke.AnError)

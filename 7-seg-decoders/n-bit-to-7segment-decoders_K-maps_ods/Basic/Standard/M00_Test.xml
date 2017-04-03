@@ -12,9 +12,10 @@ Type TTestFail
 	n As Integer
 	expected As Variant
 	actual As Variant
+	msg As String
 End Type
 
-Global testrun As Boolean
+Global testLevel As Integer
 
 Sub Main
 	test_Test()
@@ -35,31 +36,31 @@ Function assertThrows(fName As String, args As Array, Optional errNo As Integer)
 	Dim result As Object
 	Dim fResult As Variant
 On Local Error Goto Boom
-	testRun = True
+	testLevel = testLevel + 1
 	fResult = applyF(fName, args)
-	testRun = False
+	testLevel = testLevel - 1
 	result = New TTestFail
 	result.expected = IIf(IsMissing(errNo), &quot;an error&quot;, &quot;error &quot; &amp; errNo)
 	result.actual = &quot;no error&quot;
-	MsgBox(_
-		&quot;FAIL: expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield an error on args&quot; &amp; chr(13)_
+	result.msg = &quot;expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield an error on args&quot; &amp; chr(13)_
 		&amp; _argsStr(fName, args) &amp; chr(13)_
-		&amp; &quot;returned &quot; &amp; _argsStr(fName, fResult)_
-	)
+		&amp; &quot;returned &quot; &amp; _argsStr(fName, fResult)
+	MsgBox(&quot;FAIL: &quot; &amp; result.msg)
 	assertThrows = result
 	Exit Function
 Boom:
-	testRun = False
+	testLevel = testLevel - 1
 	If Not(IsMissing(errNo)) Then
 		If (errNo &lt;&gt; Err) Then
 			result = New TTestFail
 			result.expected = &quot;error &quot; &amp; errNo &amp; &quot;: &quot; &amp; toString(Error(errNo))
 			result.actual   = &quot;error &quot; &amp; Err &amp; &quot;: &quot; &amp; toString(Error$)
-			MsgBox(&quot;FAIL: expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield&quot; _
+			result.msg = &quot;expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield&quot; _
 				&amp; chr(13) &amp; &quot;       &quot; &amp; result.expected _
 				&amp; chr(13) &amp; &quot; not &quot; &amp; result.actual _
 				&amp; chr(13) &amp; &quot;on args:&quot; _
 				&amp; chr(13) &amp; _argsStr(fName, args)
+			MsgBox(&quot;FAIL: &quot; &amp; result.msg)
 		Else
 			result = New TTestPass
 			result.x = Err &amp; &quot;: &quot; &amp; Error$
@@ -72,18 +73,18 @@ Boom:
 End Function
 
 Function assertEqual(actual As Variant, expected As Variant)
-	testRun = True
 	Dim result As Object
 	If Not(actual = expected) Then
 		Set result = New TTestFail
 		result.expected = expected
 		result.actual = actual
-		MsgBox(&quot;FAIL: expected &quot; &amp; toString(actual) &amp; chr(13) &amp; &quot;     to equal &quot; &amp; toString(expected))
+		result.msg = &quot;expected &quot; &amp; toString(actual)_
+			&amp; chr(13) &amp; &quot;     to equal &quot; &amp; toString(expected)
+		MsgBox(&quot;FAIL: &quot; &amp; result.msg)
 	Else
 		Set result = New TTestPass
 	End If
 	assertEqual = result
-	testRun = False
 End Function
 
 
