@@ -37,6 +37,10 @@ ErrorHandler:
 	_typeOf = result
 End Function
 
+Function isString(x As Variant)
+	isString = (typeOf(x) = typeOf(&quot;&quot;))
+End Function
+
 Function _tyname(o As Object)
 	_tyname = o.tyname
 End Function

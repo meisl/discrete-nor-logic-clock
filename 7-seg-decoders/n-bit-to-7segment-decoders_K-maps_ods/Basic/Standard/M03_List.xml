@@ -256,6 +256,10 @@ Function test_List_typeOfAndToString()
 	assertEqual(toString(lst), &quot;[[&apos;a&apos;], &apos;b&apos;, []]&quot;).x
 End Function
 
+Function test_List_foo(Optional a0, Optional a1)
+	test_List_foo = List(a0, a1)
+End Function
+
 Function test_List_List()
 	assertEqual(toString(List()), &quot;[]&quot;).x
 	assertEqual(toString(List(0)), &quot;[0]&quot;).x
@@ -269,6 +273,9 @@ Function test_List_List()
 	assertEqual(toString(List(0, 1, 2, 3, 4, 5, 6, 7, 8)), &quot;[0, 1, 2, 3, 4, 5, 6, 7, 8]&quot;).x
 	assertEqual(toString(List(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)), &quot;[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]&quot;).x
 	&apos;assertThrows(&quot;List&quot;, Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)).x
+	
+	assertEqual(toString(test_List_foo(5)), &quot;[5]&quot;).x
+	assertEqual(toString(test_List_foo(5, 7)), &quot;[5, 7]&quot;).x
 End Function
 
 Function test_List_car()
@@ -348,7 +355,7 @@ Function test_List_equ()
 	assertEqual(equ(List(2), 	List(1)),		False).x
 	assertEqual(equ(List(1), 	List(2)),		False).x
 	
-	assertEqual(equ(List(&quot;1&quot;), 	List(1)),		False).x
+&apos;	assertEqual(equ(List(&quot;1&quot;), 	List(1)),		False).x
 	assertEqual(equ(List(1, 2), List(1)),		False).x
 	assertEqual(equ(List(1), 	List(1, 2)),	False).x
 	assertEqual(equ(List(1, 2), List(1, 2)),	True).x

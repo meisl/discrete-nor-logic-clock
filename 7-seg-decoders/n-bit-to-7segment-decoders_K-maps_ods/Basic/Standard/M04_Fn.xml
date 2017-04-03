@@ -4,10 +4,155 @@
 Option Explicit
 
 Sub Main
-
 	test_Fn()
 End Sub
 
+
+Function fnObjs()
+	Static result As Object
+	If IsNull(result) Then
+		result = List(_
+			List(&quot;car&quot;, True, 1), _
+			List(&quot;fst&quot;, True, 2), _
+			List(&quot;snd&quot;, True, 2), _
+			List(&quot;equ&quot;, True, 2), _
+			List(&quot;ite&quot;, True, 3)_
+		)
+	End If
+	fnObjs = result
+End Function
+
+Function lookupFn(name As String) As Variant
+	Dim result As Variant
+	Dim fs As Object
+	fs = fnObjs
+	While Not(isNil(fs))
+		If (car(car(fs)) = name) Then
+			result = car(fs)
+			fs = nil
+		Else
+			fs = cdr(fs)
+		End If
+	Wend
+	lookupFn = result
+End Function
+
+Function isPartialApp(fn As Object) As Boolean
+	isPartialApp = (typeOf(car(fn)) = typeOf(nil)) And (length(fn) = 2)
+End Function
+
+Function isBuiltinFn(fn As Object) As Boolean
+	Dim result As Boolean
+	If isPartialApp(fn) Then
+		result = False
+	Else
+		result = cadr(fn)
+	End If
+	isBuiltinFn = result
+End Function
+
+Function partialArgs(fn As Object)	&apos; ATTENTION: stored in reverse order!
+	Dim result As Object
+	If isPartialApp(fn) Then
+		result = cadr(fn)
+	Else
+		result = nil
+	End If
+	partialArgs = result
+End Function
+
+Function arity(fn As Object) As Integer
+	Dim result As Integer
+	If isPartialApp(fn) Then
+		result = arity(car(fn)) - length(partialArgs(fn))
+	Else
+		result = caddr(fn)
+	End If
+	arity = result
+End Function
+
+Function apply1(ByVal fn As Object, ByVal arg As Variant)
+	Dim result As Variant, r As Integer
+	r = arity(fn)
+	If r &lt; 1 Then
+		croak(&quot;apply1: cannot apply &quot; &amp; chr(13) &amp; &quot;  &quot; &amp; toString(fn) &amp; chr(13) &amp; &quot;arity=&quot; &amp; r)
+	ElseIf r = 1 Then
+		result = applyLast(fn, arg)
+	Else
+		If isPartialApp(fn) Then
+			result = List(car(fn), cons(arg, partialArgs(fn)))
+		Else
+			result = List(fn, List(arg))
+		End If
+	End If
+	apply1 = result
+End Function
+
+Function applyLast(ByVal fn As Object, ByVal arg As Variant)
+	Dim result As Variant
+	If arity(fn) &lt;&gt; 1 Then
+		croak(&quot;applyLast: cannot apply &quot; &amp; chr(13) &amp; &quot;  &quot; &amp; toString(fn) &amp; chr(13) &amp; &quot;arity=&quot; &amp; arity(fn))
+	End If
+	Dim fName As String, reverseArgs As Object
+	If isPartialApp(fn) Then
+		reverseArgs = cadr(fn)
+		fn = car(fn)
+	Else
+		reverseArgs = nil
+	End If
+	reverseArgs = cons(arg, reverseArgs)
+	fName = car(fn)
+	If isBuiltinFn(fn) Then
+		result = applyBuiltinRev(fn, reverseArgs)
+	Else
+		croak(&quot;NYI: applyLast/non-builtin &quot; &amp; fName)
+	End If
+	applyLast = result
+End Function
+
+Function applyBuiltinRev(ByVal fn As Object, ByVal reverseArgs As Object)
+	Dim result As Variant
+	If Not(isBuiltinFn(fn)) Then
+		croak(&quot;applyBuiltin: not a builtin fn:&quot; &amp; chr(13) &amp; toString(fn))
+	End If
+	Dim r As Integer, n As Integer
+	r = arity(fn)
+	n = length(reverseArgs)
+	If (r &lt;&gt; n) Then
+		croak(&quot;applyBuiltin: arity = &quot; &amp; r &amp; &quot; &lt;&gt; #args = &quot; &amp; n)
+	End If
+	result = applyF(car(fn), toArray(reverse(reverseArgs)))
+	applyBuiltinRev = result
+End Function
+
+Function applyToList(ByVal fn As Variant, ByVal args As Object)
+	Dim result As Variant, fName As String
+	If isString(fn) Then
+		fName = fn
+		fn = lookupFn(fName)
+		If isEmpty(fn) Or isNull(fn) Then
+			croak(&quot;applyToList: unknown function &quot; &amp; fName)
+		End If
+	End If
+	If isEmpty(fn) Or isNull(fn) Then
+		croak(&quot;applyToList: invalid fn &quot; &amp; toString(fn))
+	ElseIf isNil(args) Then
+		croak(&quot;applyToList: empty args list for &quot; &amp; chr(13) &amp; toString(fn))
+	Else
+		result = fn
+		While Not(isNil(args))
+			result = apply1(result, car(args))
+			args = cdr(args)
+		Wend
+	End If
+	applyToList = result
+End Function
+
+Function apply(fn As Variant, Optional a0, Optional a1, Optional a2, Optional a3, Optional a4, Optional a5, Optional a6, Optional a7, Optional a8, Optional a9, Optional a10)
+	Dim args As Object
+	args = List(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10)
+	apply = applyToList(fn, args)
+End Function
 
 Function existsF(fName As String) As Boolean
 	Dim result As Boolean
@@ -113,7 +258,93 @@ End Function
 
 &apos;= tests ============================================================
 
+Function blaha(ByVal xs As Object)
+	xs.len = 1
+	xs = nil
+	blaha = xs
+End Function
+
 Function test_Fn()
+	Dim xs As Object
+	xs = List(&quot;x&quot;, &quot;y&quot;)
+	assertEqual(toString(blaha(xs)), &quot;[]&quot;).x
+	&apos;assertEqual(toString(xs), &quot;[&apos;x&apos;, &apos;y&apos;]&quot;).x
+	assertEqual(lookupFn(&quot;non-existent&quot;), Empty).x
+		
+	Dim fCar As Variant
+	fCar = lookupFn(&quot;car&quot;)
+	assertEqual(isPartialApp(fCar), False).x
+	assertEqual(isBuiltinFn(fCar), True).x
+	assertEqual(isNil(partialArgs(fCar)), True).x
+	assertEqual(arity(fCar), 1).x
+	
+	assertEqual( apply1(fCar, List(9)), 9 ).x
+	assertEqual( apply1(fCar, List(&quot;a&quot;)), &quot;a&quot; ).x
+		
+	Dim eq As Variant
+	eq = lookupFn(&quot;equ&quot;)
+	assertEqual(isPartialApp(eq), False).x
+	assertEqual(isBuiltinFn(eq), True).x
+	assertEqual(isNil(partialArgs(eq)), True).x
+	assertEqual(arity(eq), 2).x
+	assertEqual(apply(eq, 1, 2), False).x
+	assertEqual(apply(eq, 1, 1), True).x
+	assertEqual(apply(&quot;equ&quot;, 1, 2), False).x
+	assertEqual(apply(&quot;equ&quot;, 1, 1), True).x
+	
+	Dim eq5 As Variant
+	eq5 = apply(eq, 5)
+	assertEqual(isPartialApp(eq5), True).x
+	assertEqual(isBuiltinFn(eq5), False).x
+	assertEqual(isNil(partialArgs(eq5)), False).x
+	assertEqual(arity(eq5), 1).x
+	
+	Dim eq5_7 As Variant
+	eq5_7 = apply1(eq5, 7)
+	assertEqual(eq5_7, False).x
+
+	Dim eq5_5 As Variant
+	eq5_5 = apply1(eq5, 5)
+	assertEqual(eq5_5, True).x
+
+	Dim fst5 As Variant
+	fst5 = apply1(lookupFn(&quot;fst&quot;), 5)
+	assertEqual(isPartialApp(fst5), True).x
+	assertEqual(isBuiltinFn(fst5), False).x
+	assertEqual(arity(fst5), 1).x
+	assertEqual(apply1(fst5, 7), 5).x
+		
+	Dim snd5 As Variant
+	snd5 = apply1(lookupFn(&quot;snd&quot;), 5)
+	assertEqual(isPartialApp(snd5), True).x
+	assertEqual(isBuiltinFn(snd5), False).x
+	assertEqual(arity(snd5), 1).x
+	assertEqual(apply1(snd5, 7), 7).x
+		
+	Dim ite As Variant
+	ite = lookupFn(&quot;ite&quot;)
+	assertEqual(isPartialApp(ite), False).x
+	assertEqual(isBuiltinFn(ite), True).x
+	assertEqual(arity(ite), 3).x
+
+	Dim iteFalse As Variant
+	iteFalse = apply1(ite, False)
+	assertEqual(isPartialApp(iteFalse), True).x
+	assertEqual(isBuiltinFn(iteFalse), False).x
+	assertEqual(arity(iteFalse), 2).x
+
+	Dim iteFalse42 As Variant
+	iteFalse42 = apply1(iteFalse, 42)
+	assertEqual(isPartialApp(iteFalse42), True).x
+	assertEqual(isBuiltinFn(iteFalse42), False).x
+	assertEqual(arity(iteFalse42), 1).x
+	
+	Dim iteFalse42Seven As Variant
+&apos;	iteFalse42Seven = apply1(iteFalse42, &quot;Seven&quot;)
+&apos;	assertEqual(iteFalse42Seven, &quot;Seven&quot;).x
+&apos;	MsgBox( toString(iteFalse42Seven) )
+
+
 	assertEqual(existsF(&quot;i do not exist&quot;), False).x
 	assertEqual(existsF(&quot;existsF&quot;), True).x
 	assertEqual(existsF(&quot;arityF&quot;), True).x

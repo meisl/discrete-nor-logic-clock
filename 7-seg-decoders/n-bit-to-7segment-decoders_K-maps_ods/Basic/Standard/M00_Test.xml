@@ -79,7 +79,6 @@ Function assertEqual(actual As Variant, expected As Variant)
 		result.expected = expected
 		result.actual = actual
 		MsgBox(&quot;FAIL: expected &quot; &amp; toString(actual) &amp; chr(13) &amp; &quot;     to equal &quot; &amp; toString(expected))
-		assertEqual = result
 	Else
 		Set result = New TTestPass
 	End If
