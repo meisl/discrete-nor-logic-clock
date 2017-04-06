@@ -91,6 +91,14 @@ Function pFailure()
 	pFailure = result
 End Function
 
+Function pItem()
+	Static result As New Parser
+	If result.tp = &quot;&quot; Then
+		result = mkParser(&quot;item&quot;, Array())
+	End If
+	pItem = result
+End Function
+
 Function pWs()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
@@ -242,14 +250,35 @@ End Function
 &apos;= tests ============================================================
 
 Function test_Parser()
-	test_Parser_failure()
+	&apos;test_Parser_failure()
+	
+	assert_parse(pFailure, &quot;&quot;,		Empty).x
+	assert_parse(pFailure, &quot; &quot;,		Empty).x
+	assert_parse(pFailure, &quot;a&quot;,		Empty).x
+	assert_parse(pFailure, &quot;1&quot;,		Empty).x
+	assert_parse(pFailure, &quot;[]&quot;,	Empty).x
+	
+	assert_parse(pItem, &quot;&quot;,			Empty).x
+	assert_parse(pItem, &quot; &quot;,		Array(&quot; &quot;, 2)).x
+	assert_parse(pItem, &quot;a&quot;,		Array(&quot;a&quot;, 2)).x
+	assert_parse(pItem, &quot;1&quot;,		Array(&quot;1&quot;, 2)).x
+	assert_parse(pItem, &quot;[]&quot;,		Array(&quot;[&quot;, 2)).x
+	assert_parse(pItem, &quot;abcd&quot;,		Array(&quot;a&quot;, 2)).x
+	assert_parse(pItem, chr(13),	Array(chr(13), 2)).x
 End Function
 
-Function test_Parser_failure()
-	Dim p As Parser
-	Set p = pFailure
-	
+Function assert_parse(ByVal p As Variant, ByVal s As String, ByVal expected As Variant)
+	If isString(p) Then
+		p = lookupParser(p)
+	End If
+	If Not(isString(expected)) Then
+		expected = toString(expected)
+	End If
 	assertEqual(typeOf(p), &quot;Object/TParser&quot;).x
+	Dim actual As Variant
+	actual = applyP(p, s)
+
+	assert_parse = assertEqual(toString(actual), expected)
 End Function
 
 </script:module>
