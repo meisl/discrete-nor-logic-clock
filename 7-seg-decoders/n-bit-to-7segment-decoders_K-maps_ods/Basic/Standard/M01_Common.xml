@@ -196,6 +196,7 @@ End Function
 Function test_Common()
 	test_concat()
 	test_typeOf()
+	test_isString()
 	test_toString()
 	test_fst()
 	test_snd()
@@ -210,12 +211,7 @@ Function test_concat()
 	assertEqual(concat(&quot;a&quot;, &quot;bc&quot;), &quot;abc&quot;).x
 	assertEqual(concat(&quot;ab&quot;, &quot;c&quot;), &quot;abc&quot;).x
 	
-	test_concat_app()
-End Function
-
-Function test_concat_app()
 	assertEqual(arityF(&quot;concat&quot;), 2).x
-	
 	assertEqual(apply(&quot;concat&quot;, &quot;&quot;, &quot;&quot;), &quot;&quot;).x
 	assertEqual(apply(&quot;concat&quot;, &quot;a&quot;, &quot;&quot;), &quot;a&quot;).x
 	assertEqual(apply(&quot;concat&quot;, &quot;a&quot;, &quot;b&quot;), &quot;ab&quot;).x
@@ -244,6 +240,43 @@ Function test_typeOf()
 	Dim t2 As New TTest_TyName
 	t2.tyname = &quot;foobar&quot;
 	assertEqual(typeOf(t2), &quot;Object/foobar&quot;).x
+End Function
+
+Function test_isString()
+	assertEqual(isString(&quot;&quot;),                  True).x
+	assertEqual(isString(&quot;a&quot;),                 True).x
+	assertEqual(isString(&quot;foobar&quot;),            True).x
+	assertEqual(isString(Nothing),            False).x
+	assertEqual(isString(Empty),              False).x
+	assertEqual(isString(True),               False).x
+	assertEqual(isString(False),              False).x
+	assertEqual(isString(0),                  False).x
+	assertEqual(isString(1),                  False).x
+	assertEqual(isString(3.14),               False).x
+	assertEqual(isString(Array()),            False).x
+	assertEqual(isString(Array(42)),          False).x
+	assertEqual(isString(Array(42)),          False).x
+	assertEqual(isString(&quot;0&quot;),                 True).x
+	assertEqual(isString(&quot;1&quot;),                 True).x
+	assertEqual(isString(&quot;3.14&quot;),              True).x
+	
+	assertEqual(arityF(&quot;isString&quot;),				  1).x
+	assertEqual(apply(&quot;isString&quot;, &quot;&quot;),         True).x
+	assertEqual(apply(&quot;isString&quot;, &quot;a&quot;),        True).x
+	assertEqual(apply(&quot;isString&quot;, &quot;foobar&quot;),   True).x
+	assertEqual(apply(&quot;isString&quot;, Nothing),   False).x
+	assertEqual(apply(&quot;isString&quot;, Empty),     False).x
+	assertEqual(apply(&quot;isString&quot;, True),      False).x
+	assertEqual(apply(&quot;isString&quot;, False),     False).x
+	assertEqual(apply(&quot;isString&quot;, 0),         False).x
+	assertEqual(apply(&quot;isString&quot;, 1),         False).x
+	assertEqual(apply(&quot;isString&quot;, 3.14),      False).x
+	assertEqual(apply(&quot;isString&quot;, Array()),   False).x
+	assertEqual(apply(&quot;isString&quot;, Array(42)), False).x
+	assertEqual(apply(&quot;isString&quot;, Array(42)), False).x
+	assertEqual(apply(&quot;isString&quot;, &quot;0&quot;),        True).x
+	assertEqual(apply(&quot;isString&quot;, &quot;1&quot;),        True).x
+	assertEqual(apply(&quot;isString&quot;, &quot;3.14&quot;),     True).x
 End Function
 
 Function test_toString()
