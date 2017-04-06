@@ -165,20 +165,28 @@ Function pDecDigit()
 	pDecDigit = result
 End Function
 
+Function lookupParser(pName As String) As Parser
+	Dim result As Parser
+	Select Case pName
+		Case &quot;pWs&quot;:			result = pWs
+		Case &quot;pBinDigit&quot;:	result = pBinDigit
+		Case &quot;pDecDigit&quot;:	result = pDecDigit
+		Case Else
+			croak(&quot;unknown parser &quot; &amp; pName)
+	End Select
+	lookupParser = result
+End Function
+
 &apos;==================================================================
 
 Function parse(pName As String, s As String)
-	Dim result As Variant
-	result = applyP(pName, s)
-	parse = toString(result)
+	parse = toString(applyP(lookupParser(pName), s))
 End Function
 
 Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 	Dim p As Parser
 	If IsNull(parser) Or IsEmpty(parser) Then
 		croak(&quot;applyP: parser p = &quot; &amp; toString(parser))
-	ElseIf TypeName(parser) = &quot;String&quot; Then
-		Set p = applyF(parser)
 	ElseIf TypeName(parser) = &quot;Object&quot; Then
 		Set p = parser
 	Else
@@ -245,7 +253,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		result = applyP(p.st(0), s, pos)
 		If Not IsEmpty(result) Then
 			Dim fResult As Variant
-			fResult = applyF(p.st(1), result(0))
+			fResult = applyToList(p.st(1), toList(result(0)))
 			result(0) = fResult
 		End If
 	ElseIf p.tp = &quot;seq&quot; Then
@@ -269,7 +277,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		Loop Until (i &gt; k) Or IsEmpty(t)
 		If Not IsEmpty(t) Then
 &apos;			Dim fResult As Variant
-			fResult = applyF(p.st(1), iResults)
+			fResult = applyToList(p.st(1), toList(iResults))
 			result = t
 			result(0) = fResult
 		End If
@@ -424,7 +432,5 @@ Function foo(x As Variant)
 	End If
 End Function
 
-Sub Macro1
 
-End Sub
 </script:module>

@@ -18,10 +18,11 @@ Function fnObjs()
 			List(&quot;snd&quot;,				True, 2), _
 			List(&quot;equ&quot;,				True, 2), _
 			List(&quot;ite&quot;,				True, 3), _
+			List(&quot;readHex&quot;,			True, 1), _
 			_
 			List(&quot;existsF&quot;,			True, 1), _
 			List(&quot;arityF&quot;, 			True, 1), _
-			List(&quot;apply&quot;, 			True, 2), _
+			List(&quot;applyToList&quot;,		True, 2), _
 			_
 			List(&quot;TList_toString&quot;,	True, 1), _
 			List(&quot;TList_equ&quot;,		True, 2), _
@@ -33,9 +34,8 @@ Function fnObjs()
 			List(&quot;caddr&quot;,			True, 1), _
 			List(&quot;adjoin&quot;,			True, 2), _
 			List(&quot;flatten&quot;,			True, 1), _
-			List(&quot;reverse&quot;,			True, 1), _
+			List(&quot;reverse&quot;,			True, 1)_
 			_
-			List(&quot;readHex&quot;,			True, 1)_
 		))
 	End If
 	fnObjs = result
@@ -162,13 +162,12 @@ Function applyBuiltinRev(ByVal fn As Object, ByVal reverseArgs As Object)
 	Select Case car(fn)
 		Case &quot;arityF&quot;:			result = arityF(		a(0)				)
 		Case &quot;existsF&quot;:			result = existsF(		a(0)				)
-		Case &quot;applyF&quot;:			result = applyF(		a(0), a(1)			)
-		Case &quot;i_will_throw0&quot;:	result = i_will_throw0()
+		Case &quot;applyToList&quot;:		result = applyToList(	a(0), a(1)			)
 		Case &quot;swap&quot;:			result = swap(			a(0), a(1), a(2)	)
 		Case &quot;fst&quot;:				result = fst(			a(0), a(1)			)
 		Case &quot;snd&quot;:				result = snd(			a(0), a(1)			)
-		Case &quot;concat&quot;:			result = concat(		a(0), a(1)			)
 		Case &quot;equ&quot;:				result = equ(			a(0), a(1)			)
+		Case &quot;concat&quot;:			result = concat(		a(0), a(1)			)
 		Case &quot;toString&quot;:		result = toString(		a(0)				)
 		Case &quot;TList_toString&quot;:	result = TList_toString(a(0)				)
 		Case &quot;TList_equ&quot;:		result = TList_equ(		a(0), a(1)			)
@@ -182,10 +181,6 @@ Function applyBuiltinRev(ByVal fn As Object, ByVal reverseArgs As Object)
 		Case &quot;adjoin&quot;:			result = adjoin(		a(0), a(1)			)
 		Case &quot;flatten&quot;:			result = flatten(		a(0)				)
 		Case &quot;reverse&quot;:			result = reverse(		a(0)				)
-		Case &quot;pWs&quot;:				result = pWs
-		Case &quot;pBinDigit&quot;:		result = pBinDigit
-		Case &quot;pDecDigit&quot;:		result = pDecDigit
-		Case &quot;readHex&quot;:			result = readHex(		a(0)				)
 		Case Else
 			croak(&quot;applyBuiltinRev: unknown function &apos;&quot; &amp; car(fn) &amp; &quot;&apos;&quot;)
 	End Select	
@@ -200,11 +195,13 @@ Function applyToList(ByVal fn As Variant, ByVal args As Object)
 		If isEmpty(fn) Or isNull(fn) Then
 			croak(&quot;applyToList: unknown function &quot; &amp; fName)
 		End If
-	End If
-	If isEmpty(fn) Or isNull(fn) Then
+	ElseIf isEmpty(fn) Or isNull(fn) Then
 		croak(&quot;applyToList: invalid fn &quot; &amp; toString(fn))
-	ElseIf isNil(args) Then
-		croak(&quot;applyToList: empty args list for &quot; &amp; chr(13) &amp; toString(fn))
+	End If
+	If isNil(args) Then
+		Dim fStr As String
+		fStr = toString(fn)
+		croak(&quot;applyToList: empty args list for &quot; &amp; chr(13) &amp; fStr)
 	Else
 		result = fn
 		While Not(isNil(args))
@@ -219,71 +216,6 @@ Function apply(fn As Variant, Optional a0, Optional a1, Optional a2, Optional a3
 	Dim args As Object
 	args = List(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10)
 	apply = applyToList(fn, args)
-End Function
-
-
-Function applyF(fName As String, Optional arguments As Array, Optional argN As Variant)
-	Dim result As Variant
-	Dim args As Variant
-	Dim arity As Integer, k As Integer, n As Integer
-	If IsMissing(arguments) Then
-		args = Array()
-	Else
-		If Not(IsMissing(argN)) Then
-			croak(&quot;applyF: got surplus 3rd arg &quot; &amp; toString(argN))
-		End If
-		Dim msg As String
-		msg = &quot;applyF: expecting fn args in 1-dim Array - got instead &quot;
-		If Not(IsArray(arguments)) Then
-			&apos;Do not call toString here - it might call applyF with same args again!
-			croak(msg &amp; typeOf(arguments))
-		ElseIf getDim(arguments) &lt;&gt; 1 Then
-			&apos;Do not call toString here - it might call applyF with same args again!
-			croak(msg &amp; &quot;a &quot; &amp; getDim(arguments) &amp; &quot;-dim Array&quot;)
-		End If
-		args = arguments
-	End If
-	arity = arityF(fName)
-	k = LBound(args)
-	n = UBound(args) - k + 1
-	If (n &lt;&gt; arity) Then
-		If (arity &lt; 0) Then
-			croak(&quot;applyF: unknown function &quot; &amp; toString(fName))
-		Else
-			croak(&quot;applyF &quot; &amp; toString(fName) &amp; &quot;: has arity &quot; &amp; arity &amp; &quot;, got &quot; &amp; n &amp; chr(13) &amp; toString(args)
-		End If
-	End If
-	Select Case fName
-		Case &quot;arityF&quot;:			result = arityF(		args(k)								)
-		Case &quot;existsF&quot;:			result = existsF(		args(k)								)
-		Case &quot;applyF&quot;:			result = applyF(		args(k), args(k + 1)				)
-		Case &quot;i_will_throw0&quot;:	result = i_will_throw0()
-		Case &quot;swap&quot;:			result = swap(			args(k), args(k + 1), args(k + 2)	)
-		Case &quot;fst&quot;:				result = fst(			args(k), args(k + 1)				)
-		Case &quot;snd&quot;:				result = snd(			args(k), args(k + 1)				)
-		Case &quot;concat&quot;:			result = concat(		args(k), args(k + 1)				)
-		Case &quot;equ&quot;:				result = equ(			args(k), args(k + 1)				)
-		Case &quot;toString&quot;:		result = toString(		args(k)								)
-		Case &quot;TList_toString&quot;:	result = TList_toString(args(k)								)
-		Case &quot;TList_equ&quot;:		result = TList_equ(		args(k), args(k + 1)				)
-		Case &quot;isNil&quot;:			result = isNil(			args(k)								)
-		Case &quot;cons&quot;:			result = cons(			args(k), args(k + 1)				)
-		Case &quot;snoc&quot;:			result = snoc(			args(k), args(k + 1)				)
-		Case &quot;car&quot;:				result = car(			args(k)								)
-		Case &quot;cdr&quot;:				result = cdr(			args(k)								)
-		Case &quot;cadr&quot;:			result = cadr(			args(k)								)
-		Case &quot;caddr&quot;:			result = caddr(			args(k)								)
-		Case &quot;adjoin&quot;:			result = adjoin(		args(k), args(k + 1)				)
-		Case &quot;flatten&quot;:			result = flatten(		args(k)								)
-		Case &quot;reverse&quot;:			result = reverse(		args(k)								)
-		Case &quot;pWs&quot;:				result = pWs
-		Case &quot;pBinDigit&quot;:		result = pBinDigit
-		Case &quot;pDecDigit&quot;:		result = pDecDigit
-		Case &quot;readHex&quot;:			result = readHex(		args(k)								)
-		Case Else
-			croak(&quot;applyF: unknown function &quot; &amp; toString(fName))
-	End Select	
-	applyF = result
 End Function
 
 &apos;= tests ============================================================
@@ -378,18 +310,18 @@ Function test_Fn()
 	assertEqual(existsF(&quot;i do not exist&quot;), False).x
 	assertEqual(existsF(&quot;existsF&quot;), True).x
 	assertEqual(existsF(&quot;arityF&quot;), True).x
-	assertEqual(existsF(&quot;apply&quot;), True).x
+	assertEqual(existsF(&quot;applyToList&quot;), True).x
 
 	assertEqual(arityF(&quot;existsF&quot;), 1).x
 	assertEqual(arityF(&quot;arityF&quot;), 1).x
-	assertEqual(arityF(&quot;apply&quot;), 2).x
+	assertEqual(arityF(&quot;applyToList&quot;), 2).x
 
 	assertEqual(apply(&quot;existsF&quot;, &quot;foo&quot;),         False).x
 	assertEqual(apply(&quot;existsF&quot;, &quot;existsF&quot;),      True).x
 	assertEqual(apply(&quot;arityF&quot;,  &quot;foo&quot;),            -1).x
 	assertEqual(apply(&quot;arityF&quot;,  &quot;existsF&quot;),         1).x
 	assertEqual(apply(&quot;arityF&quot;,  &quot;arityF&quot;),          1).x
-	assertEqual(apply(&quot;arityF&quot;,  &quot;apply&quot;),          2).x
+	assertEqual(apply(&quot;arityF&quot;,  &quot;applyToList&quot;),     2).x
 
 	assertEqual(apply(&quot;toString&quot;, &quot;abcd&quot;), &quot;&apos;abcd&apos;&quot;).x
 

@@ -142,11 +142,11 @@ Function toString(ByVal v As Variant) As String
 				Else
 					toStrFnName = tyName &amp; &quot;_toString&quot;
 					&apos;We&apos;ve got an Object with .tyName, so we insist on its _toString to exist
-					&apos;Note: We test ourselves since applyF/croak call toString again...
+					&apos;Note: We test for existence separately because apply/croak call toString again...
 					If Not(existsF(toStrFnName)) Then
 						croak(&quot;toString: unknown fn &apos;&quot; &amp; toStrFnName &amp; &quot;&apos;&quot;)
 					Else
-						result = applyF(toStrFnName, Array(v))
+						result = apply(toStrFnName, v)
 					End If
 				End If
 			Else
@@ -260,9 +260,6 @@ End Function
 Function test_fst()
 	assertEqual(arityF(&quot;fst&quot;), 2).x
 
-	assertThrows(&quot;fst&quot;, Array()).x
-	assertThrows(&quot;fst&quot;, Array(1)).x
-
 	assertEqual(fst(1, 2), 1).x
 	assertEqual(fst(2, 1), 2).x
 	assertEqual(fst(&quot;a&quot;, &quot;b&quot;), &quot;a&quot;).x
@@ -271,9 +268,6 @@ End Function
 
 Function test_snd()
 	assertEqual(arityF(&quot;snd&quot;), 2).x
-
-	assertThrows(&quot;snd&quot;, Array()).x
-	assertThrows(&quot;snd&quot;, Array(1)).x
 
 	assertEqual(snd(1, 2), 2).x
 	assertEqual(snd(2, 1), 1).x

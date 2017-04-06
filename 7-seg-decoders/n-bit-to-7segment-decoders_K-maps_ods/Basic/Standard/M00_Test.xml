@@ -89,7 +89,7 @@ On Local Error Goto Boom
 			End If
 		Case &quot;i_will_throw0&quot;:	fResult = i_will_throw0()
 		Case Else
-			fResult = applyF(fName, args)
+			fResult = applyToList(fName, toList(args))
 	End Select
 	testLevel = testLevel - 1
 	a = &quot;no error&quot;
