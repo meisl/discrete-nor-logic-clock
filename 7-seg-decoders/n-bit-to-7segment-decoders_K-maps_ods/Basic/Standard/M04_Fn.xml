@@ -11,18 +11,32 @@ End Sub
 Function fnObjs()
 	Static result As Object
 	If IsNull(result) Then
-		result = List(_
-			List(&quot;isNil&quot;,	True, 1), _
-			List(&quot;cons&quot;,	True, 2), _
-			List(&quot;car&quot;,		True, 1), _
-			List(&quot;cdr&quot;,		True, 1), _
-			List(&quot;adjoin&quot;,	True, 2), _
-			List(&quot;swap&quot;,	True, 3), _
-			List(&quot;fst&quot;,		True, 2), _
-			List(&quot;snd&quot;,		True, 2), _
-			List(&quot;equ&quot;,		True, 2), _
-			List(&quot;ite&quot;,		True, 3)_
-		)
+		result = toList(Array(_
+			List(&quot;toString&quot;,		True, 1), _
+			List(&quot;swap&quot;,			True, 3), _
+			List(&quot;fst&quot;,				True, 2), _
+			List(&quot;snd&quot;,				True, 2), _
+			List(&quot;equ&quot;,				True, 2), _
+			List(&quot;ite&quot;,				True, 3), _
+			_
+			List(&quot;existsF&quot;,			True, 1), _
+			List(&quot;arityF&quot;, 			True, 1), _
+			List(&quot;apply&quot;, 			True, 2), _
+			_
+			List(&quot;TList_toString&quot;,	True, 1), _
+			List(&quot;TList_equ&quot;,		True, 2), _
+			List(&quot;isNil&quot;,			True, 1), _
+			List(&quot;cons&quot;,			True, 2), _
+			List(&quot;car&quot;,				True, 1), _
+			List(&quot;cdr&quot;,				True, 1), _
+			List(&quot;cadr&quot;,			True, 1), _
+			List(&quot;caddr&quot;,			True, 1), _
+			List(&quot;adjoin&quot;,			True, 2), _
+			List(&quot;flatten&quot;,			True, 1), _
+			List(&quot;reverse&quot;,			True, 1), _
+			_
+			List(&quot;readHex&quot;,			True, 1)_
+		))
 	End If
 	fnObjs = result
 End Function
@@ -40,6 +54,18 @@ Function lookupFn(name As String) As Variant
 		End If
 	Wend
 	lookupFn = result
+End Function
+
+Function existsF(fName As String) As Boolean
+	existsF = Not(isEmpty(lookupFn(fName)))
+End Function
+
+Function arityF(fName As String) As Integer
+	If Not(existsF(fName)) Then
+		arityF = -1
+	Else
+		arityF = arity(lookupFn(fName))
+	End If
 End Function
 
 Function isPartialApp(fn As Object) As Boolean
@@ -133,7 +159,36 @@ Function applyBuiltinRev(ByVal fn As Object, ByVal reverseArgs As Object)
 		a(i) = car(reverseArgs)
 		reverseArgs = cdr(reverseArgs)
 	Next i
-	result = applyF(car(fn), a)
+	Select Case car(fn)
+		Case &quot;arityF&quot;:			result = arityF(		a(0)				)
+		Case &quot;existsF&quot;:			result = existsF(		a(0)				)
+		Case &quot;applyF&quot;:			result = applyF(		a(0), a(1)			)
+		Case &quot;i_will_throw0&quot;:	result = i_will_throw0()
+		Case &quot;swap&quot;:			result = swap(			a(0), a(1), a(2)	)
+		Case &quot;fst&quot;:				result = fst(			a(0), a(1)			)
+		Case &quot;snd&quot;:				result = snd(			a(0), a(1)			)
+		Case &quot;concat&quot;:			result = concat(		a(0), a(1)			)
+		Case &quot;equ&quot;:				result = equ(			a(0), a(1)			)
+		Case &quot;toString&quot;:		result = toString(		a(0)				)
+		Case &quot;TList_toString&quot;:	result = TList_toString(a(0)				)
+		Case &quot;TList_equ&quot;:		result = TList_equ(		a(0), a(1)			)
+		Case &quot;isNil&quot;:			result = isNil(			a(0)				)
+		Case &quot;cons&quot;:			result = cons(			a(0), a(1)			)
+		Case &quot;snoc&quot;:			result = snoc(			a(0), a(1)			)
+		Case &quot;car&quot;:				result = car(			a(0)				)
+		Case &quot;cdr&quot;:				result = cdr(			a(0)				)
+		Case &quot;cadr&quot;:			result = cadr(			a(0)				)
+		Case &quot;caddr&quot;:			result = caddr(			a(0)				)
+		Case &quot;adjoin&quot;:			result = adjoin(		a(0), a(1)			)
+		Case &quot;flatten&quot;:			result = flatten(		a(0)				)
+		Case &quot;reverse&quot;:			result = reverse(		a(0)				)
+		Case &quot;pWs&quot;:				result = pWs
+		Case &quot;pBinDigit&quot;:		result = pBinDigit
+		Case &quot;pDecDigit&quot;:		result = pDecDigit
+		Case &quot;readHex&quot;:			result = readHex(		a(0)				)
+		Case Else
+			croak(&quot;applyBuiltinRev: unknown function &apos;&quot; &amp; car(fn) &amp; &quot;&apos;&quot;)
+	End Select	
 	applyBuiltinRev = result
 End Function
 
@@ -166,47 +221,6 @@ Function apply(fn As Variant, Optional a0, Optional a1, Optional a2, Optional a3
 	apply = applyToList(fn, args)
 End Function
 
-Function existsF(fName As String) As Boolean
-	Dim result As Boolean
-	result = (arityF(fName) &gt;= 0)
-	existsF = result
-End Function
-
-Function arityF(fName As String) As Integer
-	Dim result As Integer
-	Select Case fName
-		Case &quot;arityF&quot;:			result = 1
-		Case &quot;existsF&quot;:			result = 1
-		Case &quot;applyF&quot;:			result = 2
-		Case &quot;i_will_throw0&quot;:	result = 0
-		Case &quot;swap&quot;:			result = 3
-		Case &quot;fst&quot;:				result = 2
-		Case &quot;snd&quot;:				result = 2
-		Case &quot;concat&quot;:			result = 2
-		Case &quot;equ&quot;:				result = 2
-		Case &quot;toString&quot;:		result = 1
-		Case &quot;TList_toString&quot;:	result = 1
-		Case &quot;TList_equ&quot;:		result = 2
-		Case &quot;isNil&quot;:			result = 1
-		Case &quot;cons&quot;:			result = 2
-		Case &quot;snoc&quot;:			result = 2
-		Case &quot;car&quot;:				result = 1
-		Case &quot;cdr&quot;:				result = 1
-		Case &quot;cadr&quot;:			result = 1
-		Case &quot;caddr&quot;:			result = 1
-		Case &quot;adjoin&quot;:			result = 2
-		Case &quot;flatten&quot;:			result = 1
-		Case &quot;reverse&quot;:			result = 1
-		Case &quot;pWs&quot;:				result = 0
-		Case &quot;pBinDigit&quot;:		result = 0
-		Case &quot;pDecDigit&quot;:		result = 0
-		Case &quot;readHex&quot;:			result = 1
-		Case Else
-			&apos;croak(&quot;arityF: unknown function &quot; &amp; toString(fName))
-			result = -1
-	End Select
-	arityF = result
-End Function
 
 Function applyF(fName As String, Optional arguments As Array, Optional argN As Variant)
 	Dim result As Variant
@@ -364,20 +378,20 @@ Function test_Fn()
 	assertEqual(existsF(&quot;i do not exist&quot;), False).x
 	assertEqual(existsF(&quot;existsF&quot;), True).x
 	assertEqual(existsF(&quot;arityF&quot;), True).x
-	assertEqual(existsF(&quot;applyF&quot;), True).x
+	assertEqual(existsF(&quot;apply&quot;), True).x
 
 	assertEqual(arityF(&quot;existsF&quot;), 1).x
 	assertEqual(arityF(&quot;arityF&quot;), 1).x
-	assertEqual(arityF(&quot;applyF&quot;), 2).x
+	assertEqual(arityF(&quot;apply&quot;), 2).x
 
-	assertEqual(applyF(&quot;existsF&quot;, Array(&quot;foo&quot;)),         False).x
-	assertEqual(applyF(&quot;existsF&quot;, Array(&quot;existsF&quot;)),     True).x
-	assertEqual(applyF(&quot;arityF&quot;, Array(&quot;foo&quot;)),          -1).x
-	assertEqual(applyF(&quot;arityF&quot;, Array(&quot;existsF&quot;)),       1).x
-	assertEqual(applyF(&quot;arityF&quot;, Array(&quot;arityF&quot;)),        1).x
-	assertEqual(applyF(&quot;arityF&quot;, Array(&quot;applyF&quot;)),        2).x
+	assertEqual(apply(&quot;existsF&quot;, &quot;foo&quot;),         False).x
+	assertEqual(apply(&quot;existsF&quot;, &quot;existsF&quot;),      True).x
+	assertEqual(apply(&quot;arityF&quot;,  &quot;foo&quot;),            -1).x
+	assertEqual(apply(&quot;arityF&quot;,  &quot;existsF&quot;),         1).x
+	assertEqual(apply(&quot;arityF&quot;,  &quot;arityF&quot;),          1).x
+	assertEqual(apply(&quot;arityF&quot;,  &quot;apply&quot;),          2).x
 
-	assertEqual(applyF(&quot;toString&quot;, Array(&quot;abcd&quot;)), &quot;&apos;abcd&apos;&quot;).x
+	assertEqual(apply(&quot;toString&quot;, &quot;abcd&quot;), &quot;&apos;abcd&apos;&quot;).x
 
 End Function
 

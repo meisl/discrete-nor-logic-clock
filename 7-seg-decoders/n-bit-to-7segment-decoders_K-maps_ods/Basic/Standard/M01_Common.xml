@@ -100,7 +100,7 @@ Function equ(a As Variant, b As Variant) As Boolean
 					&apos; ATTENTION: do NOT access .tyname directly!
 					Dim fName As String
 					fName = _tyname(a) &amp; &quot;_equ&quot;
-					result = applyF(fName, Array(a, b))
+					result = apply(fName, a, b)
 				ElseIf isArray(a) Then
 					croak(&quot;equ: NYI - comparing arrays&quot;)
 				Else

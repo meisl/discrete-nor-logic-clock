@@ -95,14 +95,14 @@ Function caddr(xs As TList)
 	caddr = cadr(cdr(xs))
 End Function
 
-Function map(fn As String, xs As Variant)
+Function map(fn As Variant, xs As Variant)
 	Dim result As TList
 	If isNil(xs) Then
 		result = nil
 	ElseIf isArray(xs) Then
 		result = map(fn, toList(xs))
 	Else
-		result = cons(applyF(fn, Array(xs.head)), map(fn, xs.tail))
+		result = cons(apply(fn, xs.head), map(fn, xs.tail))
 	End If
 	map = result
 End Function
@@ -121,14 +121,14 @@ Function foldl(fn As Variant, acc As Variant, ByVal xs As Variant)
 	foldl = result
 End Function
 
-Function foldr(fn As String, acc As Variant, xs As Variant)
+Function foldr(fn As Variant, ByVal acc As Variant, xs As Variant)
 	Dim result As Variant
 	If IsNil(xs) Then
 		result = acc
 	ElseIf IsArray(xs) Then
 		result = foldr(fn, acc, toList(xs))
 	Else
-		result = applyF(fn, Array(xs.head, foldr(fn, acc, xs.tail)))
+		result = apply(fn, xs.head, foldr(fn, acc, xs.tail))
 	End If
 	foldr = result
 End Function
@@ -235,7 +235,6 @@ End Function
 Function test_List_fnApp()
 	assertEqual(arityF(&quot;TList_toString&quot;), 1).x
 	assertEqual(arityF(&quot;cons&quot;), 2).x
-	assertEqual(arityF(&quot;snoc&quot;), 2).x
 	assertEqual(arityF(&quot;reverse&quot;), 1).x
 End Function
 
@@ -293,13 +292,13 @@ Function test_List_List()
 End Function
 
 Function test_List_car()
-	assertThrows(&quot;car&quot;, nil).x
+	assertThrows(&quot;car&quot;, Array(nil)).x
 	assertEqual(car(List(1   )), 1).x
 	assertEqual(car(List(2, 1)), 2).x
 End Function
 
 Function test_List_cdr()
-	assertThrows(&quot;cdr&quot;, nil).x
+	assertThrows(&quot;cdr&quot;, Array(nil)).x
 	assertEqual(toString(cdr(List(1   ))), &quot;[]&quot;).x
 	assertEqual(toString(cdr(List(2, 1))), &quot;[1]&quot;).x
 End Function
@@ -354,6 +353,8 @@ Function test_List_reverse()
 End Function
 
 Function test_List_equ()
+	assertEqual(arityF(&quot;TList_equ&quot;), 2).x
+	
 	assertThrows(&quot;equ&quot;, Array(nil, Empty)).x	&apos; incompatible types Object/TList and Empty
 	assertThrows(&quot;equ&quot;, Array(Empty, nil)).x	&apos; incompatible types Empty and Object/TList
 

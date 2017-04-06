@@ -60,12 +60,37 @@ End Function
 Function assertThrows(fName As String, args As Array, Optional errNo As Integer)
 	Dim result As Object, a As String, x As String
 	Dim fResult As Variant
-	If Not(existsF(fName)) Then
-		croak(&quot;assertThrows: unknown fn &quot; &amp; toString(fName))
+	Dim k As Integer, n As Integer
+	If Not(isArray(args)) Then
+		croak(&quot;assertThrows: expected Array of args but got&quot; &amp; chr(13) &amp; toString(args))
 	End If
+	k = LBound(args)
+	n = UBound(args) - k + 1
+	Select Case fName
+		Case &quot;assertEqual&quot;:	
+		Case &quot;assertThrows&quot;
+		Case &quot;i_will_throw0&quot;
+		Case Else
+			If Not(existsF(fName)) Then
+				croak(&quot;assertThrows: unknown fn &quot; &amp; toString(fName))
+			End If
+	End Select
 On Local Error Goto Boom
 	testLevel = testLevel + 1
-	fResult = applyF(fName, args)
+	Select Case fName
+		Case &quot;assertEqual&quot;: 	fResult = assertEqual(args(k), args(k+1))
+		Case &quot;assertThrows&quot;
+			If n = 2 Then
+				fResult = assertThrows(args(k), args(k+1))
+			ElseIf n = 3 Then
+				fResult = assertThrows(args(k), args(k+1), args(k+2))
+			Else
+				croak(&quot;assertThrows: expected Array of 2 or 3 args but got&quot; &amp; chr(13) &amp; toString(args))
+			End If
+		Case &quot;i_will_throw0&quot;:	fResult = i_will_throw0()
+		Case Else
+			fResult = applyF(fName, args)
+	End Select
 	testLevel = testLevel - 1
 	a = &quot;no error&quot;
 	x = IIf(IsMissing(errNo), &quot;an error&quot;, &quot;error &quot; &amp; errNo)
@@ -284,8 +309,7 @@ Function test_assertEqual()
 	assertFails(aName, Array(Nothing, dummy)).x
 	assertFails(aName, Array(dummy, Nothing)).x
 
-
-&apos;	assertThrows(aName, Array(dummy, dummy)).x
+	assertThrows(aName, Array(dummy, dummy)).x
 
 
 	assertFails(aName, Array(0, 1)).x
@@ -314,13 +338,20 @@ Function test_assertEqual()
 End Function
 
 Function test_assertThrows()
-	assertEqual(arityF(&quot;i_will_throw0&quot;), 0).x
-
-	&apos;------------------
-
 	assertThrows(&quot;i_will_throw0&quot;, Array()).x
 	assertThrows(&quot;i_will_throw0&quot;, Array(), 91).x
 	assertThrows(&quot;i_will_throw0&quot;, Array(5)).x
+	
+	&apos; inner assertThrows throws because *IT* gets no args (so the outer passes)
+	assertThrows(&quot;assertThrows&quot;, Array()).x
+	
+	&apos; inner assertThrows throws because *IT* gets no valid arg array to pass on (so the outer passes)
+	assertThrows(&quot;assertThrows&quot;, Array(&quot;assertEqual&quot;, 2, 2)).x
+
+&apos;	assertFails(&quot;assertThrows&quot;, Array(&quot;assertEqual&quot;, Array(2, 2))).x
+&apos;	assertFails(&quot;assertThrows&quot;, Array(&quot;assertEqual&quot;, Array(2, 3))).x
+
+&apos;	assertPasses(&quot;assertThrows&quot;, Array(&quot;i_will_throw0&quot;, Nothing)).x
 End Function
 
 </script:module>
