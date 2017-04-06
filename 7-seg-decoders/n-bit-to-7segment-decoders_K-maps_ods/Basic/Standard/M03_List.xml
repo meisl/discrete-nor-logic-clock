@@ -326,6 +326,13 @@ Function test_List_map()
 	assertEqual(toString(map(&quot;toString&quot;, List(&quot;a&quot;))), &quot;[&apos;&apos;a&apos;&apos;]&quot;).x
 	assertEqual(toString(map(&quot;toString&quot;, List(&quot;a&quot;, 42))), &quot;[&apos;&apos;a&apos;&apos;, &apos;42&apos;]&quot;).x
 	assertEqual(toString(map(&quot;toString&quot;, List(nil, &quot;a&quot;, 42))), &quot;[&apos;[]&apos;, &apos;&apos;a&apos;&apos;, &apos;42&apos;]&quot;).x
+	
+	assertEqual(arityF(&quot;map&quot;), 2).x
+	assertEqual(toString(apply(&quot;map&quot;, &quot;toString&quot;, nil)), &quot;[]&quot;).x
+	assertEqual(toString(apply(&quot;map&quot;, &quot;toString&quot;, List(1))), &quot;[&apos;1&apos;]&quot;).x
+	assertEqual(toString(apply(&quot;map&quot;, &quot;toString&quot;, List(&quot;a&quot;))), &quot;[&apos;&apos;a&apos;&apos;]&quot;).x
+	assertEqual(toString(apply(&quot;map&quot;, &quot;toString&quot;, List(&quot;a&quot;, 42))), &quot;[&apos;&apos;a&apos;&apos;, &apos;42&apos;]&quot;).x
+	assertEqual(toString(apply(&quot;map&quot;, &quot;toString&quot;, List(nil, &quot;a&quot;, 42))), &quot;[&apos;[]&apos;, &apos;&apos;a&apos;&apos;, &apos;42&apos;]&quot;).x
 End Function
 
 Function test_List_filter()
@@ -334,7 +341,18 @@ Function test_List_filter()
 	assertEqual(toString(filter(  &quot;isNil&quot;, List(nil, nil)  )), &quot;[[], []]&quot;).x
 	assertEqual(toString(filter(  &quot;isNil&quot;, List(List(1), List(1, 0), List(nil))  )), &quot;[]&quot;).x
 	assertEqual(toString(filter(  &quot;isNil&quot;, List(nil, List(1), nil, List(1, 0), List(nil))  )), &quot;[[], []]&quot;).x
-	assertEqual(toString(filter(apply(&quot;equ&quot;, 1), List(0, 1, 1, 0, 1, 0))), &quot;[1, 1, 1]&quot;).x
+	Dim equ1 As Variant
+	equ1 = apply(&quot;equ&quot;, 1)
+	assertEqual(toString(filter(  equ1, List(0, 1, 1, 0, 1, 0)  )), &quot;[1, 1, 1]&quot;).x
+	
+	assertEqual(arityF(&quot;filter&quot;), 2).x
+	assertEqual(toString(apply(&quot;filter&quot;,  &quot;isNil&quot;, nil  )), &quot;[]&quot;).x
+	assertEqual(toString(apply(&quot;filter&quot;,  &quot;isNil&quot;, List(nil)  )), &quot;[[]]&quot;).x
+	assertEqual(toString(apply(&quot;filter&quot;,  &quot;isNil&quot;, List(nil, nil)  )), &quot;[[], []]&quot;).x
+	assertEqual(toString(apply(&quot;filter&quot;,  &quot;isNil&quot;, List(List(1), List(1, 0), List(nil))  )), &quot;[]&quot;).x
+	assertEqual(toString(apply(&quot;filter&quot;,  &quot;isNil&quot;, List(nil, List(1), nil, List(1, 0), List(nil))  )), &quot;[[], []]&quot;).x
+
+	assertEqual(toString(apply(&quot;filter&quot;,  equ1, List(0, 1, 1, 0, 1, 0)  )), &quot;[1, 1, 1]&quot;).x
 End Function
 
 Function test_List_adjoin()
