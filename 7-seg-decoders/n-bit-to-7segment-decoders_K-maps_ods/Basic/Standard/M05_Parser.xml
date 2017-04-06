@@ -3,16 +3,6 @@
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M05_Parser" script:language="StarBasic">REM  *****  BASIC  *****
 Option Explicit
 
-Type KeyValuePair
-	key As String
-	val As Variant
-	nxt As Object
-End Type
-
-Type Env
-	daddy As Object
-	mappings As Object
-End Type
 
 Type Parser
 	tyname As String
@@ -38,50 +28,8 @@ Sub Main
 		&quot;applying parser &apos;&quot; &amp; p.tp &amp; &quot;&apos; to &quot; &amp; toString(s) &amp; &quot;: &quot; &amp; chr(13) _
 		&amp; toString(applyP(p, s)) _
 	)
-	Stop
-	
-	MsgBox(&quot;&apos;&quot; &amp; s &amp; &quot;&apos;&quot; &amp; chr(13) &amp; evalNorExpr(s))
-	
-	
-	Dim e0 As Object
-	Dim e1 As Object
-	Dim lu As Variant
-	Set e0 = Env_new()
-	Set e1 = Env_new(e0)
 
-	lu = Env_lookup(e1, &quot;A&quot;)
-	MsgBox(Env_show(e1) &amp; Chr(13) &amp; &quot;lookup(&apos;A&apos;) ~&gt; &quot; &amp; toString(lu))	
-
-	Env_add(e0, &quot;A&quot;, 1)
-	Env_add(e1, &quot;B&quot;, 2)
-	Env_add(e1, &quot;C&quot;, 3)
-
-	lu = Env_lookup(e1, &quot;A&quot;)
-	MsgBox(Env_show(e1) &amp; Chr(13) &amp; &quot;lookup(&apos;A&apos;) ~&gt; &quot; &amp; toString(lu))	
-
-	Env_add(e1, &quot;A&quot;, &quot;abc&quot;)
-
-	lu = Env_lookup(e1, &quot;A&quot;)
-	MsgBox(Env_show(e1) &amp; Chr(13) &amp; &quot;lookup(&apos;A&apos;) ~&gt; &quot; &amp; toString(lu))
 End Sub
-
-&apos;================================================================================
-
-
-Function inspect(o As Object)
-	On Local Error Goto ErrorHandler
-	Dim result As Variant
-	result = o.tp
-		MsgBox(&quot;property &apos;tp&apos; equals &quot; &amp; toString(result))
-	Exit Function
-	ErrorHandler:
-		croak(&quot;property &apos;tp&apos; not found in &quot; &amp; toString(o))
-End Function
-
-
-
-
-
 
 &apos;==================================================================
 
@@ -288,141 +236,6 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		MsgBox(&quot;Error in applyP: &quot; &amp; result)
 	End If
 	applyP = result
-End Function
-
-
-
-Function KeyValuePair_new(ByVal k As String, ByVal v As Variant)
-	Dim result As New KeyValuePair
-	result.key = k
-	result.val = v
-	Set result.nxt = Nothing
-	KeyValuePair_new = result
-End Function
-
-Function KeyValuePair_show(hd As KeyValuePair, Optional sep As String)
-	Dim result As String
-	result = &quot;&quot;
-	If IsMissing(sep) Then
-		sep = &quot;, &quot;
-	End If
-	If Not(IsNull(hd)) Then
-		result = result &amp; indent &amp; &quot;&apos;&quot; &amp; hd.key &amp; &quot;&apos; -&gt; &quot; &amp; hd.val
-		If Not(IsNull(hd.nxt)) Then
-			result = result &amp; sep &amp; KeyValuePair_show(hd.nxt, sep)
-		End If
-	End If
-	KeyValuePair_show = result
-End Function
-
-Function Env_new(Optional p As Object)
-	Dim result As New Env
-	If IsMissing(p) Then
-		Set result.daddy = Nothing
-	Else
-		Set result.daddy = p
-	End If
-	Set result.mappings = Nothing
-	Env_new = result
-End Function
-
-Function Env_show(e As Env, Optional indent As String)
-	Dim nl As String
-	Dim result As String
-	Dim mappingsStr As String
-	nl = Chr(13)
-	If IsMissing(indent) Then
-		indent = &quot;&quot;
-	End If
-	If IsNull(e) Then
-		result = &quot;null&quot;
-	Else
-		mappingsStr = KeyValuePair_show(e.mappings, &quot;, &quot; &amp; nl &amp; indent &amp; Space(2 + 4))
-		result = &quot;{&quot; _
-			&amp; nl &amp; indent &amp; &quot;  mappings: [&quot; _
-				&amp; IIf(IsNull(e.mappings), &quot;&quot;, nl &amp; indent &amp; Space(2 + 4) &amp; mappingsStr) _
-				&amp; nl &amp; indent &amp; &quot;  ],&quot; _
-			&amp; nl &amp; indent &amp; &quot;  daddy: &quot; &amp; Env_show(e.daddy, indent &amp; Space(4)) _
-			&amp; nl &amp; indent &amp; &quot;}&quot;
-	End If
-	Env_show = result
-End Function
-
-Function Env_add(e As Env, key As String, val As Variant)
-	Dim kvp As KeyValuePair
-	Set kvp = KeyValuePair_new(key, val)
-	Set kvp.nxt = e.mappings
-	Set e.mappings = kvp
-	Env_add = e
-End Function
-
-Function Env_lookup(e As Env, k As String)
-	Dim kvp As KeyValuePair
-	Dim result As Variant
-	Set kvp = e.mappings
-	Set result = Nothing
-	While (IsNull(result) And Not(IsNull(kvp)))
-		If (kvp.key = k) Then
-			result = kvp.val
-		Else
-			kvp = kvp.nxt
-		End If
-	Wend
-	If IsNull(result) And Not(IsNull(e.daddy)) Then
-		result = Env_lookup(e.daddy, k)
-	End If
-	Env_lookup = result
-End Function
-
-
-&apos;========================================================
-
-Function NOR(a0, Optional a1, Optional a2, Optional a3, Optional a4, Optional a5, Optional a6, Optional a7)
-	If Not IsMissing(a7) Then
-		NOR = CVErr(&quot;NOR: cannot handle more than 7 arguments&quot;)
-	Else
-		If a0 Then
-			NOR = 0
-		ElseIf IsMissing(a1) Then
-			NOR = 1
-		   Else
-		   	NOR = NOR(a1, a2, a3, a4, a5, a6)
-		End If
-	End If
-End Function
-
-Function evalArgs(s As String, e As Variant)
-	Dim args As Variant
-	s = LTrim(s)
-	If Len(s) = 0 Then
-		evalArgs = Array(&quot;xxx&quot;)
-	Else
-		evalArgs = Array()
-	End If
-End Function
-
-Function evalNorExpr(s As String, Optional e As Variant)
-	Dim args As Variant
-	Dim result As Variant
-	If IsMissing(e) Then
-		e = Array()
-	End If
-	s = LTrim(s)
-	If Left(s, 1) = &quot;-&quot; Then
-		s = Right(s, Len(s) - 1)
-		result = NOR(evalNorExpr(s, e))
-	ElseIf IsNumeric(s) Then
-	 	result = IIf(s, 1, 0)
-	Else
-		If Left(s, 1) = &quot;µ&quot; Then
-			s = Right(s, Len(s) - 1)
-			args = evalArgs(s, e)
-			result = &quot;NOR(args &quot; &amp; LBound(args) &amp; &quot;...&quot; &amp; UBound(args) &amp; &quot;)&quot;
-		Else
-			result = Empty
-		End If
-	End If
-	evalNorExpr = result
 End Function
 
 
