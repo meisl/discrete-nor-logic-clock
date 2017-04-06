@@ -53,6 +53,10 @@ Sub croak(msg As String)
 	MsgBox(provoke.AnError)
 End Sub
 
+Function swap(fn As Variant, x As Variant, y As Variant)
+	swap = apply(fn, y, x)
+End Function
+
 Function fst(x As Variant, y As Variant)
 	fst = x
 End Function

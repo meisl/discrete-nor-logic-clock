@@ -111,14 +111,16 @@ Function map(fn As String, xs As Variant)
 	map = result
 End Function
 
-Function foldl(fn As String, acc As Variant, xs As Variant)
+Function foldl(fn As Variant, acc As Variant, ByVal xs As Variant)
 	Dim result As Variant
-	If isNil(xs) Then
-		result = acc
-	ElseIf IsArray(xs) Then
+	If IsArray(xs) Then
 		result = foldl(fn, acc, toList(xs))
 	Else
-		result = foldl(fn, applyF(fn, Array(acc, xs.head)), xs.tail)
+		result = acc
+		While Not(isNil(xs))
+			result = apply(fn, result, car(xs))
+			xs = cdr(xs)
+		Wend
 	End If
 	foldl = result
 End Function
@@ -150,7 +152,8 @@ Function reverse(xs As TList)
 	If xs.len &lt;= 1 Then
 		result = xs
 	Else
-		result = foldl(&quot;snoc&quot;, nil, xs)
+		result = foldl(apply(&quot;swap&quot;, lookupFn(&quot;cons&quot;)), nil, xs)
+&apos;		result = foldl(swap(cons), nil, xs)
 	End If
 	reverse = result
 End Function

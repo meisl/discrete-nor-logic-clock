@@ -13,7 +13,11 @@ Function fnObjs()
 	If IsNull(result) Then
 		result = List(_
 			List(&quot;isNil&quot;,	True, 1), _
+			List(&quot;cons&quot;,	True, 2), _
 			List(&quot;car&quot;,		True, 1), _
+			List(&quot;cdr&quot;,		True, 1), _
+			List(&quot;adjoin&quot;,	True, 2), _
+			List(&quot;swap&quot;,	True, 3), _
 			List(&quot;fst&quot;,		True, 2), _
 			List(&quot;snd&quot;,		True, 2), _
 			List(&quot;equ&quot;,		True, 2), _
@@ -122,7 +126,14 @@ Function applyBuiltinRev(ByVal fn As Object, ByVal reverseArgs As Object)
 	If (r &lt;&gt; n) Then
 		croak(&quot;applyBuiltinRev: arity = &quot; &amp; r &amp; &quot; &lt;&gt; #args = &quot; &amp; n)
 	End If
-	result = applyF(car(fn), toArray(reverse(reverseArgs)))
+	&apos; Do NOT call or apply &quot;reverse&quot;!
+	Dim a(0 To n - 1)
+	Dim i As Integer
+	For i = n - 1 To 0 Step -1
+		a(i) = car(reverseArgs)
+		reverseArgs = cdr(reverseArgs)
+	Next i
+	result = applyF(car(fn), a)
 	applyBuiltinRev = result
 End Function
 
@@ -168,6 +179,7 @@ Function arityF(fName As String) As Integer
 		Case &quot;existsF&quot;:			result = 1
 		Case &quot;applyF&quot;:			result = 2
 		Case &quot;i_will_throw0&quot;:	result = 0
+		Case &quot;swap&quot;:			result = 3
 		Case &quot;fst&quot;:				result = 2
 		Case &quot;snd&quot;:				result = 2
 		Case &quot;concat&quot;:			result = 2
@@ -228,31 +240,32 @@ Function applyF(fName As String, Optional arguments As Array, Optional argN As V
 		End If
 	End If
 	Select Case fName
-		Case &quot;arityF&quot;:			result = arityF(		args(k)				)
-		Case &quot;existsF&quot;:			result = existsF(		args(k)				)
-		Case &quot;applyF&quot;:			result = applyF(		args(k), args(k + 1))
+		Case &quot;arityF&quot;:			result = arityF(		args(k)								)
+		Case &quot;existsF&quot;:			result = existsF(		args(k)								)
+		Case &quot;applyF&quot;:			result = applyF(		args(k), args(k + 1)				)
 		Case &quot;i_will_throw0&quot;:	result = i_will_throw0()
-		Case &quot;fst&quot;:				result = fst(			args(k), args(k + 1))
-		Case &quot;snd&quot;:				result = snd(			args(k), args(k + 1))
-		Case &quot;concat&quot;:			result = concat(		args(k), args(k + 1))
-		Case &quot;equ&quot;:				result = equ(			args(k), args(k + 1))
-		Case &quot;toString&quot;:		result = toString(		args(k)				)
-		Case &quot;TList_toString&quot;:	result = TList_toString(args(k)				)
-		Case &quot;TList_equ&quot;:		result = TList_equ(		args(k), args(k + 1))
-		Case &quot;isNil&quot;:			result = isNil(			args(k)				)
-		Case &quot;cons&quot;:			result = cons(			args(k), args(k + 1))
-		Case &quot;snoc&quot;:			result = snoc(			args(k), args(k + 1))
-		Case &quot;car&quot;:				result = car(			args(k))
-		Case &quot;cdr&quot;:				result = cdr(			args(k))
-		Case &quot;cadr&quot;:			result = cadr(			args(k))
-		Case &quot;caddr&quot;:			result = caddr(			args(k))
-		Case &quot;adjoin&quot;:			result = adjoin(		args(k), args(k + 1))
-		Case &quot;flatten&quot;:			result = flatten(		args(k)				)
-		Case &quot;reverse&quot;:			result = reverse(		args(k)				)
+		Case &quot;swap&quot;:			result = swap(			args(k), args(k + 1), args(k + 2)	)
+		Case &quot;fst&quot;:				result = fst(			args(k), args(k + 1)				)
+		Case &quot;snd&quot;:				result = snd(			args(k), args(k + 1)				)
+		Case &quot;concat&quot;:			result = concat(		args(k), args(k + 1)				)
+		Case &quot;equ&quot;:				result = equ(			args(k), args(k + 1)				)
+		Case &quot;toString&quot;:		result = toString(		args(k)								)
+		Case &quot;TList_toString&quot;:	result = TList_toString(args(k)								)
+		Case &quot;TList_equ&quot;:		result = TList_equ(		args(k), args(k + 1)				)
+		Case &quot;isNil&quot;:			result = isNil(			args(k)								)
+		Case &quot;cons&quot;:			result = cons(			args(k), args(k + 1)				)
+		Case &quot;snoc&quot;:			result = snoc(			args(k), args(k + 1)				)
+		Case &quot;car&quot;:				result = car(			args(k)								)
+		Case &quot;cdr&quot;:				result = cdr(			args(k)								)
+		Case &quot;cadr&quot;:			result = cadr(			args(k)								)
+		Case &quot;caddr&quot;:			result = caddr(			args(k)								)
+		Case &quot;adjoin&quot;:			result = adjoin(		args(k), args(k + 1)				)
+		Case &quot;flatten&quot;:			result = flatten(		args(k)								)
+		Case &quot;reverse&quot;:			result = reverse(		args(k)								)
 		Case &quot;pWs&quot;:				result = pWs
 		Case &quot;pBinDigit&quot;:		result = pBinDigit
 		Case &quot;pDecDigit&quot;:		result = pDecDigit
-		Case &quot;readHex&quot;:			result = readHex(		args(k)				)
+		Case &quot;readHex&quot;:			result = readHex(		args(k)								)
 		Case Else
 			croak(&quot;applyF: unknown function &quot; &amp; toString(fName))
 	End Select	
