@@ -15,11 +15,13 @@ Type Env
 End Type
 
 Type Parser
+	tyname As String
 	tp As String
-	st As Variant
+	st As Array
 End Type
 
 Sub Main
+	test_Parser()
 	Stop
 	Dim s As String
 	Dim pDigit As Parser, pHexDigit As Parser, pHexNum As Parser, pHexLit As Parser
@@ -85,6 +87,7 @@ End Function
 
 Function mkParser(tp As String, st As Variant)
 	Dim result As New Parser
+	result.tyname = &quot;TParser&quot;
 	result.tp = tp
 	result.st = st
 	mkParser = result
@@ -92,10 +95,6 @@ End Function
 
 Function mkReturn(node As Variant)
 	mkReturn = mkParser(&quot;return&quot;, Array(node))
-End Function
-
-Function mkFailure()
-	mkFailure = mkParser(&quot;failure&quot;, Array())
 End Function
 
 Function mkItem()
@@ -135,6 +134,14 @@ Function mkSeq(ps As Array, fName As String)
 End Function
 
 &apos;==================================================================
+
+Function pFailure()
+	Static result As New Parser
+	If result.tp = &quot;&quot; Then
+		result = mkParser(&quot;failure&quot;, Array())
+	End If
+	pFailure = result
+End Function
 
 Function pWs()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
@@ -418,13 +425,18 @@ Function evalNorExpr(s As String, Optional e As Variant)
 	evalNorExpr = result
 End Function
 
-Function foo(x As Variant)
-	If IsArray(x) Then
-		foo = &quot;size(WxH): &quot; &amp; UBound(x, 1) &amp; &quot; x &quot; &amp; UBound(x, 2)
-	Else
-		foo = TypeName(x)
-	End If
+
+&apos;= tests ============================================================
+
+Function test_Parser()
+	test_Parser_failure()
 End Function
 
+Function test_Parser_failure()
+	Dim p As Parser
+	Set p = pFailure
+	
+	assertEqual(typeOf(p), &quot;Object/TParser&quot;).x
+End Function
 
 </script:module>

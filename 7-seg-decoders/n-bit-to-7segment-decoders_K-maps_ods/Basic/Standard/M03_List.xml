@@ -244,8 +244,9 @@ Function test_List_isNil_and_cons()
 	assertEqual(isNil(cons(0, nil)), False).x
 	assertEqual(isNil(cons(&quot;&quot;, nil)), False).x
 	
-	&apos;assertEqual(toString(isNil(Empty)), &quot;[&apos;isNil&apos;, True, 1]&quot;).x
 	assertEqual(apply(&quot;isNil&quot;, nil), True).x
+		
+	&apos;assertEqual(toString(isNil(Empty)), &quot;[&apos;isNil&apos;, True, 1]&quot;).x
 	&apos;assertEqual(apply(isNil, Nothing), True).x
 End Function
 
