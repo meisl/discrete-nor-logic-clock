@@ -12,11 +12,12 @@ Function fnObjs()
 	Static result As Object
 	If IsNull(result) Then
 		result = List(_
-			List(&quot;car&quot;, True, 1), _
-			List(&quot;fst&quot;, True, 2), _
-			List(&quot;snd&quot;, True, 2), _
-			List(&quot;equ&quot;, True, 2), _
-			List(&quot;ite&quot;, True, 3)_
+			List(&quot;isNil&quot;,	True, 1), _
+			List(&quot;car&quot;,		True, 1), _
+			List(&quot;fst&quot;,		True, 2), _
+			List(&quot;snd&quot;,		True, 2), _
+			List(&quot;equ&quot;,		True, 2), _
+			List(&quot;ite&quot;,		True, 3)_
 		)
 	End If
 	fnObjs = result
@@ -113,13 +114,13 @@ End Function
 Function applyBuiltinRev(ByVal fn As Object, ByVal reverseArgs As Object)
 	Dim result As Variant
 	If Not(isBuiltinFn(fn)) Then
-		croak(&quot;applyBuiltin: not a builtin fn:&quot; &amp; chr(13) &amp; toString(fn))
+		croak(&quot;applyBuiltinRev: not a builtin fn:&quot; &amp; chr(13) &amp; toString(fn))
 	End If
 	Dim r As Integer, n As Integer
 	r = arity(fn)
 	n = length(reverseArgs)
 	If (r &lt;&gt; n) Then
-		croak(&quot;applyBuiltin: arity = &quot; &amp; r &amp; &quot; &lt;&gt; #args = &quot; &amp; n)
+		croak(&quot;applyBuiltinRev: arity = &quot; &amp; r &amp; &quot; &lt;&gt; #args = &quot; &amp; n)
 	End If
 	result = applyF(car(fn), toArray(reverse(reverseArgs)))
 	applyBuiltinRev = result
@@ -174,6 +175,7 @@ Function arityF(fName As String) As Integer
 		Case &quot;toString&quot;:		result = 1
 		Case &quot;TList_toString&quot;:	result = 1
 		Case &quot;TList_equ&quot;:		result = 2
+		Case &quot;isNil&quot;:			result = 1
 		Case &quot;cons&quot;:			result = 2
 		Case &quot;snoc&quot;:			result = 2
 		Case &quot;car&quot;:				result = 1
@@ -237,6 +239,7 @@ Function applyF(fName As String, Optional arguments As Array, Optional argN As V
 		Case &quot;toString&quot;:		result = toString(		args(k)				)
 		Case &quot;TList_toString&quot;:	result = TList_toString(args(k)				)
 		Case &quot;TList_equ&quot;:		result = TList_equ(		args(k), args(k + 1))
+		Case &quot;isNil&quot;:			result = isNil(			args(k)				)
 		Case &quot;cons&quot;:			result = cons(			args(k), args(k + 1))
 		Case &quot;snoc&quot;:			result = snoc(			args(k), args(k + 1))
 		Case &quot;car&quot;:				result = car(			args(k))

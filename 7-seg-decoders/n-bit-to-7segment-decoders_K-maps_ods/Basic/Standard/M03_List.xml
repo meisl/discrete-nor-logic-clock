@@ -207,6 +207,7 @@ End Function
 &apos;= tests ============================================================
 
 Function test_List()
+	test_List_isNil_and_cons()
 	test_List_fnApp()
 	test_List_typeOfAndToString()
 	test_List_List()
@@ -216,6 +217,20 @@ Function test_List()
 	test_List_flatten()
 	test_List_reverse()
 	test_List_equ()
+End Function
+
+Function test_List_isNil_and_cons()
+	assertEqual(isNil(nil), True).x
+	assertThrows(&quot;isNil&quot;, Array()).x
+	assertThrows(&quot;isNil&quot;, Array(Empty)).x
+	assertThrows(&quot;isNil&quot;, Array(Nothing)).x
+	assertEqual(isNil(cons(nil, nil)), False).x
+	assertEqual(isNil(cons(0, nil)), False).x
+	assertEqual(isNil(cons(&quot;&quot;, nil)), False).x
+	
+	&apos;assertEqual(toString(isNil(Empty)), &quot;[&apos;isNil&apos;, True, 1]&quot;).x
+	assertEqual(apply(&quot;isNil&quot;, nil), True).x
+	&apos;assertEqual(apply(isNil, Nothing), True).x
 End Function
 
 Function test_List_fnApp()

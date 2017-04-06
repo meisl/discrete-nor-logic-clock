@@ -60,6 +60,9 @@ End Function
 Function assertThrows(fName As String, args As Array, Optional errNo As Integer)
 	Dim result As Object, a As String, x As String
 	Dim fResult As Variant
+	If Not(existsF(fName)) Then
+		croak(&quot;assertThrows: unknown fn &quot; &amp; toString(fName))
+	End If
 On Local Error Goto Boom
 	testLevel = testLevel + 1
 	fResult = applyF(fName, args)
@@ -104,7 +107,7 @@ Function assertEqual(actual As Variant, expected As Variant)
 			If (isNull(actual) And isNull(expected)) Then
 				Goto assertEqual_passed
 			Else
-				croak(&quot;NYI/assertEqual: compare Objects for equality&quot;)
+				croak(&quot;assertEqual: cannot compare non-null Objects - test custom equ fn instead&quot;)
 			End If
 		Else &apos; one null, the other not
 			Goto assertEqual_failed
@@ -282,6 +285,9 @@ Function test_assertEqual()
 	assertFails(aName, Array(dummy, Nothing)).x
 
 
+&apos;	assertThrows(aName, Array(dummy, dummy)).x
+
+
 	assertFails(aName, Array(0, 1)).x
 	assertFails(aName, Array(0, &quot;1&quot;)).x
 	assertFails(aName, Array(0, False)).x
@@ -304,11 +310,14 @@ Function test_assertEqual()
 	assertFails(aName, Array(0, Nothing)).x
 
 	assertFails(aName, Array(&quot;a&quot;, Nothing)).x
-		
-	assertEqual(arityF(&quot;i_will_throw0&quot;), 0).x
+	
 End Function
 
 Function test_assertThrows()
+	assertEqual(arityF(&quot;i_will_throw0&quot;), 0).x
+
+	&apos;------------------
+
 	assertThrows(&quot;i_will_throw0&quot;, Array()).x
 	assertThrows(&quot;i_will_throw0&quot;, Array(), 91).x
 	assertThrows(&quot;i_will_throw0&quot;, Array(5)).x
