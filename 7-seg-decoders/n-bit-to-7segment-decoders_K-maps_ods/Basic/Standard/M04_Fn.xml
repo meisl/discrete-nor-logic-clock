@@ -18,6 +18,7 @@ Function fnObjs()
 			List(&quot;snd&quot;,				True, 2), _
 			List(&quot;equ&quot;,				True, 2), _
 			List(&quot;ite&quot;,				True, 3), _
+			List(&quot;concat&quot;,			True, 2), _
 			List(&quot;readHex&quot;,			True, 1), _
 			_
 			List(&quot;existsF&quot;,			True, 1), _

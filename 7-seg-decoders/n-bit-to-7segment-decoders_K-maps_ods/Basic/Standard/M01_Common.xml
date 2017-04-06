@@ -194,12 +194,33 @@ End Function
 &apos;= tests ============================================================
 
 Function test_Common()
+	test_concat()
 	test_typeOf()
 	test_toString()
 	test_fst()
 	test_snd()
 	test_equ()
 	test_readHex()
+End Function
+
+Function test_concat()
+	assertEqual(concat(&quot;&quot;, &quot;&quot;), &quot;&quot;).x
+	assertEqual(concat(&quot;a&quot;, &quot;&quot;), &quot;a&quot;).x
+	assertEqual(concat(&quot;a&quot;, &quot;b&quot;), &quot;ab&quot;).x
+	assertEqual(concat(&quot;a&quot;, &quot;bc&quot;), &quot;abc&quot;).x
+	assertEqual(concat(&quot;ab&quot;, &quot;c&quot;), &quot;abc&quot;).x
+	
+	test_concat_app()
+End Function
+
+Function test_concat_app()
+	assertEqual(arityF(&quot;concat&quot;), 2).x
+	
+	assertEqual(apply(&quot;concat&quot;, &quot;&quot;, &quot;&quot;), &quot;&quot;).x
+	assertEqual(apply(&quot;concat&quot;, &quot;a&quot;, &quot;&quot;), &quot;a&quot;).x
+	assertEqual(apply(&quot;concat&quot;, &quot;a&quot;, &quot;b&quot;), &quot;ab&quot;).x
+	assertEqual(apply(&quot;concat&quot;, &quot;a&quot;, &quot;bc&quot;), &quot;abc&quot;).x
+	assertEqual(apply(&quot;concat&quot;, &quot;ab&quot;, &quot;c&quot;), &quot;abc&quot;).x
 End Function
 
 Function test_typeOf()

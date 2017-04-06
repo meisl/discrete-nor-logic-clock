@@ -58,6 +58,10 @@ Function isNil(xs As TList)
 	isNil = (xs.len = 0)
 End Function
 
+Function length(xs As TList)
+	length = xs.len
+End Function
+
 Function cons(x As Variant, xs As TList)
 	Dim result As New TList
 	result.tyname = xs.tyname
@@ -65,10 +69,6 @@ Function cons(x As Variant, xs As TList)
 	result.tail = xs
 	result.len = xs.len + 1
 	cons = result
-End Function
-
-Function length(xs As TList)
-	length = xs.len
 End Function
 
 Function car(xs As TList) As Variant

@@ -20,11 +20,6 @@ Type Parser
 End Type
 
 Sub Main
-	dim test1 As Object, test2 As Object
-	set test1 = Nil
-	test2 = cons(&quot;a&quot;, Nil)
-	test2.len = 0
-&apos;	MsgBox(tostring(blah))
 	Stop
 	Dim s As String
 	Dim pDigit As Parser, pHexDigit As Parser, pHexNum As Parser, pHexLit As Parser
@@ -192,11 +187,12 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 	Else
 		croak(&quot;applyP: invalid arg parser - &quot; &amp; toString(parser))
 	End If
-&apos;	MsgBox(toString(p.tp))
-	Dim result As Variant
 	If IsMissing(pos) Then
 		pos = 1
 	End If
+
+	Dim result As Variant
+	Dim nxtPos As Integer
 	If p.tp = &quot;return&quot; Then
 		result = Array(p.st(0), pos)
 	ElseIf p.tp = &quot;failure&quot; Then
@@ -225,7 +221,6 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		&apos;MsgBox(&quot;str(&quot; &amp; toString(match) &amp; &quot;), s=&quot; &amp; toString(s) &amp; &quot;, pos=&quot; &amp; toString(pos) &amp; &quot;, matchLen=&quot; &amp; toString(matchLen)_
 		&apos;	&amp; chr(13) &amp; &quot;~&gt;&quot; &amp; toString(result))
 	ElseIf p.tp = &quot;many&quot; Then
-		Dim nxtPos As Integer
 		Dim lst As Object
 		Dim lstLen As Integer
 		nxtPos = pos
@@ -259,7 +254,6 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 	ElseIf p.tp = &quot;seq&quot; Then
 		Dim innerParsers As Variant, t As Variant
 		Dim i As Integer, j As Integer, k As Integer
-&apos;		Dim nxtPos As Integer
 		innerParsers = p.st(0)
 		i = LBound(innerParsers)
 		k = UBound(innerParsers)
