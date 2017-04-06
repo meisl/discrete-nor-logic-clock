@@ -16,16 +16,9 @@ End Sub
 
 
 Function TList_toString(xs As TList)
+&apos;	concat &quot;[&quot; (concat (foldl1 (\acc.(concat acc) ° (concat &quot;, &quot;))) &quot;[&quot; (map toString xs)) &quot;]&quot;
 	Dim result As String
-	If isNil(xs) Then
-		result = &quot;[]&quot;
-	Else
-		result = &quot;[&quot; &amp; toString(car(xs))
-		If length(xs) &gt; 1 Then
-			result = result &amp; &quot;, &quot; &amp; Join(toArray(map(&quot;toString&quot;, cdr(xs))), &quot;, &quot;)
-		End If
-		result = result &amp; &quot;]&quot;
-	End If
+	result = &quot;[&quot; &amp; Join(toArray(map(&quot;toString&quot;, xs)), &quot;, &quot;) &amp; &quot;]&quot;
 	TList_toString = result
 End Function
 
@@ -107,6 +100,24 @@ Function map(fn As Variant, xs As Variant)
 	map = result
 End Function
 
+Function filter(fn As Variant, ByVal xs As Variant)
+	Dim result As TList
+	If IsArray(xs) Then
+		result = filter(fn, toList(xs))
+	Else
+		Dim x As Variant
+		result = nil
+		While Not(isNil(xs))
+			x = car(xs)
+			If (apply(fn, x)) Then
+				result = cons(x, result)
+			End If
+			xs = cdr(xs)
+		Wend
+	End If
+	filter = result
+End Function
+
 Function foldl(fn As Variant, acc As Variant, ByVal xs As Variant)
 	Dim result As Variant
 	If IsArray(xs) Then
@@ -155,15 +166,19 @@ Function reverse(xs As TList)
 End Function
 
 Function toArray(xs As TList)
-	Dim result(0 To xs.len - 1)
-	Dim t As TList
-	Set t = xs
-	Dim i As Integer
-	For i = 0 To xs.len - 1
-		result(i) = t.head
-		Set t = t.tail
-	Next i
-	toArray = result
+	If isNil(xs) Then
+		toArray = Array()
+	Else
+		Dim result(0 To xs.len - 1)
+		Dim t As TList
+		Set t = xs
+		Dim i As Integer
+		For i = 0 To xs.len - 1
+			result(i) = t.head
+			Set t = t.tail
+		Next i
+		toArray = result
+	End If
 End Function
 
 Function List(Optional a0, Optional a1, Optional a2, Optional a3, Optional a4, Optional a5, Optional a6, Optional a7, Optional a8, Optional a9, Optional a10)
@@ -212,6 +227,8 @@ Function test_List()
 	test_List_List()
 	test_List_car()
 	test_List_cdr()
+	test_List_map()
+	test_List_filter()
 	test_List_adjoin()
 	test_List_flatten()
 	test_List_reverse()
@@ -301,6 +318,23 @@ Function test_List_cdr()
 	assertThrows(&quot;cdr&quot;, Array(nil)).x
 	assertEqual(toString(cdr(List(1   ))), &quot;[]&quot;).x
 	assertEqual(toString(cdr(List(2, 1))), &quot;[1]&quot;).x
+End Function
+
+Function test_List_map()
+	assertEqual(toString(map(&quot;toString&quot;, nil)), &quot;[]&quot;).x
+	assertEqual(toString(map(&quot;toString&quot;, List(1))), &quot;[&apos;1&apos;]&quot;).x
+	assertEqual(toString(map(&quot;toString&quot;, List(&quot;a&quot;))), &quot;[&apos;&apos;a&apos;&apos;]&quot;).x
+	assertEqual(toString(map(&quot;toString&quot;, List(&quot;a&quot;, 42))), &quot;[&apos;&apos;a&apos;&apos;, &apos;42&apos;]&quot;).x
+	assertEqual(toString(map(&quot;toString&quot;, List(nil, &quot;a&quot;, 42))), &quot;[&apos;[]&apos;, &apos;&apos;a&apos;&apos;, &apos;42&apos;]&quot;).x
+End Function
+
+Function test_List_filter()
+	assertEqual(toString(filter(  &quot;isNil&quot;, nil  )), &quot;[]&quot;).x
+	assertEqual(toString(filter(  &quot;isNil&quot;, List(nil)  )), &quot;[[]]&quot;).x
+	assertEqual(toString(filter(  &quot;isNil&quot;, List(nil, nil)  )), &quot;[[], []]&quot;).x
+	assertEqual(toString(filter(  &quot;isNil&quot;, List(List(1), List(1, 0), List(nil))  )), &quot;[]&quot;).x
+	assertEqual(toString(filter(  &quot;isNil&quot;, List(nil, List(1), nil, List(1, 0), List(nil))  )), &quot;[[], []]&quot;).x
+	assertEqual(toString(filter(apply(&quot;equ&quot;, 1), List(0, 1, 1, 0, 1, 0))), &quot;[1, 1, 1]&quot;).x
 End Function
 
 Function test_List_adjoin()
