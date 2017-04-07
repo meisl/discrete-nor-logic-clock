@@ -15,9 +15,8 @@ Sub Main
 	test_Parser()
 	Stop
 	Dim s As String
-	Dim pDigit As Parser, pHexDigit As Parser, pHexNum As Parser, pHexLit As Parser
+	Dim pDigit As Parser, pHexNum As Parser, pHexLit As Parser
 	Set pDigit = pChoice(pChoice(pChoice(pStr(&quot;0&quot;), pStr(&quot;1&quot;)), pStr(&quot;2&quot;)), pStr(&quot;3&quot;))
-	Set pHexDigit = pChoice(pDigit, pChoice(pChoice(pChoice(pChoice(pChoice(pStr(&quot;A&quot;), pStr(&quot;B&quot;)), pStr(&quot;C&quot;)), pStr(&quot;D&quot;)), pStr(&quot;E&quot;)), pStr(&quot;F&quot;)))
 	Set pHexNum = mkSeq(Array(pMany(pHexDigit)), &quot;readHex&quot;)
 	Set pHexLit = mkSeq(Array(pStr(&quot;0x&quot;), pHexNum), &quot;snd&quot;)
 	Dim p As Parser 
@@ -140,9 +139,29 @@ End Function
 Function pDecDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pChoice(pBinDigit, pChoice(pStr(&quot;2&quot;), pStr(&quot;3&quot;))
+		result = pChoice(pBinDigit,	pStr(&quot;2&quot;))
+		result = pChoice(result,	pStr(&quot;3&quot;))
+		result = pChoice(result,	pStr(&quot;4&quot;))
+		result = pChoice(result,	pStr(&quot;5&quot;))
+		result = pChoice(result,	pStr(&quot;6&quot;))
+		result = pChoice(result,	pStr(&quot;7&quot;))
+		result = pChoice(result,	pStr(&quot;8&quot;))
+		result = pChoice(result,	pStr(&quot;9&quot;))
 	End If
 	pDecDigit = result
+End Function
+
+Function pHexDigit()
+	Static result As Parser	&apos; an uninitialized instance of Parser at first
+	If result.tp = &quot;&quot; Then
+		result = pChoice(pDecDigit,	pChoice(pStr(&quot;A&quot;), pStr(&quot;a&quot;)))
+		result = pChoice(result,	pChoice(pStr(&quot;B&quot;), pStr(&quot;b&quot;)))
+		result = pChoice(result,	pChoice(pStr(&quot;C&quot;), pStr(&quot;c&quot;)))
+		result = pChoice(result,	pChoice(pStr(&quot;D&quot;), pStr(&quot;d&quot;)))
+		result = pChoice(result,	pChoice(pStr(&quot;E&quot;), pStr(&quot;e&quot;)))
+		result = pChoice(result,	pChoice(pStr(&quot;F&quot;), pStr(&quot;f&quot;)))
+	End If
+	pHexDigit = result
 End Function
 
 Function lookupParser(pName As String) As Parser
@@ -277,13 +296,21 @@ End Function
 &apos;= tests ============================================================
 
 Function test_Parser()
+	Dim tm As Date
+	tm = TimeValue(Time)
 	test_Parser_fail()
 	test_Parser_item()
 	test_Parser_return()
 	test_Parser_str()
 	test_Parser_choice()
 	test_Parser_white()
+	test_Parser_binDigit()
+	test_Parser_decDigit()
+	test_Parser_hexDigit()
 	test_Parser_many()
+	
+	tm = TimeValue(Time) - tm
+	MsgBox(TimeSerial(Hour(tm), Minute(tm), Second(tm)))
 End Function
 
 Function assert_parse(ByVal p As Variant, ByVal ss As Variant, ByVal expected As Variant)
@@ -449,6 +476,105 @@ Function test_Parser_white()
 	assert_parse(p, chr(13) &amp; chr(9) &amp; &quot;asdf&quot;, 	parseFailure).x
 	assert_parse(p, chr(9) &amp; chr(13) &amp; &quot;asdf&quot;, 	Array(&quot;\t&quot;, 2)).x
 	assert_parse(p, chr(13) &amp; chr(13) &amp; &quot;asdf&quot;, parseFailure).x
+End Function
+
+Function test_Parser_binDigit()
+	Dim p As Parser
+	p = pBinDigit
+
+	assert_parse(p, &quot;&quot;, 						parseFailure).x
+	assert_parse(p, &quot; &quot;, 						parseFailure).x
+	assert_parse(p, &quot;sadf&quot;,						parseFailure).x
+	assert_parse(p, &quot;0sadf&quot;, 					Array(&quot;0&quot;, 2)).x
+	assert_parse(p, &quot;1sadf&quot;, 					Array(&quot;1&quot;, 2)).x
+	assert_parse(p, &quot;2sadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;3sadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;4sadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;5sadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;6sadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;7sadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;8sadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;9sadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;Asadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;asadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;Bsadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;bsadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;Csadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;csadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;Dsadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;dsadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;Esadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;esadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;Fsadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;fsadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;Gsadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;gsadf&quot;, 					parseFailure).x
+End Function
+
+Function test_Parser_decDigit()
+	Dim p As Parser
+	p = pDecDigit
+
+	assert_parse(p, &quot;&quot;, 						parseFailure).x
+	assert_parse(p, &quot; &quot;, 						parseFailure).x
+	assert_parse(p, &quot;sadf&quot;,						parseFailure).x
+	assert_parse(p, &quot;0sadf&quot;, 					Array(&quot;0&quot;, 2)).x
+	assert_parse(p, &quot;1sadf&quot;, 					Array(&quot;1&quot;, 2)).x
+	assert_parse(p, &quot;2sadf&quot;, 					Array(&quot;2&quot;, 2)).x
+	assert_parse(p, &quot;3sadf&quot;, 					Array(&quot;3&quot;, 2)).x
+	assert_parse(p, &quot;4sadf&quot;, 					Array(&quot;4&quot;, 2)).x
+	assert_parse(p, &quot;5sadf&quot;, 					Array(&quot;5&quot;, 2)).x
+	assert_parse(p, &quot;6sadf&quot;, 					Array(&quot;6&quot;, 2)).x
+	assert_parse(p, &quot;7sadf&quot;, 					Array(&quot;7&quot;, 2)).x
+	assert_parse(p, &quot;8sadf&quot;, 					Array(&quot;8&quot;, 2)).x
+	assert_parse(p, &quot;9sadf&quot;, 					Array(&quot;9&quot;, 2)).x
+	assert_parse(p, &quot;Asadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;asadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;Bsadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;bsadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;Csadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;csadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;Dsadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;dsadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;Esadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;esadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;Fsadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;fsadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;Gsadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;gsadf&quot;, 					parseFailure).x
+End Function
+
+Function test_Parser_hexDigit()
+	Dim p As Parser
+	p = pHexDigit
+
+	assert_parse(p, &quot;&quot;, 						parseFailure).x
+	assert_parse(p, &quot; &quot;, 						parseFailure).x
+	assert_parse(p, &quot;sadf&quot;,						parseFailure).x
+	assert_parse(p, &quot;0sadf&quot;, 					Array(&quot;0&quot;, 2)).x
+	assert_parse(p, &quot;1sadf&quot;, 					Array(&quot;1&quot;, 2)).x
+	assert_parse(p, &quot;2sadf&quot;, 					Array(&quot;2&quot;, 2)).x
+	assert_parse(p, &quot;3sadf&quot;, 					Array(&quot;3&quot;, 2)).x
+	assert_parse(p, &quot;4sadf&quot;, 					Array(&quot;4&quot;, 2)).x
+	assert_parse(p, &quot;5sadf&quot;, 					Array(&quot;5&quot;, 2)).x
+	assert_parse(p, &quot;6sadf&quot;, 					Array(&quot;6&quot;, 2)).x
+	assert_parse(p, &quot;7sadf&quot;, 					Array(&quot;7&quot;, 2)).x
+	assert_parse(p, &quot;8sadf&quot;, 					Array(&quot;8&quot;, 2)).x
+	assert_parse(p, &quot;9sadf&quot;, 					Array(&quot;9&quot;, 2)).x
+	assert_parse(p, &quot;Asadf&quot;, 					Array(&quot;A&quot;, 2)).x
+	assert_parse(p, &quot;asadf&quot;, 					Array(&quot;a&quot;, 2)).x
+	assert_parse(p, &quot;Bsadf&quot;, 					Array(&quot;B&quot;, 2)).x
+	assert_parse(p, &quot;bsadf&quot;, 					Array(&quot;b&quot;, 2)).x
+	assert_parse(p, &quot;Csadf&quot;, 					Array(&quot;C&quot;, 2)).x
+	assert_parse(p, &quot;csadf&quot;, 					Array(&quot;c&quot;, 2)).x
+	assert_parse(p, &quot;Dsadf&quot;, 					Array(&quot;D&quot;, 2)).x
+	assert_parse(p, &quot;dsadf&quot;, 					Array(&quot;d&quot;, 2)).x
+	assert_parse(p, &quot;Esadf&quot;, 					Array(&quot;E&quot;, 2)).x
+	assert_parse(p, &quot;esadf&quot;, 					Array(&quot;e&quot;, 2)).x
+	assert_parse(p, &quot;Fsadf&quot;, 					Array(&quot;F&quot;, 2)).x
+	assert_parse(p, &quot;fsadf&quot;, 					Array(&quot;f&quot;, 2)).x
+	assert_parse(p, &quot;Gsadf&quot;, 					parseFailure).x
+	assert_parse(p, &quot;gsadf&quot;, 					parseFailure).x
 End Function
 
 Function test_Parser_many()
