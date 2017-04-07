@@ -16,12 +16,12 @@ Sub Main
 	Stop
 	Dim s As String
 	Dim pDigit As Parser, pHexDigit As Parser, pHexNum As Parser, pHexLit As Parser
-	Set pDigit = mkChoice(mkChoice(mkChoice(pStr(&quot;0&quot;), pStr(&quot;1&quot;)), pStr(&quot;2&quot;)), pStr(&quot;3&quot;))
-	Set pHexDigit = mkChoice(pDigit, mkChoice(mkChoice(mkChoice(mkChoice(mkChoice(pStr(&quot;A&quot;), pStr(&quot;B&quot;)), pStr(&quot;C&quot;)), pStr(&quot;D&quot;)), pStr(&quot;E&quot;)), pStr(&quot;F&quot;)))
+	Set pDigit = pChoice(pChoice(pChoice(pStr(&quot;0&quot;), pStr(&quot;1&quot;)), pStr(&quot;2&quot;)), pStr(&quot;3&quot;))
+	Set pHexDigit = pChoice(pDigit, pChoice(pChoice(pChoice(pChoice(pChoice(pStr(&quot;A&quot;), pStr(&quot;B&quot;)), pStr(&quot;C&quot;)), pStr(&quot;D&quot;)), pStr(&quot;E&quot;)), pStr(&quot;F&quot;)))
 	Set pHexNum = mkSeq(Array(mkMany(pHexDigit)), &quot;readHex&quot;)
 	Set pHexLit = mkSeq(Array(pStr(&quot;0x&quot;), pHexNum), &quot;snd&quot;)
 	Dim p As Parser 
-	&apos;mkChoice(pItem(), pReturn(&quot;bar&quot;))
+	&apos;pChoice(pItem(), pReturn(&quot;bar&quot;))
 	Set p = mkSeq(Array(pHexLit, mkMany(pWs)), &quot;fst&quot;)
 	s = &quot;FF 0x1F __µ 0&quot;
 
@@ -82,8 +82,8 @@ Function pStr(t As String)
 	End If
 End Function
 
-Function mkChoice(p1 As Parser, p2 As Parser)
-	mkChoice = mkParser(&quot;choice&quot;, Array(p1, p2))
+Function pChoice(p1 As Parser, p2 As Parser)
+	pChoice = mkParser(&quot;choice&quot;, Array(p1, p2))
 End Function
 
 Function mkMany(p As Parser)
@@ -112,7 +112,7 @@ End Function
 Function pWs()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = mkChoice(pStr(&quot; &quot;), pStr(Chr(9))
+		result = pChoice(pStr(&quot; &quot;), pStr(Chr(9))
 	End If
 	pWs = result
 End Function
@@ -120,7 +120,7 @@ End Function
 Function pBinDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = mkChoice(pStr(&quot;0&quot;), pStr(&quot;1&quot;))
+		result = pChoice(pStr(&quot;0&quot;), pStr(&quot;1&quot;))
 	End If
 	pBinDigit = result
 End Function
@@ -128,7 +128,7 @@ End Function
 Function pDecDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = mkChoice(pBinDigit, mkChoice(pStr(&quot;2&quot;), pStr(&quot;3&quot;))
+		result = pChoice(pBinDigit, pChoice(pStr(&quot;2&quot;), pStr(&quot;3&quot;))
 	End If
 	pDecDigit = result
 End Function
@@ -269,10 +269,10 @@ Function test_Parser()
 	test_Parser_item()
 	test_Parser_return()
 	test_Parser_str()
-	
+	test_Parser_choice()
 End Function
 
-Function assert_parse(ByVal p As Variant, ByVal s As String, ByVal expected As Variant)
+Function assert_parse(ByVal p As Variant, ByVal ss As Variant, ByVal expected As Variant)
 	If isString(p) Then
 		p = lookupParser(p)
 	End If
@@ -280,10 +280,23 @@ Function assert_parse(ByVal p As Variant, ByVal s As String, ByVal expected As V
 		expected = toString(expected)
 	End If
 	assertEqual(typeOf(p), &quot;Object/TParser&quot;).x
-	Dim actual As Variant
-	actual = applyP(p, s)
+	Dim actual As Variant, result As Variant
 	
-	assert_parse = assertEqual(toString(actual), expected)
+	If isArray(ss) Then
+		Dim i As Integer
+		For i = LBound(ss) To UBound(ss)
+			actual = applyP(p, ss(i))
+			result = assertEqual(toString(actual), expected)
+			If result.isFail Then 
+				MsgBox(&quot;at index &quot; &amp; i &amp; &quot;: &quot; &amp; toString(ss(i)))
+				Exit For
+			End If
+		Next i
+	Else
+		actual = applyP(p, ss)
+		result = assertEqual(toString(actual), expected)
+	End If
+	assert_parse = result
 End Function
 
 Function test_Parser_fail()
@@ -363,6 +376,46 @@ Function test_Parser_str()
 	assert_parse(p, chr(13) &amp; &quot;bar&quot;,			Array(&quot;\n&quot;, 2)).x
 	assert_parse(p, chr(13) &amp; chr(13),			Array(&quot;\n&quot;, 2)).x
 	assert_parse(p, chr(13) &amp; chr(13) &amp; &quot;bar&quot;,	Array(&quot;\n&quot;, 2)).x
+End Function
+
+Function test_Parser_choice()
+	Dim p As Parser
+	Dim data As Variant
+	Dim expected As Variant
+	
+	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
+		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
+		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
+	)
+	p = pChoice(pFail, pFail)
+	assert_parse(p, data, parseFailure).x
+	
+	p = pChoice(pReturn(7), pFail)
+	expected = Array(7, 1)
+	assert_parse(p, data, expected).x
+	
+	p = pChoice(pFail, pReturn(7))
+	expected = Array(7, 1)
+	assert_parse(p, data, expected).x
+	
+	p = pChoice(pReturn(42), pReturn(7))
+	expected = Array(42, 1)
+	assert_parse(p, data, expected).x
+	
+	assert_parse(pChoice(pItem, pReturn(11)), 	&quot;&quot;, Array(11, 1)).x
+	assert_parse(pChoice(pItem, pStr(&quot;x&quot;)), 	&quot;&quot;, parseFailure).x
+	assert_parse(pChoice(pReturn(11), pItem), 	&quot;&quot;, Array(11, 1)).x
+	assert_parse(pChoice(pStr(&quot;x&quot;), pItem), 	&quot;&quot;, parseFailure).x
+	
+	assert_parse(pChoice(pItem, pReturn(11)), 	&quot; &quot;, Array(&quot; &quot;, 2)).x
+	assert_parse(pChoice(pItem, pStr(&quot;x&quot;)), 	&quot; &quot;, Array(&quot; &quot;, 2)).x
+	assert_parse(pChoice(pReturn(11), pItem), 	&quot; &quot;, Array(11, 1)).x
+	assert_parse(pChoice(pStr(&quot;x&quot;), pItem), 	&quot; &quot;, Array(&quot; &quot;, 2)).x
+	
+	assert_parse(pChoice(pItem, pReturn(11)), 	&quot;x&quot;, Array(&quot;x&quot;, 2)).x
+	assert_parse(pChoice(pItem, pStr(&quot;x&quot;)), 	&quot;x&quot;, Array(&quot;x&quot;, 2)).x
+	assert_parse(pChoice(pReturn(11), pItem), 	&quot;x&quot;, Array(11, 1)).x
+	assert_parse(pChoice(pStr(&quot;x&quot;), pItem), 	&quot;x&quot;, Array(&quot;x&quot;, 2)).x
 End Function
 
 
