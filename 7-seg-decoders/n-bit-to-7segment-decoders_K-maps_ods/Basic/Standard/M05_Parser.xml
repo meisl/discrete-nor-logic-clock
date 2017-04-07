@@ -7,7 +7,7 @@ Option Explicit
 Type Parser
 	tyname As String
 	tp As String
-	st As Array
+	st As Variant
 End Type
 
 
@@ -44,7 +44,7 @@ End Function
 Function pFail()
 	Static result As New Parser
 	If result.tp = &quot;&quot; Then
-		result = mkParser(&quot;fail&quot;, Array())
+		result = mkParser(&quot;fail&quot;, Nothing)
 	End If
 	pFail = result
 End Function
@@ -61,17 +61,9 @@ Function isParseFailure(parseResult) As Boolean
 	End If
 End Function
 
-Function failureS()
-	Static result As String
-	If (result = &quot;&quot;) Then
-		result = toString(parseFailure)
-	End If
-	failureS = result
-End Function
-
 &apos; always succeeds by returning the provided value; without increasing pos
 Function pReturn(v As Variant)
-	pReturn = mkParser(&quot;return&quot;, Array(v))
+	pReturn = mkParser(&quot;return&quot;, v)
 End Function
 
 &apos; fails on empty string but succeeds on all others
@@ -79,7 +71,7 @@ End Function
 Function pItem()
 	Static result As New Parser
 	If result.tp = &quot;&quot; Then
-		result = mkParser(&quot;item&quot;, Array())
+		result = mkParser(&quot;item&quot;, Nothing)
 	End If
 	pItem = result
 End Function
@@ -90,7 +82,7 @@ Function pStr(t As String)
 	If (Len(t) = 0) Then
 		croak(&quot;pStr: cannot match &apos;exactly&apos; the empty string t=&apos;&apos;&quot;)
 	Else
-		pStr = mkParser(&quot;str&quot;, Array(t))
+		pStr = mkParser(&quot;str&quot;, t)
 	End If
 End Function
 
@@ -98,38 +90,62 @@ End Function
 &apos; or (and only if p1 fails) if p2 succeeds, returns p2&apos;s result and pos.
 &apos; fails if both, p1 and p2 fail
 Function pChoice(p1 As Parser, p2 As Parser)
-	pChoice = mkParser(&quot;choice&quot;, Array(p1, p2))
+&apos;	pChoice = mkParser(&quot;choice&quot;, Array(p1, p2))
+&apos;	Exit Function
+	Dim choices As Variant
+	If p2.tp = &quot;choice&quot; Then
+		If p1.tp = &quot;choice&quot; Then
+			choices = adjoin(p1.st, p2.st)
+		Else
+			choices = cons(p1,  p2.st)
+		End If
+	Else
+		If p1.tp = &quot;choice&quot; Then
+			choices = adjoin(p1.st, List(p2))
+		Else
+			choices = List(p1, p2)
+		End If
+	End If
+&apos;	dim i as integer, s As string
+&apos;	s = &quot;&quot;
+&apos;	for i = lbound(choices) to ubound(choices)
+&apos;		s = s &amp; &quot;, &quot; &amp; choices(i).tp
+&apos;		if choices(i).tp = &quot;str&quot; then
+&apos;			s = s &amp; &quot;(&quot; &amp; toString(choices(i).st(0)) &amp; &quot;)&quot;
+&apos;		end if
+&apos;	next i
+	pChoice = mkParser(&quot;choice&quot;, choices)
 End Function
 
 &apos; never fails: if p fails than pZeroOrOne(p) returns nil + same pos as result,
 &apos; otherwise returns a singleton list of p&apos;s result + pos
 &apos; matches at most once
 Function pZeroOrOne(p As Parser)
-	pZeroOrOne = mkParser(&quot;zeroOrOne&quot;, Array(p))
+	pZeroOrOne = mkParser(&quot;zeroOrOne&quot;, p)
 End Function
 
 &apos; never fails: if p fails than pMany(p) returns nil + same pos as result,
 &apos; otherwise returns a *REVERSED list* of p results + last pos
 &apos; matches as many as possible
 Function pManyRev(p As Parser)
-	pManyRev = mkParser(&quot;manyRev&quot;, Array(p))
+	pManyRev = mkParser(&quot;manyRev&quot;, p)
 End Function
 
 &apos; same as pManyRev but with the list in the order as in the parsed string
 Function pMany(p As Parser)
-	pMany = mkParser(&quot;many&quot;, Array(p))
+	pMany = mkParser(&quot;many&quot;, p)
 End Function
 
 &apos; same as pManyRev but fails if there is no match at all
 &apos; matches as many as possible
 Function pMany1Rev(p As Parser)
-	pMany1Rev = mkParser(&quot;many1Rev&quot;, Array(p))
+	pMany1Rev = mkParser(&quot;many1Rev&quot;, p)
 End Function
 
 &apos; same as pMany but fails if there is no match at all
 &apos; matches as many as possible
 Function pMany1(p As Parser)
-	pMany1 = mkParser(&quot;many1&quot;, Array(p))
+	pMany1 = mkParser(&quot;many1&quot;, p)
 End Function
 
 &apos; pSeq - make a sequence of parsers and finally process the results (list)
@@ -246,9 +262,12 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 
 	Dim result As Variant
 	Dim nxtPos As Integer
+	Dim i As Integer, j As Integer, k As Integer
+	Dim innerParser As Parser
+	Dim lst As Object
 	nxtPos = pos
 	If p.tp = &quot;return&quot; Then
-		result = Array(p.st(0), nxtPos)
+		result = Array(p.st, nxtPos)
 	ElseIf p.tp = &quot;fail&quot; Then
 		result = parseFailure
 	ElseIf p.tp = &quot;item&quot; Then
@@ -261,7 +280,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 	ElseIf p.tp = &quot;str&quot; Then
 		Dim match As String
 		Dim matchLen As Integer
-		match = p.st(0)
+		match = p.st
 		matchLen = Len(match)
 		If (Mid(s, pos, matchLen) = match) Then
 			nxtPos = pos + matchLen
@@ -272,29 +291,42 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		&apos;MsgBox(&quot;str(&quot; &amp; toString(match) &amp; &quot;), s=&quot; &amp; toString(s) &amp; &quot;, pos=&quot; &amp; toString(pos) &amp; &quot;, matchLen=&quot; &amp; toString(matchLen)_
 		&apos;	&amp; chr(13) &amp; &quot;~&gt;&quot; &amp; toString(result))
 	ElseIf p.tp = &quot;choice&quot; Then
-		result = applyP(p.st(0), s, pos)
-		If isParseFailure(result) Then
-			result = applyP(p.st(1), s, pos)
-		End If
+		
+		&apos;For i = LBound(p.st) To UBound(p.st)
+		&apos;	result = applyP(p.st(i), s, pos)
+		&apos;	If Not(isParseFailure(result)) Then Exit For
+		&apos;Next i
+		
+		&apos;result = applyP(p.st(0), s, pos)
+		&apos;If isParseFailure(result) Then
+		&apos;	result = applyP(p.st(1), s, pos)
+		&apos;End If
+		
+		lst = p.st
+		Do
+			innerParser = car(lst)
+			result = applyP(innerParser, s, pos)
+			lst = cdr(lst)
+		Loop Until (isNil(lst) Or Not(isParseFailure(result)))
 	ElseIf p.tp = &quot;zeroOrOne&quot; Then
-		result = applyP(p.st(0), s, pos)
+		result = applyP(p.st, s, pos)
 		If isParseFailure(result) Then
 			result = Array(nil, pos)
 		Else
 			result = Array(List(result(0)), result(1))
 		End If
 	ElseIf (p.tp = &quot;manyRev&quot;) Or (p.tp = &quot;many1Rev&quot;) Then
-		Dim lst As Object
 		Dim lstLen As Integer
 		nxtPos = pos
 		lstLen = 0
 		Set lst = nil
-		result = applyP(p.st(0), s, nxtPos)
+		innerParser = p.st
+		result = applyP(innerParser, s, nxtPos)
 		While Not(isParseFailure(result))
 			nxtPos = result(1)
 			Set lst = cons(result(0), lst)
 			lstLen = lstLen + 1
-			result = applyP(p.st(0), s, nxtPos)
+			result = applyP(innerParser, s, nxtPos)
 		Wend
 		If (p.tp = &quot;many1Rev&quot;) And isNil(lst) Then
 			result = parseFailure
@@ -302,10 +334,10 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 			result = Array(lst, nxtPos)
 		End If
 	ElseIf p.tp = &quot;many&quot; Then
-		result = applyP(pManyRev(p.st(0)), s, pos)
+		result = applyP(pManyRev(p.st), s, pos)
 		result(0) = reverse(result(0))
 	ElseIf p.tp = &quot;many1&quot; Then
-		result = applyP(pMany1Rev(p.st(0)), s, pos)
+		result = applyP(pMany1Rev(p.st), s, pos)
 		result(0) = reverse(result(0))
 	ElseIf p.tp = &quot;bind&quot; Then
 		result = applyP(p.st(0), s, pos)
@@ -315,7 +347,6 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		End If
 	ElseIf p.tp = &quot;seq&quot; Then
 		Dim innerParsers As Variant, t As Variant
-		Dim i As Integer, j As Integer, k As Integer
 		innerParsers = p.st(0)
 		i = LBound(innerParsers)
 		k = UBound(innerParsers)
