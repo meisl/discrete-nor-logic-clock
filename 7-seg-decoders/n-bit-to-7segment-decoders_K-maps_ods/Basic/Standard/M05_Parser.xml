@@ -22,7 +22,7 @@ Sub Main
 	Set pHexLit = mkSeq(Array(pStr(&quot;0x&quot;), pHexNum), &quot;snd&quot;)
 	Dim p As Parser 
 	&apos;pChoice(pItem(), pReturn(&quot;bar&quot;))
-	Set p = mkSeq(Array(pHexLit, pMany(pWs)), &quot;fst&quot;)
+	Set p = mkSeq(Array(pHexLit, pMany(pWhite)), &quot;fst&quot;)
 	s = &quot;FF 0x1F __µ 0&quot;
 
 	MsgBox( _
@@ -42,6 +42,7 @@ Function mkParser(tp As String, st As Variant)
 	mkParser = result
 End Function
 
+&apos; always fails on any string; failure is indicated by returning parseFailure()
 Function pFail()
 	Static result As New Parser
 	If result.tp = &quot;&quot; Then
@@ -62,10 +63,13 @@ Function isParseFailure(parseResult) As Boolean
 	End If
 End Function
 
-Function pReturn(x As Variant)
-	pReturn = mkParser(&quot;return&quot;, Array(x))
+&apos; always succeeds by returning the provided value; without increasing pos
+Function pReturn(v As Variant)
+	pReturn = mkParser(&quot;return&quot;, Array(v))
 End Function
 
+&apos; fails on empty string but succeeds on all others
+&apos; by returning the first character; and increasing pos by 1
 Function pItem()
 	Static result As New Parser
 	If result.tp = &quot;&quot; Then
@@ -74,6 +78,8 @@ Function pItem()
 	pItem = result
 End Function
 
+&apos; succeeds on strings with the given prefix t by returning t,
+&apos; and advancing pos by the length of t
 Function pStr(t As String)
 	If (Len(t) = 0) Then
 		croak(&quot;pStr: cannot match &apos;exactly&apos; the empty string t=&apos;&apos;&quot;)
@@ -82,10 +88,16 @@ Function pStr(t As String)
 	End If
 End Function
 
+&apos; succeeds if either p1 succeeds (then returning p1&apos;s result and pos)
+&apos; or (and only if p1 fails) if p2 succeeds, returns p2&apos;s result and pos.
+&apos; fails if both, p1 and p2 fail
 Function pChoice(p1 As Parser, p2 As Parser)
 	pChoice = mkParser(&quot;choice&quot;, Array(p1, p2))
 End Function
 
+&apos; never fails: if p fails than pMany(p) returns nil + same pos as result,
+&apos; otherwise returns a list of p results + last pos
+&apos; matches as many as possible
 Function pMany(p As Parser)
 	pMany = mkParser(&quot;many&quot;, Array(p))
 End Function
@@ -109,12 +121,12 @@ End Function
 &apos;==================================================================
 
 
-Function pWs()
+Function pWhite()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
 		result = pChoice(pStr(&quot; &quot;), pStr(Chr(9))
 	End If
-	pWs = result
+	pWhite = result
 End Function
 
 Function pBinDigit()
@@ -136,7 +148,7 @@ End Function
 Function lookupParser(pName As String) As Parser
 	Dim result As Parser
 	Select Case pName
-		Case &quot;pWs&quot;:			result = pWs
+		Case &quot;pWhite&quot;:		result = pWhite
 		Case &quot;pBinDigit&quot;:	result = pBinDigit
 		Case &quot;pDecDigit&quot;:	result = pDecDigit
 		Case Else
@@ -270,6 +282,7 @@ Function test_Parser()
 	test_Parser_return()
 	test_Parser_str()
 	test_Parser_choice()
+	test_Parser_white()
 	test_Parser_many()
 End Function
 
@@ -417,6 +430,25 @@ Function test_Parser_choice()
 	assert_parse(pChoice(pItem, pStr(&quot;x&quot;)), 	&quot;x&quot;, Array(&quot;x&quot;, 2)).x
 	assert_parse(pChoice(pReturn(11), pItem), 	&quot;x&quot;, Array(11, 1)).x
 	assert_parse(pChoice(pStr(&quot;x&quot;), pItem), 	&quot;x&quot;, Array(&quot;x&quot;, 2)).x
+End Function
+
+Function test_Parser_white()
+	Dim p As Parser
+	p = pWhite
+
+	assert_parse(p, &quot;&quot;, 						parseFailure).x
+	assert_parse(p, &quot; &quot;, 						Array(&quot; &quot;, 2)).x
+	assert_parse(p, chr(9), 					Array(&quot;\t&quot;, 2)).x
+	assert_parse(p, chr(13), 					parseFailure).x
+	assert_parse(p, &quot;asdf&quot;,						parseFailure).x
+	assert_parse(p, &quot; asdf&quot;, 					Array(&quot; &quot;, 2)).x
+	assert_parse(p, chr(9) &amp; &quot;asdf&quot;, 			Array(&quot;\t&quot;, 2)).x
+	assert_parse(p, chr(13) &amp; &quot;asdf&quot;, 			parseFailure).x
+	assert_parse(p, &quot;  asdf&quot;, 					Array(&quot; &quot;, 2)).x
+	assert_parse(p, chr(9) &amp; chr(9) &amp; &quot;asdf&quot;, 	Array(&quot;\t&quot;, 2)).x
+	assert_parse(p, chr(13) &amp; chr(9) &amp; &quot;asdf&quot;, 	parseFailure).x
+	assert_parse(p, chr(9) &amp; chr(13) &amp; &quot;asdf&quot;, 	Array(&quot;\t&quot;, 2)).x
+	assert_parse(p, chr(13) &amp; chr(13) &amp; &quot;asdf&quot;, parseFailure).x
 End Function
 
 Function test_Parser_many()
