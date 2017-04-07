@@ -40,10 +40,14 @@ Function Array_toString(v As Variant) As String
 		If i &gt; LBound(v) Then
 			result = result &amp; &quot;, &quot;
 		End If
+On Local Error Goto whatstheproblem		
 		result = result &amp; toString(v(i))
 	Next i
 	result = result &amp; &quot;)&quot;
 	Array_toString = result
+	Exit Function
+whatstheproblem:
+	MsgBox(&quot;got problem at index &quot; &amp; i &amp; chr(13) &amp; &quot;LBound=&quot; &amp; LBound(v) &amp; &quot;, UBound=&quot; &amp; UBound(v))
 End Function
 
 &apos;= tests ============================================================

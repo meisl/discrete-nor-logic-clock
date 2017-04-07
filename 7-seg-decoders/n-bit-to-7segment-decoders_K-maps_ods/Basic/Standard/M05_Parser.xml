@@ -10,17 +10,18 @@ Type Parser
 	st As Array
 End Type
 
+
 Sub Main
 	test_Parser()
 	Stop
 	Dim s As String
 	Dim pDigit As Parser, pHexDigit As Parser, pHexNum As Parser, pHexLit As Parser
-	Set pDigit = mkChoice(mkChoice(mkChoice(mkStr(&quot;0&quot;), mkStr(&quot;1&quot;)), mkStr(&quot;2&quot;)), mkStr(&quot;3&quot;))
-	Set pHexDigit = mkChoice(pDigit, mkChoice(mkChoice(mkChoice(mkChoice(mkChoice(mkStr(&quot;A&quot;), mkStr(&quot;B&quot;)), mkStr(&quot;C&quot;)), mkStr(&quot;D&quot;)), mkStr(&quot;E&quot;)), mkStr(&quot;F&quot;)))
+	Set pDigit = mkChoice(mkChoice(mkChoice(pStr(&quot;0&quot;), pStr(&quot;1&quot;)), pStr(&quot;2&quot;)), pStr(&quot;3&quot;))
+	Set pHexDigit = mkChoice(pDigit, mkChoice(mkChoice(mkChoice(mkChoice(mkChoice(pStr(&quot;A&quot;), pStr(&quot;B&quot;)), pStr(&quot;C&quot;)), pStr(&quot;D&quot;)), pStr(&quot;E&quot;)), pStr(&quot;F&quot;)))
 	Set pHexNum = mkSeq(Array(mkMany(pHexDigit)), &quot;readHex&quot;)
-	Set pHexLit = mkSeq(Array(mkStr(&quot;0x&quot;), pHexNum), &quot;snd&quot;)
+	Set pHexLit = mkSeq(Array(pStr(&quot;0x&quot;), pHexNum), &quot;snd&quot;)
 	Dim p As Parser 
-	&apos;mkChoice(mkItem(), mkReturn(&quot;bar&quot;))
+	&apos;mkChoice(pItem(), pReturn(&quot;bar&quot;))
 	Set p = mkSeq(Array(pHexLit, mkMany(pWs)), &quot;fst&quot;)
 	s = &quot;FF 0x1F __µ 0&quot;
 
@@ -41,24 +42,48 @@ Function mkParser(tp As String, st As Variant)
 	mkParser = result
 End Function
 
-Function mkReturn(node As Variant)
-	mkReturn = mkParser(&quot;return&quot;, Array(node))
+Function pFail()
+	Static result As New Parser
+	If result.tp = &quot;&quot; Then
+		result = mkParser(&quot;fail&quot;, Array())
+	End If
+	pFail = result
 End Function
 
-Function mkItem()
-	mkItem = mkParser(&quot;item&quot;, Array())
+Function parseFailure()
+	parseFailure = nil
+End Function
+
+Function isParseFailure(parseResult) As Boolean
+	If typeOf(parseResult) &lt;&gt; typeOf(parseFailure) Then
+		isParseFailure = False
+	Else
+		isParseFailure = equ(parseResult, parseFailure)
+	End If
+End Function
+
+Function pReturn(x As Variant)
+	pReturn = mkParser(&quot;return&quot;, Array(x))
+End Function
+
+Function pItem()
+	Static result As New Parser
+	If result.tp = &quot;&quot; Then
+		result = mkParser(&quot;item&quot;, Array())
+	End If
+	pItem = result
+End Function
+
+Function pStr(t As String)
+	If (Len(t) = 0) Then
+		croak(&quot;pStr: cannot match &apos;exactly&apos; the empty string t=&apos;&apos;&quot;)
+	Else
+		pStr = mkParser(&quot;str&quot;, Array(t))
+	End If
 End Function
 
 Function mkChoice(p1 As Parser, p2 As Parser)
 	mkChoice = mkParser(&quot;choice&quot;, Array(p1, p2))
-End Function
-
-Function mkStr(t As String)
-	If (Len(t) = 0) Then
-		croak(&quot;mkStr: cannot match &apos;exactly&apos; the empty string t=&apos;&apos;&quot;)
-	Else
-		mkStr = mkParser(&quot;str&quot;, Array(t))
-	End If
 End Function
 
 Function mkMany(p As Parser)
@@ -83,26 +108,11 @@ End Function
 
 &apos;==================================================================
 
-Function pFailure()
-	Static result As New Parser
-	If result.tp = &quot;&quot; Then
-		result = mkParser(&quot;failure&quot;, Array())
-	End If
-	pFailure = result
-End Function
-
-Function pItem()
-	Static result As New Parser
-	If result.tp = &quot;&quot; Then
-		result = mkParser(&quot;item&quot;, Array())
-	End If
-	pItem = result
-End Function
 
 Function pWs()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = mkChoice(mkStr(&quot; &quot;), mkStr(Chr(9))
+		result = mkChoice(pStr(&quot; &quot;), pStr(Chr(9))
 	End If
 	pWs = result
 End Function
@@ -110,7 +120,7 @@ End Function
 Function pBinDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = mkChoice(mkStr(&quot;0&quot;), mkStr(&quot;1&quot;))
+		result = mkChoice(pStr(&quot;0&quot;), pStr(&quot;1&quot;))
 	End If
 	pBinDigit = result
 End Function
@@ -118,7 +128,7 @@ End Function
 Function pDecDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = mkChoice(pBinDigit, mkChoice(mkStr(&quot;2&quot;), mkStr(&quot;3&quot;))
+		result = mkChoice(pBinDigit, mkChoice(pStr(&quot;2&quot;), pStr(&quot;3&quot;))
 	End If
 	pDecDigit = result
 End Function
@@ -138,7 +148,12 @@ End Function
 &apos;==================================================================
 
 Function parse(pName As String, s As String)
-	parse = toString(applyP(lookupParser(pName), s))
+	Dim result As String
+	result = toString(applyP(lookupParser(pName), s))
+	if (result = &quot;Empty&quot;) then
+		MsgBox(pName &amp; &quot; on &quot; &amp; tostring(s) &amp; &quot; yielded &quot; &amp; result)
+	end if
+	parse = result
 End Function
 
 Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
@@ -158,17 +173,17 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 	Dim nxtPos As Integer
 	If p.tp = &quot;return&quot; Then
 		result = Array(p.st(0), pos)
-	ElseIf p.tp = &quot;failure&quot; Then
-		result = Empty
+	ElseIf p.tp = &quot;fail&quot; Then
+		result = parseFailure
 	ElseIf p.tp = &quot;item&quot; Then
 		If pos &lt;= Len(s) Then
 			result = Array(Mid(s, pos, 1), pos + 1)
 		Else
-			result = Empty
+			result = parseFailure
 		End If
 	ElseIf p.tp = &quot;choice&quot; Then
 		result = applyP(p.st(0), s, pos)
-		If IsEmpty(result) Then
+		If isParseFailure(result) Then
 			result = applyP(p.st(1), s, pos)
 		End If
 	ElseIf p.tp = &quot;str&quot; Then
@@ -179,7 +194,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		If (Mid(s, pos, matchLen) = match) Then
 			result = Array(match, pos + matchLen)
 		Else
-			result = Empty
+			result = parseFailure
 		End If
 		&apos;MsgBox(&quot;str(&quot; &amp; toString(match) &amp; &quot;), s=&quot; &amp; toString(s) &amp; &quot;, pos=&quot; &amp; toString(pos) &amp; &quot;, matchLen=&quot; &amp; toString(matchLen)_
 		&apos;	&amp; chr(13) &amp; &quot;~&gt;&quot; &amp; toString(result))
@@ -190,7 +205,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		lstLen = 0
 		Set lst = nil
 		result = applyP(p.st(0), s, nxtPos)
-		While Not(IsEmpty(result))
+		While Not(isParseFailure(result))
 			nxtPos = result(1)
 			Set lst = cons(result(0), lst)
 			lstLen = lstLen + 1
@@ -209,7 +224,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		End If
 	ElseIf p.tp = &quot;bind&quot; Then
 		result = applyP(p.st(0), s, pos)
-		If Not IsEmpty(result) Then
+		If Not isParseFailure(result) Then
 			Dim fResult As Variant
 			fResult = applyToList(p.st(1), toList(result(0)))
 			result(0) = fResult
@@ -225,13 +240,13 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		Dim iResults(0 To k-i) As Variant
 		Do
 			t = applyP(innerParsers(i), s, nxtPos)
-			If Not IsEmpty(t) Then
+			If Not isParseFailure(t) Then
 				iResults(j) = t(0)
 				nxtPos = t(1)
 				i = i + 1
 				j = j + 1
 			End If
-		Loop Until (i &gt; k) Or IsEmpty(t)
+		Loop Until (i &gt; k) Or isParseFailure(t)
 		If Not IsEmpty(t) Then
 &apos;			Dim fResult As Variant
 			fResult = applyToList(p.st(1), toList(iResults))
@@ -250,21 +265,11 @@ End Function
 &apos;= tests ============================================================
 
 Function test_Parser()
-	&apos;test_Parser_failure()
+	test_Parser_fail()
+	test_Parser_item()
+	test_Parser_return()
+	test_Parser_str()
 	
-	assert_parse(pFailure, &quot;&quot;,		Empty).x
-	assert_parse(pFailure, &quot; &quot;,		Empty).x
-	assert_parse(pFailure, &quot;a&quot;,		Empty).x
-	assert_parse(pFailure, &quot;1&quot;,		Empty).x
-	assert_parse(pFailure, &quot;[]&quot;,	Empty).x
-	
-	assert_parse(pItem, &quot;&quot;,			Empty).x
-	assert_parse(pItem, &quot; &quot;,		Array(&quot; &quot;, 2)).x
-	assert_parse(pItem, &quot;a&quot;,		Array(&quot;a&quot;, 2)).x
-	assert_parse(pItem, &quot;1&quot;,		Array(&quot;1&quot;, 2)).x
-	assert_parse(pItem, &quot;[]&quot;,		Array(&quot;[&quot;, 2)).x
-	assert_parse(pItem, &quot;abcd&quot;,		Array(&quot;a&quot;, 2)).x
-	assert_parse(pItem, chr(13),	Array(chr(13), 2)).x
 End Function
 
 Function assert_parse(ByVal p As Variant, ByVal s As String, ByVal expected As Variant)
@@ -277,8 +282,88 @@ Function assert_parse(ByVal p As Variant, ByVal s As String, ByVal expected As V
 	assertEqual(typeOf(p), &quot;Object/TParser&quot;).x
 	Dim actual As Variant
 	actual = applyP(p, s)
-
+	
 	assert_parse = assertEqual(toString(actual), expected)
 End Function
+
+Function test_Parser_fail()
+	assert_parse(pFail, &quot;&quot;,		parseFailure).x
+	assert_parse(pFail, &quot; &quot;,	parseFailure).x
+	assert_parse(pFail, &quot;a&quot;,	parseFailure).x
+	assert_parse(pFail, &quot;1&quot;,	parseFailure).x
+	assert_parse(pFail, &quot;[]&quot;,	parseFailure).x
+End Function
+
+Function test_Parser_item()
+	assert_parse(pItem, &quot;&quot;,			parseFailure).x
+	assert_parse(pItem, &quot; &quot;,		Array(&quot; &quot;, 2)).x
+	assert_parse(pItem, &quot;a&quot;,		Array(&quot;a&quot;, 2)).x
+	assert_parse(pItem, &quot;1&quot;,		Array(&quot;1&quot;, 2)).x
+	assert_parse(pItem, &quot;[]&quot;,		Array(&quot;[&quot;, 2)).x
+	assert_parse(pItem, &quot;abcd&quot;,		Array(&quot;a&quot;, 2)).x
+	assert_parse(pItem, chr(13),	Array(chr(13), 2)).x
+End Function
+
+Function test_Parser_return()
+	Dim p As Parser
+	Dim expected As Variant
+
+	p = pReturn(&quot;bar&quot;)
+	expected = Array(&quot;bar&quot;, 1)
+	assert_parse(p, &quot;&quot;,			expected).x
+	assert_parse(p, &quot; &quot;,		expected).x
+	assert_parse(p, &quot;a&quot;,		expected).x
+	assert_parse(p, &quot;1&quot;,		expected).x
+	assert_parse(p, &quot;[]&quot;,		expected).x
+	assert_parse(p, &quot;abcd&quot;,		expected).x
+	assert_parse(p, chr(13),	expected).x
+
+	p = pReturn(4711)	
+	expected = Array(4711, 1)
+	assert_parse(p, &quot;&quot;,			expected).x
+	assert_parse(p, &quot; &quot;,		expected).x
+	assert_parse(p, &quot;a&quot;,		expected).x
+	assert_parse(p, &quot;1&quot;,		expected).x
+	assert_parse(p, &quot;[]&quot;,		expected).x
+	assert_parse(p, &quot;abcd&quot;,		expected).x
+	assert_parse(p, chr(13),	expected).x
+End Function
+
+Function test_Parser_str()
+	Dim p As Parser
+
+&apos;	assertThrows(pStr, Array(&quot;&quot;)).x
+
+	p = pStr(&quot;bar&quot;)
+	assert_parse(p, &quot;&quot;,				parseFailure).x
+	assert_parse(p, &quot; &quot;,			parseFailure).x
+	assert_parse(p, &quot; &quot; &amp; chr(13),	parseFailure).x
+	assert_parse(p, &quot;asdf&quot;,			parseFailure).x
+	assert_parse(p, &quot; bar&quot;,			parseFailure).x
+	assert_parse(p, &quot;b&quot;,			parseFailure).x
+	assert_parse(p, &quot;ba&quot;,			parseFailure).x
+	assert_parse(p, &quot;bar&quot;,			Array(&quot;bar&quot;, 4)).x
+	assert_parse(p, &quot;barb&quot;,			Array(&quot;bar&quot;, 4)).x
+	assert_parse(p, &quot;barba&quot;,		Array(&quot;bar&quot;, 4)).x
+	assert_parse(p, &quot;barbar&quot;,		Array(&quot;bar&quot;, 4)).x
+
+	p = pStr(chr(13))
+	assert_parse(p, &quot;&quot;,				parseFailure).x
+	assert_parse(p, &quot; &quot;,			parseFailure).x
+	assert_parse(p, &quot; &quot; &amp; chr(13),	parseFailure).x
+	assert_parse(p, &quot;asdf&quot;,			parseFailure).x
+	assert_parse(p, &quot; bar&quot;,			parseFailure).x
+	assert_parse(p, &quot;b&quot;,			parseFailure).x
+	assert_parse(p, &quot;ba&quot;,			parseFailure).x
+	assert_parse(p, &quot;bar&quot;,			parseFailure).x
+	assert_parse(p, &quot;barb&quot;,			parseFailure).x
+	assert_parse(p, &quot;barba&quot;,		parseFailure).x
+	assert_parse(p, &quot;barbar&quot;,		parseFailure).x
+	assert_parse(p, chr(13),					Array(&quot;\n&quot;, 2)).x
+	assert_parse(p, chr(13) &amp; &quot;bar&quot;,			Array(&quot;\n&quot;, 2)).x
+	assert_parse(p, chr(13) &amp; chr(13),			Array(&quot;\n&quot;, 2)).x
+	assert_parse(p, chr(13) &amp; chr(13) &amp; &quot;bar&quot;,	Array(&quot;\n&quot;, 2)).x
+End Function
+
 
 </script:module>
