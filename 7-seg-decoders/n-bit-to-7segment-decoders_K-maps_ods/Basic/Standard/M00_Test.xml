@@ -21,6 +21,7 @@ Type TTest_Dummy
 End Type
 
 Global testLevel As Integer
+Global assertionCount As Integer
 
 Sub Main
 	test_Test()
@@ -58,6 +59,7 @@ Function mkPass()
 End Function
 
 Function assertThrows(fName As String, args As Array, Optional errNo As Integer)
+	assertionCount = assertionCount + 1
 	Dim result As Object, a As String, x As String
 	Dim fResult As Variant
 	Dim k As Integer, n As Integer
@@ -121,6 +123,7 @@ Boom:
 End Function
 
 Function assertEqual(actual As Variant, expected As Variant)
+	assertionCount = assertionCount + 1
 	Dim result As Object
 	Dim ta As String, tx As String
 	ta = typeOf(actual)
@@ -159,6 +162,7 @@ assertEqual_passed:
 End Function
 
 Function assertPasses(assertionName As String, args As Array)
+	assertionCount = assertionCount + 1
 	Dim result As Object, innerResult As Object
 	Select Case assertionName
 		Case &quot;assertEqual&quot;
@@ -185,6 +189,7 @@ Function assertPasses(assertionName As String, args As Array)
 End Function
 
 Function assertFails(assertionName As String, args As Array)
+	assertionCount = assertionCount + 1
 	Dim result As Object, innerResult As Object
 	Select Case assertionName
 		Case &quot;assertEqual&quot;

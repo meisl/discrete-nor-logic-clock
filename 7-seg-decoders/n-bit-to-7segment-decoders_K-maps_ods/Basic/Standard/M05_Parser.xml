@@ -90,8 +90,10 @@ End Function
 &apos; or (and only if p1 fails) if p2 succeeds, returns p2&apos;s result and pos.
 &apos; fails if both, p1 and p2 fail
 Function pChoice(p1 As Parser, p2 As Parser)
-&apos;	pChoice = mkParser(&quot;choice&quot;, Array(p1, p2))
-&apos;	Exit Function
+	&apos; TODO: @pChoice: strip out always failing parsers
+	&apos; TODO: @pChoice: if p1 always succeeds strip out p2
+	pChoice = mkParser(&quot;choice&quot;, List(p1, p2))
+	Exit Function
 	Dim choices As Variant
 	If p2.tp = &quot;choice&quot; Then
 		If p1.tp = &quot;choice&quot; Then
@@ -106,14 +108,6 @@ Function pChoice(p1 As Parser, p2 As Parser)
 			choices = List(p1, p2)
 		End If
 	End If
-&apos;	dim i as integer, s As string
-&apos;	s = &quot;&quot;
-&apos;	for i = lbound(choices) to ubound(choices)
-&apos;		s = s &amp; &quot;, &quot; &amp; choices(i).tp
-&apos;		if choices(i).tp = &quot;str&quot; then
-&apos;			s = s &amp; &quot;(&quot; &amp; toString(choices(i).st(0)) &amp; &quot;)&quot;
-&apos;		end if
-&apos;	next i
 	pChoice = mkParser(&quot;choice&quot;, choices)
 End Function
 
@@ -264,6 +258,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 	Dim nxtPos As Integer
 	Dim i As Integer, j As Integer, k As Integer
 	Dim innerParser As Parser
+	Dim innerParsers As Variant
 	Dim lst As Object
 	nxtPos = pos
 	If p.tp = &quot;return&quot; Then
@@ -291,23 +286,22 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		&apos;MsgBox(&quot;str(&quot; &amp; toString(match) &amp; &quot;), s=&quot; &amp; toString(s) &amp; &quot;, pos=&quot; &amp; toString(pos) &amp; &quot;, matchLen=&quot; &amp; toString(matchLen)_
 		&apos;	&amp; chr(13) &amp; &quot;~&gt;&quot; &amp; toString(result))
 	ElseIf p.tp = &quot;choice&quot; Then
-		
-		&apos;For i = LBound(p.st) To UBound(p.st)
-		&apos;	result = applyP(p.st(i), s, pos)
-		&apos;	If Not(isParseFailure(result)) Then Exit For
-		&apos;Next i
-		
-		&apos;result = applyP(p.st(0), s, pos)
-		&apos;If isParseFailure(result) Then
-		&apos;	result = applyP(p.st(1), s, pos)
-		&apos;End If
-		
-		lst = p.st
-		Do
-			innerParser = car(lst)
-			result = applyP(innerParser, s, pos)
-			lst = cdr(lst)
-		Loop Until (isNil(lst) Or Not(isParseFailure(result)))
+		innerParsers = p.st
+		k = length(innerParsers)
+		If k = 2 Then	&apos; if there are two alternatives
+			result = applyP(car(innerParsers), s, pos)
+			If isParseFailure(result) Then
+				result = applyP(cadr(innerParsers), s, pos)
+			End If
+		ElseIf k &gt; 2 Then	&apos; more than 2 alternatives
+			Do
+				innerParser = car(lst)
+				result = applyP(innerParser, s, pos)
+				lst = cdr(lst)
+			Loop Until (isNil(lst) Or Not(isParseFailure(result)))
+		Else
+			croak(&quot;applying pChoice: invalid list of alternatives &quot; &amp; chr(13) &amp; toString(innerParsers))
+		End If
 	ElseIf p.tp = &quot;zeroOrOne&quot; Then
 		result = applyP(p.st, s, pos)
 		If isParseFailure(result) Then
@@ -346,7 +340,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 			result(0) = fResult
 		End If
 	ElseIf p.tp = &quot;seq&quot; Then
-		Dim innerParsers As Variant, t As Variant
+		Dim t As Variant
 		innerParsers = p.st(0)
 		i = LBound(innerParsers)
 		k = UBound(innerParsers)
@@ -384,8 +378,11 @@ End Function
 Global refute_parses_pass As Object
 
 Function test_Parser()
-	Dim tm As Date
+	Dim tm As Date, tmSecs As Long, aPerSec As Integer
 	tm = TimeValue(Time)
+	
+	Dim aCount As Integer
+	aCount = assertionCount
 	
 	Dim failure As String
 	failure = toString(parseFailure)
@@ -397,23 +394,31 @@ Function test_Parser()
 	test_Parser_str()
 	test_Parser_choice()
 	test_Parser_zeroOrOne()
-&apos; 1 second	
+&apos; 1 sec for 209 ~&gt; 209 aPerSec
 	test_Parser_white()
 	test_Parser_binDigit()
+&apos; 2 sec for 227 ~&gt; 117 aPerSec
 	test_Parser_decDigit()
+&apos; 4 sec for 247 ~&gt; 62 aPerSec
 	test_Parser_hexDigit()
-&apos;Goto end_of_Parser_tests
-&apos; 7 seconds	
+&apos; 7 sec for 291 ~&gt; 42 aPerSec
 	test_Parser_manyRev()
 	test_Parser_many()
+&apos; 10 sec for 423 ~&gt; 42 aPerSec
 	test_Parser_many1Rev()
 	test_Parser_many1()
-&apos; 15 seconds
+&apos; 15 sec for 475 ~&gt; 34 aPerSec
 	test_Parser_seq()
-&apos; 19 seconds
+&apos; 19 sec for 509 ~&gt; 27 aPerSec
+Goto end_of_Parser_tests
 end_of_Parser_tests:	
+	aCount = assertionCount - aCount
 	tm = TimeValue(Time) - tm
-	MsgBox(TimeSerial(Hour(tm), Minute(tm), Second(tm)))
+	tmSecs = Second(tm) + 60 * (Minute(tm) + 60 * Hour(tm))
+	aPerSec = aCount/tmSecs
+	MsgBox(TimeSerial(Hour(tm), Minute(tm), Second(tm)) &amp; &quot; for &quot; &amp; aCount &amp; &quot; assertions&quot;_
+		&amp; chr(13) &amp; &quot;that&apos;s ~&quot; &amp; aPerSec &amp; &quot; assertions/sec&quot;_
+	)
 End Function
 
 &apos;= test helpers =====================================================
