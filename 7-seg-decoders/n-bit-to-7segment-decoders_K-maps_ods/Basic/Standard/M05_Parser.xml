@@ -112,6 +112,18 @@ Function pMany(p As Parser)
 	pMany = mkParser(&quot;many&quot;, Array(p))
 End Function
 
+&apos; same as pManyRev but fails if there is no match at all
+&apos; matches as many as possible
+Function pMany1Rev(p As Parser)
+	pMany1Rev = mkParser(&quot;many1Rev&quot;, Array(p))
+End Function
+
+&apos; same as pMany but fails if there is no match at all
+&apos; matches as many as possible
+Function pMany1(p As Parser)
+	pMany1 = mkParser(&quot;many1&quot;, Array(p))
+End Function
+
 Function mkBind(fName As String, p As Parser)
 	If Not existsF(fName) Then
 		croak(&quot;mkBind: unknown function &quot; &amp; toString(fName))
@@ -247,7 +259,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		Else
 			result = Array(List(result(0)), result(1))
 		End If
-	ElseIf p.tp = &quot;manyRev&quot; Then
+	ElseIf (p.tp = &quot;manyRev&quot;) Or (p.tp = &quot;many1Rev&quot;) Then
 		Dim lst As Object
 		Dim lstLen As Integer
 		nxtPos = pos
@@ -260,10 +272,17 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 			lstLen = lstLen + 1
 			result = applyP(p.st(0), s, nxtPos)
 		Wend
-		result = Array(lst, nxtPos)
+		If (p.tp = &quot;many1Rev&quot;) And isNil(lst) Then
+			result = parseFailure
+		Else
+			result = Array(lst, nxtPos)
+		End If
 	ElseIf p.tp = &quot;many&quot; Then
 		result = applyP(pManyRev(p.st(0)), s, pos)
 		result(0) = toArray(reverse(result(0)))
+	ElseIf p.tp = &quot;many1&quot; Then
+		result = applyP(pMany1Rev(p.st(0)), s, pos)
+		result(0) = reverse(result(0))
 	ElseIf p.tp = &quot;bind&quot; Then
 		result = applyP(p.st(0), s, pos)
 		If Not isParseFailure(result) Then
@@ -321,6 +340,8 @@ Function test_Parser()
 	test_Parser_hexDigit()
 	test_Parser_manyRev()
 	test_Parser_many()
+	test_Parser_many1Rev()
+	test_Parser_many1()
 	
 	tm = TimeValue(Time) - tm
 	MsgBox(TimeSerial(Hour(tm), Minute(tm), Second(tm)))
@@ -694,5 +715,83 @@ Function test_Parser_many()
 	assert_parse(p, &quot;12 &quot;, 			Array(Array(&quot;1&quot;, &quot;2&quot;), 3)).x
 	assert_parse(p, &quot;12345&quot;, 		Array(Array(&quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;), 6)).x
 End Function
+
+
+Function test_Parser_many1Rev()
+	Dim p As Parser
+	Dim data As Variant
+	
+	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
+		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
+		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
+	)
+	p = pMany1Rev(pFail)
+	assert_parse(p, data, parseFailure).x
+	
+	&apos;p = pMany1(pReturn(3)) - yields infite sequence of 3s, except on empty string
+	
+	p = pMany1Rev(pItem)
+	assert_parse(p, &quot;&quot;, 			parseFailure).x
+	assert_parse(p, &quot; &quot;, 			Array(List(&quot; &quot;), 2)).x
+	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(List(&quot;\n&quot;, &quot; &quot;), 3)).x
+	assert_parse(p, &quot;asdf&quot;,			Array(List(&quot;f&quot;, &quot;d&quot;, &quot;s&quot;, &quot;a&quot;), 5)).x
+	
+	p = pMany1Rev(pStr(&quot; &quot;))
+	assert_parse(p, &quot;&quot;, 			parseFailure).x
+	assert_parse(p, &quot; &quot;, 			Array(List(&quot; &quot;), 2)).x
+	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(List(&quot; &quot;), 2)).x
+	assert_parse(p, &quot;asdf&quot;,			parseFailure).x
+	assert_parse(p, &quot;  &quot;,			Array(List(&quot; &quot;, &quot; &quot;), 3)).x
+	assert_parse(p, &quot;   &quot;,			Array(List(&quot; &quot;, &quot; &quot;, &quot; &quot;), 4)).x
+	assert_parse(p, &quot; x &quot;,			Array(List(&quot; &quot;), 2)).x
+	assert_parse(p, &quot; x  &quot;,			Array(List(&quot; &quot;), 2)).x
+	assert_parse(p, &quot;  x &quot;,			Array(List(&quot; &quot;, &quot; &quot;), 3)).x
+	
+	p = pMany1Rev(pDecDigit)
+	assert_parse(p, &quot;&quot;, 			parseFailure).x
+	assert_parse(p, &quot; &quot;, 			parseFailure).x
+	assert_parse(p, &quot;1&quot;, 			Array(List(&quot;1&quot;), 2)).x
+	assert_parse(p, &quot;12 &quot;, 			Array(List(&quot;2&quot;, &quot;1&quot;), 3)).x
+	assert_parse(p, &quot;12345&quot;, 		Array(List(&quot;5&quot;, &quot;4&quot;, &quot;3&quot;, &quot;2&quot;, &quot;1&quot;), 6)).x
+End Function
+
+Function test_Parser_many1()
+	Dim p As Parser
+	Dim data As Variant
+	
+	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
+		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
+		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
+	)
+	p = pMany1(pFail)
+	assert_parse(p, data, parseFailure).x
+	
+	&apos;p = pMany1(pReturn(3)) - yields infite sequence of 3s, except on empty string
+	
+	p = pMany1(pItem)
+	assert_parse(p, &quot;&quot;, 			parseFailure).x
+	assert_parse(p, &quot; &quot;, 			Array(List(&quot; &quot;), 2)).x
+	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(List(&quot; &quot;, &quot;\n&quot;), 3)).x
+	assert_parse(p, &quot;asdf&quot;,			Array(List(&quot;a&quot;, &quot;s&quot;, &quot;d&quot;, &quot;f&quot;), 5)).x
+	
+	p = pMany1(pStr(&quot; &quot;))
+	assert_parse(p, &quot;&quot;, 			parseFailure).x
+	assert_parse(p, &quot; &quot;, 			Array(List(&quot; &quot;), 2)).x
+	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(List(&quot; &quot;), 2)).x
+	assert_parse(p, &quot;asdf&quot;,			parseFailure).x
+	assert_parse(p, &quot;  &quot;,			Array(List(&quot; &quot;, &quot; &quot;), 3)).x
+	assert_parse(p, &quot;   &quot;,			Array(List(&quot; &quot;, &quot; &quot;, &quot; &quot;), 4)).x
+	assert_parse(p, &quot; x &quot;,			Array(List(&quot; &quot;), 2)).x
+	assert_parse(p, &quot; x  &quot;,			Array(List(&quot; &quot;), 2)).x
+	assert_parse(p, &quot;  x &quot;,			Array(List(&quot; &quot;, &quot; &quot;), 3)).x
+	
+	p = pMany1(pDecDigit)
+	assert_parse(p, &quot;&quot;, 			parseFailure).x
+	assert_parse(p, &quot; &quot;, 			parseFailure).x
+	assert_parse(p, &quot;1&quot;, 			Array(List(&quot;1&quot;), 2)).x
+	assert_parse(p, &quot;12 &quot;, 			Array(List(&quot;1&quot;, &quot;2&quot;), 3)).x
+	assert_parse(p, &quot;12345&quot;, 		Array(List(&quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;), 6)).x
+End Function
+
 
 </script:module>
