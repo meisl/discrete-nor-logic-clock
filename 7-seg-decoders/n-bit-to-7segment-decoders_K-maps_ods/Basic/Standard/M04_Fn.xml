@@ -20,6 +20,8 @@ Function fnObjs()
 			List(&quot;equ&quot;,				True, 2), _
 			List(&quot;ite&quot;,				True, 3), _
 			List(&quot;concat&quot;,			True, 2), _
+			List(&quot;asc&quot;,				True, 1), _
+			List(&quot;chr&quot;,				True, 1), _
 			List(&quot;readHex&quot;,			True, 1), _
 			_
 			List(&quot;existsF&quot;,			True, 1), _
@@ -172,6 +174,8 @@ Function applyBuiltinRev(ByVal fn As Object, ByVal reverseArgs As Object)
 		Case &quot;snd&quot;:				result = snd(			a(0), a(1)			)
 		Case &quot;equ&quot;:				result = equ(			a(0), a(1)			)
 		Case &quot;concat&quot;:			result = concat(		a(0), a(1)			)
+		Case &quot;asc&quot;:				result = asc(			a(0)				)
+		Case &quot;chr&quot;:				result = chr(			a(0)				)
 		Case &quot;isString&quot;:		result = isString(		a(0)				)
 		Case &quot;toString&quot;:		result = toString(		a(0)				)
 		Case &quot;TList_toString&quot;:	result = TList_toString(a(0)				)
@@ -234,6 +238,7 @@ Function blaha(ByVal xs As Object)
 End Function
 
 Function test_Fn()
+	Dim i As Integer
 	Dim xs As Object
 	xs = List(&quot;x&quot;, &quot;y&quot;)
 	assertEqual(toString(blaha(xs)), &quot;[]&quot;).x
@@ -312,6 +317,29 @@ Function test_Fn()
 &apos;	iteFalse42Seven = apply1(iteFalse42, &quot;Seven&quot;)
 &apos;	assertEqual(iteFalse42Seven, &quot;Seven&quot;).x
 &apos;	MsgBox( toString(iteFalse42Seven) )
+
+	Dim fAsc As Variant
+	fAsc = lookupFn(&quot;asc&quot;)
+	assertEqual(arity(fAsc), 1).x
+	assertEqual(apply(fAsc, &quot; &quot;), 		Asc(&quot; &quot;)).x
+	assertEqual(apply(fAsc, Chr( 9)), 	       9).x
+	assertEqual(apply(fAsc, Chr(13)), 	      13).x
+	assertEqual(apply(fAsc, &quot;0&quot;), 		Asc(&quot;0&quot;)).x
+	assertEqual(apply(fAsc, &quot;9&quot;), 		Asc(&quot;9&quot;)).x
+	assertEqual(apply(fAsc, &quot;A&quot;), 		Asc(&quot;A&quot;)).x
+	assertEqual(apply(fAsc, &quot;B&quot;), 		Asc(&quot;B&quot;)).x
+	assertEqual(apply(fAsc, &quot;Z&quot;), 		Asc(&quot;Z&quot;)).x
+
+	Dim fChr As Variant
+	fChr = lookupFn(&quot;chr&quot;)
+	assertEqual(arity(fChr), 1).x
+	assertEqual(apply(fChr,  9), 	Chr( 9)).x
+	assertEqual(apply(fChr, 13), 	Chr(13)).x
+	assertEqual(apply(fChr, 32), 	Chr(32)).x
+	assertEqual(apply(fChr, 48), 	Chr(48)).x
+	assertEqual(apply(fChr, 65), 	Chr(65)).x
+	assertEqual(apply(fChr, 66), 	Chr(66)).x
+	assertEqual(apply(fChr, 90), 	Chr(90)).x
 
 
 	assertEqual(existsF(&quot;i do not exist&quot;), False).x

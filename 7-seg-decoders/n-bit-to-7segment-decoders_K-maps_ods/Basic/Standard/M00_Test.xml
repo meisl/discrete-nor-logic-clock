@@ -126,7 +126,14 @@ Function assertEqual(actual As Variant, expected As Variant)
 	ta = typeOf(actual)
 	tx = typeOf(expected)
 	If (ta &lt;&gt; tx) Then
-		Goto assertEqual_failed
+		If ((ta = &quot;Long&quot;) And (tx = &quot;Integer&quot;))_
+		Or ((ta = &quot;Integer&quot;) And (tx = &quot;Long&quot;))Then
+			If (actual = expected) Then
+				Goto assertEqual_passed
+			End If
+		Else
+			Goto assertEqual_failed
+		End If
 	ElseIf (isObject(actual) And isObject(expected)) Then
 		If (isNull(actual) = isNull(expected)) Then &apos; either both null or both not
 			If (isNull(actual) And isNull(expected)) Then
@@ -224,6 +231,20 @@ Function test_assertEqual()
 
 	assertEqual(0, 0).x
 	assertPasses(aName, Array(0, 0)).x
+
+	Dim aLong As Long, aInt As Integer
+	aLong = 9
+	aInt = 9
+	assertPasses(aName, Array(aLong, aInt)).x
+	assertPasses(aName, Array(aInt, aLong)).x
+	assertFails(aName, Array(&quot;9&quot;, aInt)).x
+	assertFails(aName, Array(&quot;9&quot;, aLong)).x
+	assertFails(aName, Array(aInt,  &quot;9&quot;)).x
+	assertFails(aName, Array(aLong, &quot;9&quot;)).x
+
+	aInt = 7
+	assertFails(aName, Array(aLong, aInt)).x
+	assertFails(aName, Array(aInt, aLong)).x
 
 	assertEqual(&quot;0&quot;, &quot;0&quot;).x
 	assertPasses(aName, Array(&quot;0&quot;, &quot;0&quot;)).x
