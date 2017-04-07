@@ -18,11 +18,11 @@ Sub Main
 	Dim pDigit As Parser, pHexDigit As Parser, pHexNum As Parser, pHexLit As Parser
 	Set pDigit = pChoice(pChoice(pChoice(pStr(&quot;0&quot;), pStr(&quot;1&quot;)), pStr(&quot;2&quot;)), pStr(&quot;3&quot;))
 	Set pHexDigit = pChoice(pDigit, pChoice(pChoice(pChoice(pChoice(pChoice(pStr(&quot;A&quot;), pStr(&quot;B&quot;)), pStr(&quot;C&quot;)), pStr(&quot;D&quot;)), pStr(&quot;E&quot;)), pStr(&quot;F&quot;)))
-	Set pHexNum = mkSeq(Array(mkMany(pHexDigit)), &quot;readHex&quot;)
+	Set pHexNum = mkSeq(Array(pMany(pHexDigit)), &quot;readHex&quot;)
 	Set pHexLit = mkSeq(Array(pStr(&quot;0x&quot;), pHexNum), &quot;snd&quot;)
 	Dim p As Parser 
 	&apos;pChoice(pItem(), pReturn(&quot;bar&quot;))
-	Set p = mkSeq(Array(pHexLit, mkMany(pWs)), &quot;fst&quot;)
+	Set p = mkSeq(Array(pHexLit, pMany(pWs)), &quot;fst&quot;)
 	s = &quot;FF 0x1F __µ 0&quot;
 
 	MsgBox( _
@@ -86,8 +86,8 @@ Function pChoice(p1 As Parser, p2 As Parser)
 	pChoice = mkParser(&quot;choice&quot;, Array(p1, p2))
 End Function
 
-Function mkMany(p As Parser)
-	mkMany = mkParser(&quot;many&quot;, Array(p))
+Function pMany(p As Parser)
+	pMany = mkParser(&quot;many&quot;, Array(p))
 End Function
 
 Function mkBind(fName As String, p As Parser)
@@ -214,7 +214,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		If lstLen = 0 Then
 			result = Array(Array(), nxtPos)
 		Else
-			ReDim things(0 To lstLen-1) As Variant
+			Dim things(0 To lstLen-1) As Variant
 			While lstLen &gt; 0
 				lstLen = lstLen - 1
 				things(lstLen) = lst.head
@@ -270,6 +270,7 @@ Function test_Parser()
 	test_Parser_return()
 	test_Parser_str()
 	test_Parser_choice()
+	test_Parser_many()
 End Function
 
 Function assert_parse(ByVal p As Variant, ByVal ss As Variant, ByVal expected As Variant)
@@ -416,6 +417,39 @@ Function test_Parser_choice()
 	assert_parse(pChoice(pItem, pStr(&quot;x&quot;)), 	&quot;x&quot;, Array(&quot;x&quot;, 2)).x
 	assert_parse(pChoice(pReturn(11), pItem), 	&quot;x&quot;, Array(11, 1)).x
 	assert_parse(pChoice(pStr(&quot;x&quot;), pItem), 	&quot;x&quot;, Array(&quot;x&quot;, 2)).x
+End Function
+
+Function test_Parser_many()
+	Dim p As Parser
+	Dim data As Variant
+	Dim zeroMatches As Variant
+	
+	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
+		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
+		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
+	)
+	p = pMany(pFail)
+	zeroMatches = Array(Array(), 1)
+	assert_parse(p, data, zeroMatches).x
+	
+	&apos;p = pMany(pReturn(3)) - yields infite sequence of 3s, even on empty string
+	
+	p = pMany(pItem)
+	assert_parse(p, &quot;&quot;, 			zeroMatches).x
+	assert_parse(p, &quot; &quot;, 			Array(Array(&quot; &quot;), 2)).x
+	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(Array(&quot; &quot;, &quot;\n&quot;), 3)).x
+	assert_parse(p, &quot;asdf&quot;,			Array(Array(&quot;a&quot;, &quot;s&quot;, &quot;d&quot;, &quot;f&quot;), 5)).x
+	
+	p = pMany(pStr(&quot; &quot;))
+	assert_parse(p, &quot;&quot;, 			zeroMatches).x
+	assert_parse(p, &quot; &quot;, 			Array(Array(&quot; &quot;), 2)).x
+	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(Array(&quot; &quot;), 2)).x
+	assert_parse(p, &quot;asdf&quot;,			zeroMatches).x
+	assert_parse(p, &quot;  &quot;,			Array(Array(&quot; &quot;, &quot; &quot;), 3)).x
+	assert_parse(p, &quot;   &quot;,			Array(Array(&quot; &quot;, &quot; &quot;, &quot; &quot;), 4)).x
+	assert_parse(p, &quot; x &quot;,			Array(Array(&quot; &quot;), 2)).x
+	assert_parse(p, &quot; x  &quot;,			Array(Array(&quot; &quot;), 2)).x
+	assert_parse(p, &quot;  x &quot;,			Array(Array(&quot; &quot;, &quot; &quot;), 3)).x
 End Function
 
 
