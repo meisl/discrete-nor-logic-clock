@@ -299,6 +299,11 @@ Function test_toString()
 	assertEqual(toString(&quot;x&quot; &amp; chr(13) &amp; &quot;y&quot;), &quot;&apos;x\ny&apos;&quot;).x
 	assertEqual(toString(chr(9) &amp; chr(13) &amp; &quot;y&quot;), &quot;&apos;\t\ny&apos;&quot;).x
 
+	Dim aLong As Long
+	aLong = 0
+	assertEqual(toString(aLong), 	 &quot;0&quot;).x
+	assertEqual(toString(aLong + 1), &quot;1&quot;).x
+
 	assertEqual(toString(Nothing), &quot;Nothing&quot;).x
 	assertEqual(toString(Empty), &quot;Empty&quot;).x
 

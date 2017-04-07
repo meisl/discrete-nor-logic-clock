@@ -20,7 +20,7 @@ Sub Main
 	Set pHexLit = mkSeq(Array(pStr(&quot;0x&quot;), pHexNum), &quot;snd&quot;)
 	Dim p As Parser 
 	&apos;pChoice(pItem(), pReturn(&quot;bar&quot;))
-	Set p = mkSeq(Array(pHexLit, pMany(pWhite)), &quot;fst&quot;)
+	Set p = pSeq(Array(pHexLit, pMany(pWhite)), &quot;fst&quot;)
 	s = &quot;FF 0x1F __µ 0&quot;
 
 	MsgBox( _
@@ -124,6 +124,24 @@ Function pMany1(p As Parser)
 	pMany1 = mkParser(&quot;many1&quot;, Array(p))
 End Function
 
+&apos; pSeq - make a sequence of parsers and finally process the results (list)
+&apos; fails if any of the given parsers fails
+&apos; if instead all succeed, collects their results in a list 
+&apos; which is then passed on the the given function. The result
+&apos; of this function application is then packed up with the last
+&apos; parsers pos to give the overall result
+Function pSeq(ps As Array, fName As String)
+	Dim f As Variant
+	If isString(fName) Then
+		f = lookupFn(fName)
+	End If
+	If isEmpty(f) Then
+		croak(&quot;pSeq: unknown function &quot; &amp; toString(fName))
+	Else
+		pSeq = mkParser(&quot;seq&quot;, Array(ps, f))
+	End If
+End Function
+
 Function mkBind(fName As String, p As Parser)
 	If Not existsF(fName) Then
 		croak(&quot;mkBind: unknown function &quot; &amp; toString(fName))
@@ -132,13 +150,7 @@ Function mkBind(fName As String, p As Parser)
 	End If
 End Function
 
-Function mkSeq(ps As Array, fName As String)
-	If Not existsF(fName) Then
-		croak(&quot;mkSeq: unknown function &quot; &amp; toString(fName))
-	Else
-		mkSeq = mkParser(&quot;seq&quot;, Array(ps, fName))
-	End If
-End Function
+
 
 &apos;==================================================================
 
@@ -212,6 +224,7 @@ End Function
 
 Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 	Dim p As Parser
+	Dim fResult As Variant
 	If IsNull(parser) Or IsEmpty(parser) Then
 		croak(&quot;applyP: parser p = &quot; &amp; toString(parser))
 	ElseIf TypeName(parser) = &quot;Object&quot; Then
@@ -286,7 +299,6 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 	ElseIf p.tp = &quot;bind&quot; Then
 		result = applyP(p.st(0), s, pos)
 		If Not isParseFailure(result) Then
-			Dim fResult As Variant
 			fResult = applyToList(p.st(1), toList(result(0)))
 			result(0) = fResult
 		End If
@@ -308,13 +320,15 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 				j = j + 1
 			End If
 		Loop Until (i &gt; k) Or isParseFailure(t)
-		If Not IsEmpty(t) Then
-&apos;			Dim fResult As Variant
-			fResult = applyToList(p.st(1), toList(iResults))
+		If isParseFailure(t) Then
 			result = t
-			result(0) = fResult
+		Else
+			fResult = applyToList(p.st(1), toList(iResults))
+			&apos; ATTENTION: do not reuse t, type of result value may not match
+			&apos;            and an implicit conversion might happen!
+			result = Array(fResult, t(1))
 		End If
-		MsgBox(&quot;seq/&quot; &amp; p.st(1) &amp; &quot;: &quot; &amp; toString(result))
+		&apos;MsgBox(&quot;seq/&quot; &amp; p.st(1) &amp; &quot;: &quot; &amp; toString(result))
 	Else
 		result = &quot;unknown Parser &apos;&quot; &amp; p.tp &amp; &quot;&apos;&quot;
 		MsgBox(&quot;Error in applyP: &quot; &amp; result)
@@ -342,6 +356,8 @@ Function test_Parser()
 	test_Parser_many()
 	test_Parser_many1Rev()
 	test_Parser_many1()
+
+	test_Parser_seq()
 	
 	tm = TimeValue(Time) - tm
 	MsgBox(TimeSerial(Hour(tm), Minute(tm), Second(tm)))
@@ -791,6 +807,59 @@ Function test_Parser_many1()
 	assert_parse(p, &quot;1&quot;, 			Array(List(&quot;1&quot;), 2)).x
 	assert_parse(p, &quot;12 &quot;, 			Array(List(&quot;1&quot;, &quot;2&quot;), 3)).x
 	assert_parse(p, &quot;12345&quot;, 		Array(List(&quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;), 6)).x
+End Function
+
+Function test_Parser_seq()
+	Dim p As Parser, f As Variant
+	Dim data As Variant
+	
+	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
+		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
+		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
+	)
+	f = &quot;asc&quot;
+	p = pSeq(Array(pFail), f)
+	assert_parse(p, data, parseFailure).x
+	
+	f = &quot;asc&quot;
+	p = pSeq(Array(pItem), f)
+	assert_parse(p, &quot;&quot;, 	parseFailure).x
+	assert_parse(p, &quot;0&quot;, 	Array(asc(&quot;0&quot;), 2)).x
+	assert_parse(p, &quot;1&quot;, 	Array(asc(&quot;1&quot;), 2)).x
+	assert_parse(p, &quot;A&quot;, 	Array(asc(&quot;A&quot;), 2)).x
+	assert_parse(p, &quot;B&quot;, 	Array(asc(&quot;B&quot;), 2)).x
+	assert_parse(p, &quot;AB&quot;,	Array(asc(&quot;A&quot;), 2)).x
+	assert_parse(p, &quot;BA&quot;,	Array(asc(&quot;B&quot;), 2)).x
+	
+	f = &quot;concat&quot;
+	p = pSeq(Array(pItem, pItem), f)
+	assert_parse(p, &quot;&quot;, 	parseFailure).x
+	assert_parse(p, &quot;A&quot;, 	parseFailure).x
+	assert_parse(p, &quot;B&quot;, 	parseFailure).x
+	assert_parse(p, &quot;AB&quot;,	Array(&quot;AB&quot;, 3)).x
+	assert_parse(p, &quot;BA&quot;,	Array(&quot;BA&quot;, 3)).x
+	
+	f = &quot;asc&quot;
+	p = pSeq(Array(pDecDigit), f)
+	assert_parse(p, &quot;&quot;, 			parseFailure).x
+	assert_parse(p, &quot;A&quot;, 			parseFailure).x
+	assert_parse(p, &quot;B&quot;, 			parseFailure).x
+	assert_parse(p, &quot;AB&quot;,			parseFailure).x
+	assert_parse(p, &quot;BA&quot;,			parseFailure).x
+	assert_parse(p, &quot;0&quot;, 			Array(48, 2)).x
+	assert_parse(p, &quot;1&quot;, 			Array(49, 2)).x
+	assert_parse(p, &quot;123456789&quot;,	Array(49, 2)).x
+	
+	p = pMany1(pSeq(Array(pDecDigit), f))
+	assert_parse(p, &quot;&quot;, 			parseFailure).x
+	assert_parse(p, &quot;A&quot;, 			parseFailure).x
+	assert_parse(p, &quot;B&quot;, 			parseFailure).x
+	assert_parse(p, &quot;AB&quot;,			parseFailure).x
+	assert_parse(p, &quot;BA&quot;,			parseFailure).x
+	assert_parse(p, &quot;0&quot;, 			Array(List(48), 2)).x
+	assert_parse(p, &quot;1&quot;, 			Array(List(49), 2)).x
+	assert_parse(p, &quot;123456789&quot;,	Array(List(49, 50, 51, 52, 53, 54, 55, 56, 57), 10)).x
+	assert_parse(p, &quot;123456789 0&quot;,	Array(List(49, 50, 51, 52, 53, 54, 55, 56, 57), 10)).x
 End Function
 
 
