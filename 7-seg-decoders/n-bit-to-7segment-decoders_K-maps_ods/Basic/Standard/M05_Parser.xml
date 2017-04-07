@@ -15,8 +15,7 @@ Sub Main
 	test_Parser()
 	Stop
 	Dim s As String
-	Dim pDigit As Parser, pHexNum As Parser, pHexLit As Parser
-	Set pDigit = pChoice(pChoice(pChoice(pStr(&quot;0&quot;), pStr(&quot;1&quot;)), pStr(&quot;2&quot;)), pStr(&quot;3&quot;))
+	Dim pHexNum As Parser, pHexLit As Parser
 	Set pHexNum = mkSeq(Array(pMany(pHexDigit)), &quot;readHex&quot;)
 	Set pHexLit = mkSeq(Array(pStr(&quot;0x&quot;), pHexNum), &quot;snd&quot;)
 	Dim p As Parser 
@@ -92,6 +91,14 @@ End Function
 &apos; fails if both, p1 and p2 fail
 Function pChoice(p1 As Parser, p2 As Parser)
 	pChoice = mkParser(&quot;choice&quot;, Array(p1, p2))
+End Function
+
+
+&apos; never fails: if p fails than pZeroOrOne(p) returns nil + same pos as result,
+&apos; otherwise returns a singleton list of p&apos;s result + pos
+&apos; matches at most once
+Function pZeroOrOne(p As Parser)
+	pZeroOrOne = mkParser(&quot;zeroOrOne&quot;, Array(p))
 End Function
 
 &apos; never fails: if p fails than pMany(p) returns nil + same pos as result,
@@ -212,11 +219,6 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		Else
 			result = parseFailure
 		End If
-	ElseIf p.tp = &quot;choice&quot; Then
-		result = applyP(p.st(0), s, pos)
-		If isParseFailure(result) Then
-			result = applyP(p.st(1), s, pos)
-		End If
 	ElseIf p.tp = &quot;str&quot; Then
 		Dim match As String
 		Dim matchLen As Integer
@@ -229,6 +231,18 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		End If
 		&apos;MsgBox(&quot;str(&quot; &amp; toString(match) &amp; &quot;), s=&quot; &amp; toString(s) &amp; &quot;, pos=&quot; &amp; toString(pos) &amp; &quot;, matchLen=&quot; &amp; toString(matchLen)_
 		&apos;	&amp; chr(13) &amp; &quot;~&gt;&quot; &amp; toString(result))
+	ElseIf p.tp = &quot;choice&quot; Then
+		result = applyP(p.st(0), s, pos)
+		If isParseFailure(result) Then
+			result = applyP(p.st(1), s, pos)
+		End If
+	ElseIf p.tp = &quot;zeroOrOne&quot; Then
+		result = applyP(p.st(0), s, pos)
+		If isParseFailure(result) Then
+			result = Array(Array(), pos)
+		Else
+			result = Array(Array(result(0)), result(1))
+		End If
 	ElseIf p.tp = &quot;many&quot; Then
 		Dim lst As Object
 		Dim lstLen As Integer
@@ -303,11 +317,12 @@ Function test_Parser()
 	test_Parser_return()
 	test_Parser_str()
 	test_Parser_choice()
+	test_Parser_zeroOrOne()
+	test_Parser_many()
 	test_Parser_white()
 	test_Parser_binDigit()
 	test_Parser_decDigit()
 	test_Parser_hexDigit()
-	test_Parser_many()
 	
 	tm = TimeValue(Time) - tm
 	MsgBox(TimeSerial(Hour(tm), Minute(tm), Second(tm)))
@@ -459,6 +474,64 @@ Function test_Parser_choice()
 	assert_parse(pChoice(pStr(&quot;x&quot;), pItem), 	&quot;x&quot;, Array(&quot;x&quot;, 2)).x
 End Function
 
+
+Function test_Parser_zeroOrOne()
+	Dim p As Parser
+	Dim data As Variant
+	Dim zeroMatches As Variant, oneMatch As Variant
+	zeroMatches = Array(Array(), 1)
+	oneMatch    = Array(Array(&quot;x&quot;), 2)
+		
+	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
+		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
+		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
+	)
+
+	p = pZeroOrOne(pStr(&quot;x&quot;))
+
+	assert_parse(p, data,	zeroMatches).x
+	assert_parse(p, &quot;x&quot;, 	oneMatch).x
+	assert_parse(p, &quot;xx&quot;, 	oneMatch).x
+	assert_parse(p, &quot;xxx&quot;, 	oneMatch).x
+	assert_parse(p, &quot; x&quot;, 	zeroMatches).x
+	assert_parse(p, &quot; xx&quot;, 	zeroMatches).x
+	assert_parse(p, &quot; xxx&quot;,	zeroMatches).x
+End Function
+
+Function test_Parser_many()
+	Dim p As Parser
+	Dim data As Variant
+	Dim zeroMatches As Variant
+	zeroMatches = Array(Array(), 1)
+	
+	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
+		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
+		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
+	)
+	p = pMany(pFail)
+	assert_parse(p, data, zeroMatches).x
+	
+	&apos;p = pMany(pReturn(3)) - yields infite sequence of 3s, even on empty string
+	
+	p = pMany(pItem)
+	assert_parse(p, &quot;&quot;, 			zeroMatches).x
+	assert_parse(p, &quot; &quot;, 			Array(Array(&quot; &quot;), 2)).x
+	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(Array(&quot; &quot;, &quot;\n&quot;), 3)).x
+	assert_parse(p, &quot;asdf&quot;,			Array(Array(&quot;a&quot;, &quot;s&quot;, &quot;d&quot;, &quot;f&quot;), 5)).x
+	
+	p = pMany(pStr(&quot; &quot;))
+	assert_parse(p, &quot;&quot;, 			zeroMatches).x
+	assert_parse(p, &quot; &quot;, 			Array(Array(&quot; &quot;), 2)).x
+	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(Array(&quot; &quot;), 2)).x
+	assert_parse(p, &quot;asdf&quot;,			zeroMatches).x
+	assert_parse(p, &quot;  &quot;,			Array(Array(&quot; &quot;, &quot; &quot;), 3)).x
+	assert_parse(p, &quot;   &quot;,			Array(Array(&quot; &quot;, &quot; &quot;, &quot; &quot;), 4)).x
+	assert_parse(p, &quot; x &quot;,			Array(Array(&quot; &quot;), 2)).x
+	assert_parse(p, &quot; x  &quot;,			Array(Array(&quot; &quot;), 2)).x
+	assert_parse(p, &quot;  x &quot;,			Array(Array(&quot; &quot;, &quot; &quot;), 3)).x
+End Function
+
+
 Function test_Parser_white()
 	Dim p As Parser
 	p = pWhite
@@ -576,39 +649,5 @@ Function test_Parser_hexDigit()
 	assert_parse(p, &quot;Gsadf&quot;, 					parseFailure).x
 	assert_parse(p, &quot;gsadf&quot;, 					parseFailure).x
 End Function
-
-Function test_Parser_many()
-	Dim p As Parser
-	Dim data As Variant
-	Dim zeroMatches As Variant
-	
-	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
-		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
-		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
-	)
-	p = pMany(pFail)
-	zeroMatches = Array(Array(), 1)
-	assert_parse(p, data, zeroMatches).x
-	
-	&apos;p = pMany(pReturn(3)) - yields infite sequence of 3s, even on empty string
-	
-	p = pMany(pItem)
-	assert_parse(p, &quot;&quot;, 			zeroMatches).x
-	assert_parse(p, &quot; &quot;, 			Array(Array(&quot; &quot;), 2)).x
-	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(Array(&quot; &quot;, &quot;\n&quot;), 3)).x
-	assert_parse(p, &quot;asdf&quot;,			Array(Array(&quot;a&quot;, &quot;s&quot;, &quot;d&quot;, &quot;f&quot;), 5)).x
-	
-	p = pMany(pStr(&quot; &quot;))
-	assert_parse(p, &quot;&quot;, 			zeroMatches).x
-	assert_parse(p, &quot; &quot;, 			Array(Array(&quot; &quot;), 2)).x
-	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(Array(&quot; &quot;), 2)).x
-	assert_parse(p, &quot;asdf&quot;,			zeroMatches).x
-	assert_parse(p, &quot;  &quot;,			Array(Array(&quot; &quot;, &quot; &quot;), 3)).x
-	assert_parse(p, &quot;   &quot;,			Array(Array(&quot; &quot;, &quot; &quot;, &quot; &quot;), 4)).x
-	assert_parse(p, &quot; x &quot;,			Array(Array(&quot; &quot;), 2)).x
-	assert_parse(p, &quot; x  &quot;,			Array(Array(&quot; &quot;), 2)).x
-	assert_parse(p, &quot;  x &quot;,			Array(Array(&quot; &quot;, &quot; &quot;), 3)).x
-End Function
-
 
 </script:module>
