@@ -61,6 +61,14 @@ Function isParseFailure(parseResult) As Boolean
 	End If
 End Function
 
+Function failureS()
+	Static result As String
+	If (result = &quot;&quot;) Then
+		result = toString(parseFailure)
+	End If
+	failureS = result
+End Function
+
 &apos; always succeeds by returning the provided value; without increasing pos
 Function pReturn(v As Variant)
 	pReturn = mkParser(&quot;return&quot;, Array(v))
@@ -238,13 +246,15 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 
 	Dim result As Variant
 	Dim nxtPos As Integer
+	nxtPos = pos
 	If p.tp = &quot;return&quot; Then
-		result = Array(p.st(0), pos)
+		result = Array(p.st(0), nxtPos)
 	ElseIf p.tp = &quot;fail&quot; Then
 		result = parseFailure
 	ElseIf p.tp = &quot;item&quot; Then
 		If pos &lt;= Len(s) Then
-			result = Array(Mid(s, pos, 1), pos + 1)
+			nxtPos = pos + 1
+			result = Array(Mid(s, pos, 1), nxtPos)
 		Else
 			result = parseFailure
 		End If
@@ -254,7 +264,8 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		match = p.st(0)
 		matchLen = Len(match)
 		If (Mid(s, pos, matchLen) = match) Then
-			result = Array(match, pos + matchLen)
+			nxtPos = pos + matchLen
+			result = Array(match, nxtPos)
 		Else
 			result = parseFailure
 		End If
@@ -292,7 +303,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		End If
 	ElseIf p.tp = &quot;many&quot; Then
 		result = applyP(pManyRev(p.st(0)), s, pos)
-		result(0) = toArray(reverse(result(0)))
+		result(0) = reverse(result(0))
 	ElseIf p.tp = &quot;many1&quot; Then
 		result = applyP(pMany1Rev(p.st(0)), s, pos)
 		result(0) = reverse(result(0))
@@ -339,73 +350,130 @@ End Function
 
 &apos;= tests ============================================================
 
+Global refute_parses_pass As Object
+
 Function test_Parser()
 	Dim tm As Date
 	tm = TimeValue(Time)
+	
+	Dim failure As String
+	failure = toString(parseFailure)
+	refute_parses_pass = assertEqual(failure, failure)
+	
 	test_Parser_fail()
 	test_Parser_item()
 	test_Parser_return()
 	test_Parser_str()
 	test_Parser_choice()
 	test_Parser_zeroOrOne()
+&apos; 1 second	
 	test_Parser_white()
 	test_Parser_binDigit()
 	test_Parser_decDigit()
 	test_Parser_hexDigit()
+&apos;Goto end_of_Parser_tests
+&apos; 7 seconds	
 	test_Parser_manyRev()
 	test_Parser_many()
 	test_Parser_many1Rev()
 	test_Parser_many1()
-
+&apos; 15 seconds
 	test_Parser_seq()
-	
+&apos; 19 seconds
+end_of_Parser_tests:	
 	tm = TimeValue(Time) - tm
 	MsgBox(TimeSerial(Hour(tm), Minute(tm), Second(tm)))
 End Function
 
-Function assert_parse(ByVal p As Variant, ByVal ss As Variant, ByVal expected As Variant)
-	If isString(p) Then
-		p = lookupParser(p)
+&apos;= test helpers =====================================================
+
+Function refute_parses(p As Parser, ByVal ss As Variant)
+	Dim actual As Variant, testResult As Variant
+	Dim actualS As String, expectedS As String
+	If isArray(ss) Then
+		Dim i As Integer
+		For i = LBound(ss) To UBound(ss)
+			actual = applyP(p, ss(i))
+			If Not(isParseFailure(actual)) Then
+				Goto refute_parses_failed
+			End If
+		Next i
+	Else
+		actual = applyP(p, ss)
+		If Not(isParseFailure(actual)) Then
+			Goto refute_parses_failed
+		End If
 	End If
-	If Not(isString(expected)) Then
-		expected = toString(expected)
+	refute_parses = refute_parses_pass
+	Exit Function
+refute_parses_failed:
+	actualS = toString(actual)
+	expectedS = toString(parseFailure)
+	testResult = assertEqual(actualS, expectedS)
+	If isArray(ss) Then
+		MsgBox(&quot;at index &quot; &amp; i &amp; &quot;: &quot; &amp; toString(ss(i)))
 	End If
-	assertEqual(typeOf(p), &quot;Object/TParser&quot;).x
-	Dim actual As Variant, result As Variant
+	refute_parses = testResult
+End Function
+
+Function assert_parses(p As Parser, ByVal ss As Variant, expVal As Variant, expPos As Integer)
+&apos;	assertEqual(typeOf(p), &quot;Object/TParser&quot;).x
+	Dim actual As Variant, testResult As Variant
+	Dim actualS As String, expectedS As String
 	
 	If isArray(ss) Then
 		Dim i As Integer
 		For i = LBound(ss) To UBound(ss)
 			actual = applyP(p, ss(i))
-			result = assertEqual(toString(actual), expected)
-			If result.isFail Then 
-				MsgBox(&quot;at index &quot; &amp; i &amp; &quot;: &quot; &amp; toString(ss(i)))
-				Exit For
+			testResult = assertEqual(actual(1), expPos)
+			If (testResult.isFail) Then
+				MsgBox(toString(actual))
+				Goto assert_parse_failed
+			End If
+			testResult = assertEqual(toString(actual(0)), toString(expVal))
+			If (testResult.isFail) Then
+				Goto assert_parse_failed
 			End If
 		Next i
 	Else
 		actual = applyP(p, ss)
-		result = assertEqual(toString(actual), expected)
+		testResult = assertEqual(actual(1), expPos)
+		If (testResult.isFail) Then
+			Goto assert_parse_failed
+		End If
+		testResult = assertEqual(toString(actual(0)), toString(expVal))
+		If (testResult.isFail) Then
+			Goto assert_parse_failed
+		End If
 	End If
-	assert_parse = result
+	assert_parses = testResult
+	Exit Function
+assert_parse_failed:
+	actualS = toString(actual)
+	expectedS = toString(Array(expVal, expPos))
+	testResult = assertEqual(actualS, expectedS)
+	If isArray(ss) Then
+		MsgBox(&quot;at index &quot; &amp; i &amp; &quot;: &quot; &amp; toString(ss(i)))
+	End If
+	assert_parses = testResult
 End Function
 
 Function test_Parser_fail()
-	assert_parse(pFail, &quot;&quot;,		parseFailure).x
-	assert_parse(pFail, &quot; &quot;,	parseFailure).x
-	assert_parse(pFail, &quot;a&quot;,	parseFailure).x
-	assert_parse(pFail, &quot;1&quot;,	parseFailure).x
-	assert_parse(pFail, &quot;[]&quot;,	parseFailure).x
+	refute_parses(pFail, Array( _
+		&quot;&quot;,	&quot; &quot;, &quot;   &quot;, chr(13), chr(9), &quot;a&quot;, &quot;1&quot;, &quot;[]&quot;, &quot;asdf&quot; _
+	)).x
 End Function
 
+&apos;= actual tests =====================================================
+
 Function test_Parser_item()
-	assert_parse(pItem, &quot;&quot;,			parseFailure).x
-	assert_parse(pItem, &quot; &quot;,		Array(&quot; &quot;, 2)).x
-	assert_parse(pItem, &quot;a&quot;,		Array(&quot;a&quot;, 2)).x
-	assert_parse(pItem, &quot;1&quot;,		Array(&quot;1&quot;, 2)).x
-	assert_parse(pItem, &quot;[]&quot;,		Array(&quot;[&quot;, 2)).x
-	assert_parse(pItem, &quot;abcd&quot;,		Array(&quot;a&quot;, 2)).x
-	assert_parse(pItem, chr(13),	Array(chr(13), 2)).x
+	refute_parses(pItem, &quot;&quot;).x
+	assert_parses(pItem, &quot; &quot;,		&quot; &quot;, 2).x
+	assert_parses(pItem, &quot;a&quot;,		&quot;a&quot;, 2).x
+	assert_parses(pItem, &quot;1&quot;,		&quot;1&quot;, 2).x
+	assert_parses(pItem, &quot;[]&quot;,		&quot;[&quot;, 2).x
+	assert_parses(pItem, &quot;abcd&quot;,		&quot;a&quot;, 2).x
+	assert_parses(pItem, chr(13),	chr(13), 2).x
 End Function
 
 Function test_Parser_return()
@@ -413,100 +481,94 @@ Function test_Parser_return()
 	Dim expected As Variant
 
 	p = pReturn(&quot;bar&quot;)
-	expected = Array(&quot;bar&quot;, 1)
-	assert_parse(p, &quot;&quot;,			expected).x
-	assert_parse(p, &quot; &quot;,		expected).x
-	assert_parse(p, &quot;a&quot;,		expected).x
-	assert_parse(p, &quot;1&quot;,		expected).x
-	assert_parse(p, &quot;[]&quot;,		expected).x
-	assert_parse(p, &quot;abcd&quot;,		expected).x
-	assert_parse(p, chr(13),	expected).x
+	assert_parses(p, &quot;&quot;,		&quot;bar&quot;, 1).x
+	assert_parses(p, &quot; &quot;,		&quot;bar&quot;, 1).x
+	assert_parses(p, &quot;a&quot;,		&quot;bar&quot;, 1).x
+	assert_parses(p, &quot;1&quot;,		&quot;bar&quot;, 1).x
+	assert_parses(p, &quot;[]&quot;,		&quot;bar&quot;, 1).x
+	assert_parses(p, &quot;abcd&quot;,	&quot;bar&quot;, 1).x
+	assert_parses(p, chr(13),	&quot;bar&quot;, 1).x
 
 	p = pReturn(4711)	
-	expected = Array(4711, 1)
-	assert_parse(p, &quot;&quot;,			expected).x
-	assert_parse(p, &quot; &quot;,		expected).x
-	assert_parse(p, &quot;a&quot;,		expected).x
-	assert_parse(p, &quot;1&quot;,		expected).x
-	assert_parse(p, &quot;[]&quot;,		expected).x
-	assert_parse(p, &quot;abcd&quot;,		expected).x
-	assert_parse(p, chr(13),	expected).x
+	assert_parses(p, &quot;&quot;,		4711, 1).x
+	assert_parses(p, &quot; &quot;,		4711, 1).x
+	assert_parses(p, &quot;a&quot;,		4711, 1).x
+	assert_parses(p, &quot;1&quot;,		4711, 1).x
+	assert_parses(p, &quot;[]&quot;,		4711, 1).x
+	assert_parses(p, &quot;abcd&quot;,	4711, 1).x
+	assert_parses(p, chr(13),	4711, 1).x
 End Function
 
 Function test_Parser_str()
 	Dim p As Parser
-
+	
 &apos;	assertThrows(pStr, Array(&quot;&quot;)).x
 
 	p = pStr(&quot;bar&quot;)
-	assert_parse(p, &quot;&quot;,				parseFailure).x
-	assert_parse(p, &quot; &quot;,			parseFailure).x
-	assert_parse(p, &quot; &quot; &amp; chr(13),	parseFailure).x
-	assert_parse(p, &quot;asdf&quot;,			parseFailure).x
-	assert_parse(p, &quot; bar&quot;,			parseFailure).x
-	assert_parse(p, &quot;b&quot;,			parseFailure).x
-	assert_parse(p, &quot;ba&quot;,			parseFailure).x
-	assert_parse(p, &quot;bar&quot;,			Array(&quot;bar&quot;, 4)).x
-	assert_parse(p, &quot;barb&quot;,			Array(&quot;bar&quot;, 4)).x
-	assert_parse(p, &quot;barba&quot;,		Array(&quot;bar&quot;, 4)).x
-	assert_parse(p, &quot;barbar&quot;,		Array(&quot;bar&quot;, 4)).x
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot; &quot;).x
+	refute_parses(p, &quot; &quot; &amp; chr(13)).x
+	refute_parses(p, &quot;asdf&quot;).x
+	refute_parses(p, &quot; bar&quot;).x
+	refute_parses(p, &quot;b&quot;).x
+	refute_parses(p, &quot;ba&quot;).x
+	assert_parses(p, &quot;bar&quot;,		&quot;bar&quot;, 4).x
+	assert_parses(p, &quot;barb&quot;,	&quot;bar&quot;, 4).x
+	assert_parses(p, &quot;barba&quot;,	&quot;bar&quot;, 4).x
+	assert_parses(p, &quot;barbar&quot;,	&quot;bar&quot;, 4).x
 
 	p = pStr(chr(13))
-	assert_parse(p, &quot;&quot;,				parseFailure).x
-	assert_parse(p, &quot; &quot;,			parseFailure).x
-	assert_parse(p, &quot; &quot; &amp; chr(13),	parseFailure).x
-	assert_parse(p, &quot;asdf&quot;,			parseFailure).x
-	assert_parse(p, &quot; bar&quot;,			parseFailure).x
-	assert_parse(p, &quot;b&quot;,			parseFailure).x
-	assert_parse(p, &quot;ba&quot;,			parseFailure).x
-	assert_parse(p, &quot;bar&quot;,			parseFailure).x
-	assert_parse(p, &quot;barb&quot;,			parseFailure).x
-	assert_parse(p, &quot;barba&quot;,		parseFailure).x
-	assert_parse(p, &quot;barbar&quot;,		parseFailure).x
-	assert_parse(p, chr(13),					Array(&quot;\n&quot;, 2)).x
-	assert_parse(p, chr(13) &amp; &quot;bar&quot;,			Array(&quot;\n&quot;, 2)).x
-	assert_parse(p, chr(13) &amp; chr(13),			Array(&quot;\n&quot;, 2)).x
-	assert_parse(p, chr(13) &amp; chr(13) &amp; &quot;bar&quot;,	Array(&quot;\n&quot;, 2)).x
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot; &quot;).x
+	refute_parses(p, &quot; &quot; &amp; chr(13)).x
+	refute_parses(p, &quot;asdf&quot;).x
+	refute_parses(p, &quot; bar&quot;).x
+	refute_parses(p, &quot;b&quot;).x
+	refute_parses(p, &quot;ba&quot;).x
+	refute_parses(p, &quot;bar&quot;).x
+	refute_parses(p, &quot;barb&quot;).x
+	refute_parses(p, &quot;barba&quot;).x
+	refute_parses(p, &quot;barbar&quot;).x
+	assert_parses(p, chr(13),					&quot;\n&quot;, 2).x
+	assert_parses(p, chr(13) &amp; &quot;bar&quot;,			&quot;\n&quot;, 2).x
+	assert_parses(p, chr(13) &amp; chr(13),			&quot;\n&quot;, 2).x
+	assert_parses(p, chr(13) &amp; chr(13) &amp; &quot;bar&quot;,	&quot;\n&quot;, 2).x
 End Function
 
 Function test_Parser_choice()
 	Dim p As Parser
 	Dim data As Variant
-	Dim expected As Variant
 	
 	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
 		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
 		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
 	)
 	p = pChoice(pFail, pFail)
-	assert_parse(p, data, parseFailure).x
+	refute_parses(p, data).x
 	
 	p = pChoice(pReturn(7), pFail)
-	expected = Array(7, 1)
-	assert_parse(p, data, expected).x
+	assert_parses(p, data, 7, 1).x
 	
 	p = pChoice(pFail, pReturn(7))
-	expected = Array(7, 1)
-	assert_parse(p, data, expected).x
+	assert_parses(p, data, 7, 1).x
 	
 	p = pChoice(pReturn(42), pReturn(7))
-	expected = Array(42, 1)
-	assert_parse(p, data, expected).x
+	assert_parses(p, data, 42, 1).x
 	
-	assert_parse(pChoice(pItem, pReturn(11)), 	&quot;&quot;, Array(11, 1)).x
-	assert_parse(pChoice(pItem, pStr(&quot;x&quot;)), 	&quot;&quot;, parseFailure).x
-	assert_parse(pChoice(pReturn(11), pItem), 	&quot;&quot;, Array(11, 1)).x
-	assert_parse(pChoice(pStr(&quot;x&quot;), pItem), 	&quot;&quot;, parseFailure).x
+	assert_parses(pChoice(pItem, pReturn(11)), 	&quot;&quot;, 11, 1	).x
+	refute_parses(pChoice(pItem, pStr(&quot;x&quot;)),	&quot;&quot;).x
+	assert_parses(pChoice(pReturn(11), pItem), 	&quot;&quot;, 11, 1	).x
+	refute_parses(pChoice(pStr(&quot;x&quot;), pItem),	&quot;&quot;).x
 	
-	assert_parse(pChoice(pItem, pReturn(11)), 	&quot; &quot;, Array(&quot; &quot;, 2)).x
-	assert_parse(pChoice(pItem, pStr(&quot;x&quot;)), 	&quot; &quot;, Array(&quot; &quot;, 2)).x
-	assert_parse(pChoice(pReturn(11), pItem), 	&quot; &quot;, Array(11, 1)).x
-	assert_parse(pChoice(pStr(&quot;x&quot;), pItem), 	&quot; &quot;, Array(&quot; &quot;, 2)).x
+	assert_parses(pChoice(pItem, pReturn(11)), 	&quot; &quot;, &quot; &quot;, 2	).x
+	assert_parses(pChoice(pItem, pStr(&quot;x&quot;)), 	&quot; &quot;, &quot; &quot;, 2	).x
+	assert_parses(pChoice(pReturn(11), pItem), 	&quot; &quot;, 11, 1	).x
+	assert_parses(pChoice(pStr(&quot;x&quot;), pItem), 	&quot; &quot;, &quot; &quot;, 2	).x
 	
-	assert_parse(pChoice(pItem, pReturn(11)), 	&quot;x&quot;, Array(&quot;x&quot;, 2)).x
-	assert_parse(pChoice(pItem, pStr(&quot;x&quot;)), 	&quot;x&quot;, Array(&quot;x&quot;, 2)).x
-	assert_parse(pChoice(pReturn(11), pItem), 	&quot;x&quot;, Array(11, 1)).x
-	assert_parse(pChoice(pStr(&quot;x&quot;), pItem), 	&quot;x&quot;, Array(&quot;x&quot;, 2)).x
+	assert_parses(pChoice(pItem, pReturn(11)), 	&quot;x&quot;, &quot;x&quot;, 2	).x
+	assert_parses(pChoice(pItem, pStr(&quot;x&quot;)), 	&quot;x&quot;, &quot;x&quot;, 2	).x
+	assert_parses(pChoice(pReturn(11), pItem), 	&quot;x&quot;, 11, 1	).x
+	assert_parses(pChoice(pStr(&quot;x&quot;), pItem), 	&quot;x&quot;, &quot;x&quot;, 2	).x
 End Function
 
 
@@ -514,8 +576,8 @@ Function test_Parser_zeroOrOne()
 	Dim p As Parser
 	Dim data As Variant
 	Dim zeroMatches As Variant, oneMatch As Variant
-	zeroMatches = Array(nil, 1)
-	oneMatch    = Array(List(&quot;x&quot;), 2)
+	zeroMatches = nil
+	oneMatch    = List(&quot;x&quot;)
 		
 	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
 		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
@@ -524,131 +586,131 @@ Function test_Parser_zeroOrOne()
 
 	p = pZeroOrOne(pStr(&quot;x&quot;))
 
-	assert_parse(p, data,	zeroMatches).x
-	assert_parse(p, &quot;x&quot;, 	oneMatch).x
-	assert_parse(p, &quot;xx&quot;, 	oneMatch).x
-	assert_parse(p, &quot;xxx&quot;, 	oneMatch).x
-	assert_parse(p, &quot; x&quot;, 	zeroMatches).x
-	assert_parse(p, &quot; xx&quot;, 	zeroMatches).x
-	assert_parse(p, &quot; xxx&quot;,	zeroMatches).x
+	assert_parses(p, data,	zeroMatches, 1).x
+	assert_parses(p, &quot;x&quot;, 	oneMatch, 2).x
+	assert_parses(p, &quot;xx&quot;, 	oneMatch, 2).x
+	assert_parses(p, &quot;xxx&quot;, oneMatch, 2).x
+	assert_parses(p, &quot; x&quot;, 	zeroMatches, 1).x
+	assert_parses(p, &quot; xx&quot;, zeroMatches, 1).x
+	assert_parses(p, &quot; xxx&quot;,zeroMatches, 1).x
 End Function
 
 Function test_Parser_white()
 	Dim p As Parser
 	p = pWhite
 
-	assert_parse(p, &quot;&quot;, 						parseFailure).x
-	assert_parse(p, &quot; &quot;, 						Array(&quot; &quot;, 2)).x
-	assert_parse(p, chr(9), 					Array(&quot;\t&quot;, 2)).x
-	assert_parse(p, chr(13), 					parseFailure).x
-	assert_parse(p, &quot;asdf&quot;,						parseFailure).x
-	assert_parse(p, &quot; asdf&quot;, 					Array(&quot; &quot;, 2)).x
-	assert_parse(p, chr(9) &amp; &quot;asdf&quot;, 			Array(&quot;\t&quot;, 2)).x
-	assert_parse(p, chr(13) &amp; &quot;asdf&quot;, 			parseFailure).x
-	assert_parse(p, &quot;  asdf&quot;, 					Array(&quot; &quot;, 2)).x
-	assert_parse(p, chr(9) &amp; chr(9) &amp; &quot;asdf&quot;, 	Array(&quot;\t&quot;, 2)).x
-	assert_parse(p, chr(13) &amp; chr(9) &amp; &quot;asdf&quot;, 	parseFailure).x
-	assert_parse(p, chr(9) &amp; chr(13) &amp; &quot;asdf&quot;, 	Array(&quot;\t&quot;, 2)).x
-	assert_parse(p, chr(13) &amp; chr(13) &amp; &quot;asdf&quot;, parseFailure).x
+	refute_parses(p, &quot;&quot;).x
+	assert_parses(p, &quot; &quot;, 						&quot; &quot;, 2	).x
+	assert_parses(p, chr(9), 					&quot;\t&quot;, 2	).x
+	refute_parses(p, chr(13)).x
+	refute_parses(p, &quot;asdf&quot;).x
+	assert_parses(p, &quot; asdf&quot;, 					&quot; &quot;, 2).x
+	assert_parses(p, chr(9) &amp; &quot;asdf&quot;, 			&quot;\t&quot;, 2).x
+	refute_parses(p, chr(13) &amp; &quot;asdf&quot;).x
+	assert_parses(p, &quot;  asdf&quot;, 					&quot; &quot;, 2).x
+	assert_parses(p, chr(9) &amp; chr(9) &amp; &quot;asdf&quot;, 	&quot;\t&quot;, 2).x
+	refute_parses(p, chr(13) &amp; chr(9) &amp; &quot;asdf&quot;).x
+	assert_parses(p, chr(9) &amp; chr(13) &amp; &quot;asdf&quot;, 	&quot;\t&quot;, 2).x
+	refute_parses(p, chr(13) &amp; chr(13) &amp; &quot;asdf&quot;).x
 End Function
 
 Function test_Parser_binDigit()
 	Dim p As Parser
 	p = pBinDigit
 
-	assert_parse(p, &quot;&quot;, 						parseFailure).x
-	assert_parse(p, &quot; &quot;, 						parseFailure).x
-	assert_parse(p, &quot;sadf&quot;,						parseFailure).x
-	assert_parse(p, &quot;0sadf&quot;, 					Array(&quot;0&quot;, 2)).x
-	assert_parse(p, &quot;1sadf&quot;, 					Array(&quot;1&quot;, 2)).x
-	assert_parse(p, &quot;2sadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;3sadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;4sadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;5sadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;6sadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;7sadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;8sadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;9sadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;Asadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;asadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;Bsadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;bsadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;Csadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;csadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;Dsadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;dsadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;Esadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;esadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;Fsadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;fsadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;Gsadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;gsadf&quot;, 					parseFailure).x
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot; &quot;).x
+	refute_parses(p, &quot;sadf&quot;).x
+	assert_parses(p, &quot;0sadf&quot;,	&quot;0&quot;, 2).x
+	assert_parses(p, &quot;1sadf&quot;,	&quot;1&quot;, 2).x
+	refute_parses(p, &quot;2sadf&quot;).x
+	refute_parses(p, &quot;3sadf&quot;).x
+	refute_parses(p, &quot;4sadf&quot;).x
+	refute_parses(p, &quot;5sadf&quot;).x
+	refute_parses(p, &quot;6sadf&quot;).x
+	refute_parses(p, &quot;7sadf&quot;).x
+	refute_parses(p, &quot;8sadf&quot;).x
+	refute_parses(p, &quot;9sadf&quot;).x
+	refute_parses(p, &quot;Asadf&quot;).x
+	refute_parses(p, &quot;asadf&quot;).x
+	refute_parses(p, &quot;Bsadf&quot;).x
+	refute_parses(p, &quot;bsadf&quot;).x
+	refute_parses(p, &quot;Csadf&quot;).x
+	refute_parses(p, &quot;csadf&quot;).x
+	refute_parses(p, &quot;Dsadf&quot;).x
+	refute_parses(p, &quot;dsadf&quot;).x
+	refute_parses(p, &quot;Esadf&quot;).x
+	refute_parses(p, &quot;esadf&quot;).x
+	refute_parses(p, &quot;Fsadf&quot;).x
+	refute_parses(p, &quot;fsadf&quot;).x
+	refute_parses(p, &quot;Gsadf&quot;).x
+	refute_parses(p, &quot;gsadf&quot;).x
 End Function
 
 Function test_Parser_decDigit()
 	Dim p As Parser
 	p = pDecDigit
 
-	assert_parse(p, &quot;&quot;, 						parseFailure).x
-	assert_parse(p, &quot; &quot;, 						parseFailure).x
-	assert_parse(p, &quot;sadf&quot;,						parseFailure).x
-	assert_parse(p, &quot;0sadf&quot;, 					Array(&quot;0&quot;, 2)).x
-	assert_parse(p, &quot;1sadf&quot;, 					Array(&quot;1&quot;, 2)).x
-	assert_parse(p, &quot;2sadf&quot;, 					Array(&quot;2&quot;, 2)).x
-	assert_parse(p, &quot;3sadf&quot;, 					Array(&quot;3&quot;, 2)).x
-	assert_parse(p, &quot;4sadf&quot;, 					Array(&quot;4&quot;, 2)).x
-	assert_parse(p, &quot;5sadf&quot;, 					Array(&quot;5&quot;, 2)).x
-	assert_parse(p, &quot;6sadf&quot;, 					Array(&quot;6&quot;, 2)).x
-	assert_parse(p, &quot;7sadf&quot;, 					Array(&quot;7&quot;, 2)).x
-	assert_parse(p, &quot;8sadf&quot;, 					Array(&quot;8&quot;, 2)).x
-	assert_parse(p, &quot;9sadf&quot;, 					Array(&quot;9&quot;, 2)).x
-	assert_parse(p, &quot;Asadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;asadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;Bsadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;bsadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;Csadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;csadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;Dsadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;dsadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;Esadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;esadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;Fsadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;fsadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;Gsadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;gsadf&quot;, 					parseFailure).x
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot; &quot;).x
+	refute_parses(p, &quot;sadf&quot;).x
+	assert_parses(p, &quot;0sadf&quot;,	&quot;0&quot;, 2).x
+	assert_parses(p, &quot;1sadf&quot;,	&quot;1&quot;, 2).x
+	assert_parses(p, &quot;2sadf&quot;,	&quot;2&quot;, 2).x
+	assert_parses(p, &quot;3sadf&quot;,	&quot;3&quot;, 2).x
+	assert_parses(p, &quot;4sadf&quot;,	&quot;4&quot;, 2).x
+	assert_parses(p, &quot;5sadf&quot;,	&quot;5&quot;, 2).x
+	assert_parses(p, &quot;6sadf&quot;,	&quot;6&quot;, 2).x
+	assert_parses(p, &quot;7sadf&quot;,	&quot;7&quot;, 2).x
+	assert_parses(p, &quot;8sadf&quot;,	&quot;8&quot;, 2).x
+	assert_parses(p, &quot;9sadf&quot;,	&quot;9&quot;, 2).x
+	refute_parses(p, &quot;Asadf&quot;).x
+	refute_parses(p, &quot;asadf&quot;).x
+	refute_parses(p, &quot;Bsadf&quot;).x
+	refute_parses(p, &quot;bsadf&quot;).x
+	refute_parses(p, &quot;Csadf&quot;).x
+	refute_parses(p, &quot;csadf&quot;).x
+	refute_parses(p, &quot;Dsadf&quot;).x
+	refute_parses(p, &quot;dsadf&quot;).x
+	refute_parses(p, &quot;Esadf&quot;).x
+	refute_parses(p, &quot;esadf&quot;).x
+	refute_parses(p, &quot;Fsadf&quot;).x
+	refute_parses(p, &quot;fsadf&quot;).x
+	refute_parses(p, &quot;Gsadf&quot;).x
+	refute_parses(p, &quot;gsadf&quot;).x
 End Function
 
 Function test_Parser_hexDigit()
 	Dim p As Parser
 	p = pHexDigit
 
-	assert_parse(p, &quot;&quot;, 						parseFailure).x
-	assert_parse(p, &quot; &quot;, 						parseFailure).x
-	assert_parse(p, &quot;sadf&quot;,						parseFailure).x
-	assert_parse(p, &quot;0sadf&quot;, 					Array(&quot;0&quot;, 2)).x
-	assert_parse(p, &quot;1sadf&quot;, 					Array(&quot;1&quot;, 2)).x
-	assert_parse(p, &quot;2sadf&quot;, 					Array(&quot;2&quot;, 2)).x
-	assert_parse(p, &quot;3sadf&quot;, 					Array(&quot;3&quot;, 2)).x
-	assert_parse(p, &quot;4sadf&quot;, 					Array(&quot;4&quot;, 2)).x
-	assert_parse(p, &quot;5sadf&quot;, 					Array(&quot;5&quot;, 2)).x
-	assert_parse(p, &quot;6sadf&quot;, 					Array(&quot;6&quot;, 2)).x
-	assert_parse(p, &quot;7sadf&quot;, 					Array(&quot;7&quot;, 2)).x
-	assert_parse(p, &quot;8sadf&quot;, 					Array(&quot;8&quot;, 2)).x
-	assert_parse(p, &quot;9sadf&quot;, 					Array(&quot;9&quot;, 2)).x
-	assert_parse(p, &quot;Asadf&quot;, 					Array(&quot;A&quot;, 2)).x
-	assert_parse(p, &quot;asadf&quot;, 					Array(&quot;a&quot;, 2)).x
-	assert_parse(p, &quot;Bsadf&quot;, 					Array(&quot;B&quot;, 2)).x
-	assert_parse(p, &quot;bsadf&quot;, 					Array(&quot;b&quot;, 2)).x
-	assert_parse(p, &quot;Csadf&quot;, 					Array(&quot;C&quot;, 2)).x
-	assert_parse(p, &quot;csadf&quot;, 					Array(&quot;c&quot;, 2)).x
-	assert_parse(p, &quot;Dsadf&quot;, 					Array(&quot;D&quot;, 2)).x
-	assert_parse(p, &quot;dsadf&quot;, 					Array(&quot;d&quot;, 2)).x
-	assert_parse(p, &quot;Esadf&quot;, 					Array(&quot;E&quot;, 2)).x
-	assert_parse(p, &quot;esadf&quot;, 					Array(&quot;e&quot;, 2)).x
-	assert_parse(p, &quot;Fsadf&quot;, 					Array(&quot;F&quot;, 2)).x
-	assert_parse(p, &quot;fsadf&quot;, 					Array(&quot;f&quot;, 2)).x
-	assert_parse(p, &quot;Gsadf&quot;, 					parseFailure).x
-	assert_parse(p, &quot;gsadf&quot;, 					parseFailure).x
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot; &quot;).x
+	refute_parses(p, &quot;sadf&quot;).x
+	assert_parses(p, &quot;0sadf&quot;,	&quot;0&quot;, 2).x
+	assert_parses(p, &quot;1sadf&quot;,	&quot;1&quot;, 2).x
+	assert_parses(p, &quot;2sadf&quot;,	&quot;2&quot;, 2).x
+	assert_parses(p, &quot;3sadf&quot;,	&quot;3&quot;, 2).x
+	assert_parses(p, &quot;4sadf&quot;,	&quot;4&quot;, 2).x
+	assert_parses(p, &quot;5sadf&quot;,	&quot;5&quot;, 2).x
+	assert_parses(p, &quot;6sadf&quot;,	&quot;6&quot;, 2).x
+	assert_parses(p, &quot;7sadf&quot;,	&quot;7&quot;, 2).x
+	assert_parses(p, &quot;8sadf&quot;,	&quot;8&quot;, 2).x
+	assert_parses(p, &quot;9sadf&quot;,	&quot;9&quot;, 2).x
+	assert_parses(p, &quot;Asadf&quot;,	&quot;A&quot;, 2).x
+	assert_parses(p, &quot;asadf&quot;,	&quot;a&quot;, 2).x
+	assert_parses(p, &quot;Bsadf&quot;,	&quot;B&quot;, 2).x
+	assert_parses(p, &quot;bsadf&quot;,	&quot;b&quot;, 2).x
+	assert_parses(p, &quot;Csadf&quot;,	&quot;C&quot;, 2).x
+	assert_parses(p, &quot;csadf&quot;,	&quot;c&quot;, 2).x
+	assert_parses(p, &quot;Dsadf&quot;,	&quot;D&quot;, 2).x
+	assert_parses(p, &quot;dsadf&quot;,	&quot;d&quot;, 2).x
+	assert_parses(p, &quot;Esadf&quot;,	&quot;E&quot;, 2).x
+	assert_parses(p, &quot;esadf&quot;,	&quot;e&quot;, 2).x
+	assert_parses(p, &quot;Fsadf&quot;,	&quot;F&quot;, 2).x
+	assert_parses(p, &quot;fsadf&quot;,	&quot;f&quot;, 2).x
+	refute_parses(p, &quot;Gsadf&quot;).x
+	refute_parses(p, &quot;gsadf&quot;).x
 End Function
 
 
@@ -656,80 +718,80 @@ Function test_Parser_manyRev()
 	Dim p As Parser
 	Dim data As Variant
 	Dim zeroMatches As Variant
-	zeroMatches = Array(nil, 1)
+	zeroMatches = nil
 	
 	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
 		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
 		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
 	)
 	p = pManyRev(pFail)
-	assert_parse(p, data, zeroMatches).x
+	assert_parses(p, data, zeroMatches, 1).x
 	
 	&apos;p = pMany(pReturn(3)) - yields infite sequence of 3s, even on empty string
 	
 	p = pManyRev(pItem)
-	assert_parse(p, &quot;&quot;, 			zeroMatches).x
-	assert_parse(p, &quot; &quot;, 			Array(List(&quot; &quot;), 2)).x
-	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(List(&quot;\n&quot;, &quot; &quot;), 3)).x
-	assert_parse(p, &quot;asdf&quot;,			Array(List(&quot;f&quot;, &quot;d&quot;, &quot;s&quot;, &quot;a&quot;), 5)).x
+	assert_parses(p, &quot;&quot;, 			zeroMatches, 1).x
+	assert_parses(p, &quot; &quot;, 			List(&quot; &quot;), 2).x
+	assert_parses(p, &quot; &quot; &amp; chr(13),	List(&quot;\n&quot;, &quot; &quot;), 3).x
+	assert_parses(p, &quot;asdf&quot;,		List(&quot;f&quot;, &quot;d&quot;, &quot;s&quot;, &quot;a&quot;), 5).x
 	
 	p = pManyRev(pStr(&quot; &quot;))
-	assert_parse(p, &quot;&quot;, 			zeroMatches).x
-	assert_parse(p, &quot; &quot;, 			Array(List(&quot; &quot;), 2)).x
-	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(List(&quot; &quot;), 2)).x
-	assert_parse(p, &quot;asdf&quot;,			zeroMatches).x
-	assert_parse(p, &quot;  &quot;,			Array(List(&quot; &quot;, &quot; &quot;), 3)).x
-	assert_parse(p, &quot;   &quot;,			Array(List(&quot; &quot;, &quot; &quot;, &quot; &quot;), 4)).x
-	assert_parse(p, &quot; x &quot;,			Array(List(&quot; &quot;), 2)).x
-	assert_parse(p, &quot; x  &quot;,			Array(List(&quot; &quot;), 2)).x
-	assert_parse(p, &quot;  x &quot;,			Array(List(&quot; &quot;, &quot; &quot;), 3)).x
+	assert_parses(p, &quot;&quot;, 			zeroMatches, 1).x
+	assert_parses(p, &quot; &quot;, 			List(&quot; &quot;), 2).x
+	assert_parses(p, &quot; &quot; &amp; chr(13),	List(&quot; &quot;), 2).x
+	assert_parses(p, &quot;asdf&quot;,		zeroMatches, 1).x
+	assert_parses(p, &quot;  &quot;,			List(&quot; &quot;, &quot; &quot;), 3).x
+	assert_parses(p, &quot;   &quot;,			List(&quot; &quot;, &quot; &quot;, &quot; &quot;), 4).x
+	assert_parses(p, &quot; x &quot;,			List(&quot; &quot;), 2).x
+	assert_parses(p, &quot; x  &quot;,		List(&quot; &quot;), 2).x
+	assert_parses(p, &quot;  x &quot;,		List(&quot; &quot;, &quot; &quot;), 3).x
 	
 	p = pManyRev(pDecDigit)
-	assert_parse(p, &quot;&quot;, 			zeroMatches).x
-	assert_parse(p, &quot; &quot;, 			zeroMatches).x
-	assert_parse(p, &quot;1&quot;, 			Array(List(&quot;1&quot;), 2)).x
-	assert_parse(p, &quot;12 &quot;, 			Array(List(&quot;2&quot;, &quot;1&quot;), 3)).x
-	assert_parse(p, &quot;12345&quot;, 		Array(List(&quot;5&quot;, &quot;4&quot;, &quot;3&quot;, &quot;2&quot;, &quot;1&quot;), 6)).x
+	assert_parses(p, &quot;&quot;, 			zeroMatches, 1).x
+	assert_parses(p, &quot; &quot;, 			zeroMatches, 1).x
+	assert_parses(p, &quot;1&quot;, 			List(&quot;1&quot;), 2).x
+	assert_parses(p, &quot;12 &quot;, 		List(&quot;2&quot;, &quot;1&quot;), 3).x
+	assert_parses(p, &quot;12345&quot;, 		List(&quot;5&quot;, &quot;4&quot;, &quot;3&quot;, &quot;2&quot;, &quot;1&quot;), 6).x
 End Function
 
 Function test_Parser_many()
 	Dim p As Parser
 	Dim data As Variant
 	Dim zeroMatches As Variant
-	zeroMatches = Array(Array(), 1)
+	zeroMatches = nil
 	
 	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
 		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
 		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
 	)
 	p = pMany(pFail)
-	assert_parse(p, data, zeroMatches).x
+	assert_parses(p, data, zeroMatches, 1).x
 	
 	&apos;p = pMany(pReturn(3)) - yields infite sequence of 3s, even on empty string
 	
 	p = pMany(pItem)
-	assert_parse(p, &quot;&quot;, 			zeroMatches).x
-	assert_parse(p, &quot; &quot;, 			Array(Array(&quot; &quot;), 2)).x
-	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(Array(&quot; &quot;, &quot;\n&quot;), 3)).x
-	assert_parse(p, &quot;asdf&quot;,			Array(Array(&quot;a&quot;, &quot;s&quot;, &quot;d&quot;, &quot;f&quot;), 5)).x
+	assert_parses(p, &quot;&quot;, 			zeroMatches, 1).x
+	assert_parses(p, &quot; &quot;, 			List(&quot; &quot;), 2).x
+	assert_parses(p, &quot; &quot; &amp; chr(13),	List(&quot; &quot;, &quot;\n&quot;), 3).x
+	assert_parses(p, &quot;asdf&quot;,		List(&quot;a&quot;, &quot;s&quot;, &quot;d&quot;, &quot;f&quot;), 5).x
 	
 	p = pMany(pStr(&quot; &quot;))
-	assert_parse(p, &quot;&quot;, 			zeroMatches).x
-	assert_parse(p, &quot; &quot;, 			Array(Array(&quot; &quot;), 2)).x
-	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(Array(&quot; &quot;), 2)).x
-	assert_parse(p, &quot;asdf&quot;,			zeroMatches).x
-	assert_parse(p, &quot;  &quot;,			Array(Array(&quot; &quot;, &quot; &quot;), 3)).x
-	assert_parse(p, &quot;   &quot;,			Array(Array(&quot; &quot;, &quot; &quot;, &quot; &quot;), 4)).x
-	assert_parse(p, &quot; x &quot;,			Array(Array(&quot; &quot;), 2)).x
-	assert_parse(p, &quot; x  &quot;,			Array(Array(&quot; &quot;), 2)).x
-	assert_parse(p, &quot;  x &quot;,			Array(Array(&quot; &quot;, &quot; &quot;), 3)).x
+	assert_parses(p, &quot;&quot;, 			zeroMatches, 1).x
+	assert_parses(p, &quot; &quot;, 			List(&quot; &quot;), 2).x
+	assert_parses(p, &quot; &quot; &amp; chr(13),	List(&quot; &quot;), 2).x
+	assert_parses(p, &quot;asdf&quot;,		zeroMatches, 1).x
+	assert_parses(p, &quot;  &quot;,			List(&quot; &quot;, &quot; &quot;), 3).x
+	assert_parses(p, &quot;   &quot;,			List(&quot; &quot;, &quot; &quot;, &quot; &quot;), 4).x
+	assert_parses(p, &quot; x &quot;,			List(&quot; &quot;), 2).x
+	assert_parses(p, &quot; x  &quot;,		List(&quot; &quot;), 2).x
+	assert_parses(p, &quot;  x &quot;,		List(&quot; &quot;, &quot; &quot;), 3).x
 	
 	p = pMany(pDecDigit)
-	assert_parse(p, &quot;&quot;, 			zeroMatches).x
-	assert_parse(p, &quot; &quot;, 			zeroMatches).x
-	assert_parse(p, &quot;1&quot;, 			Array(Array(&quot;1&quot;), 2)).x
-	assert_parse(p, &quot;12 &quot;, 			Array(Array(&quot;1&quot;, &quot;2&quot;), 3)).x
-	assert_parse(p, &quot;12345&quot;, 		Array(Array(&quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;), 6)).x
+	assert_parses(p, &quot;&quot;, 			zeroMatches, 1).x
+	assert_parses(p, &quot; &quot;, 			zeroMatches, 1).x
+	assert_parses(p, &quot;1&quot;, 			List(&quot;1&quot;), 2).x
+	assert_parses(p, &quot;12 &quot;, 		List(&quot;1&quot;, &quot;2&quot;), 3).x
+	assert_parses(p, &quot;12345&quot;, 		List(&quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;), 6).x
 End Function
 
 
@@ -742,33 +804,33 @@ Function test_Parser_many1Rev()
 		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
 	)
 	p = pMany1Rev(pFail)
-	assert_parse(p, data, parseFailure).x
+	refute_parses(p, data).x
 	
 	&apos;p = pMany1(pReturn(3)) - yields infite sequence of 3s, except on empty string
 	
 	p = pMany1Rev(pItem)
-	assert_parse(p, &quot;&quot;, 			parseFailure).x
-	assert_parse(p, &quot; &quot;, 			Array(List(&quot; &quot;), 2)).x
-	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(List(&quot;\n&quot;, &quot; &quot;), 3)).x
-	assert_parse(p, &quot;asdf&quot;,			Array(List(&quot;f&quot;, &quot;d&quot;, &quot;s&quot;, &quot;a&quot;), 5)).x
+	refute_parses(p, &quot;&quot;).x
+	assert_parses(p, &quot; &quot;, 			List(&quot; &quot;), 2).x
+	assert_parses(p, &quot; &quot; &amp; chr(13),	List(&quot;\n&quot;, &quot; &quot;), 3).x
+	assert_parses(p, &quot;asdf&quot;,		List(&quot;f&quot;, &quot;d&quot;, &quot;s&quot;, &quot;a&quot;), 5).x
 	
 	p = pMany1Rev(pStr(&quot; &quot;))
-	assert_parse(p, &quot;&quot;, 			parseFailure).x
-	assert_parse(p, &quot; &quot;, 			Array(List(&quot; &quot;), 2)).x
-	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(List(&quot; &quot;), 2)).x
-	assert_parse(p, &quot;asdf&quot;,			parseFailure).x
-	assert_parse(p, &quot;  &quot;,			Array(List(&quot; &quot;, &quot; &quot;), 3)).x
-	assert_parse(p, &quot;   &quot;,			Array(List(&quot; &quot;, &quot; &quot;, &quot; &quot;), 4)).x
-	assert_parse(p, &quot; x &quot;,			Array(List(&quot; &quot;), 2)).x
-	assert_parse(p, &quot; x  &quot;,			Array(List(&quot; &quot;), 2)).x
-	assert_parse(p, &quot;  x &quot;,			Array(List(&quot; &quot;, &quot; &quot;), 3)).x
+	refute_parses(p, &quot;&quot;).x
+	assert_parses(p, &quot; &quot;, 			List(&quot; &quot;), 2).x
+	assert_parses(p, &quot; &quot; &amp; chr(13),	List(&quot; &quot;), 2).x
+	refute_parses(p, &quot;asdf&quot;).x
+	assert_parses(p, &quot;  &quot;,			List(&quot; &quot;, &quot; &quot;), 3).x
+	assert_parses(p, &quot;   &quot;,			List(&quot; &quot;, &quot; &quot;, &quot; &quot;), 4).x
+	assert_parses(p, &quot; x &quot;,			List(&quot; &quot;), 2).x
+	assert_parses(p, &quot; x  &quot;,		List(&quot; &quot;), 2).x
+	assert_parses(p, &quot;  x &quot;,		List(&quot; &quot;, &quot; &quot;), 3).x
 	
 	p = pMany1Rev(pDecDigit)
-	assert_parse(p, &quot;&quot;, 			parseFailure).x
-	assert_parse(p, &quot; &quot;, 			parseFailure).x
-	assert_parse(p, &quot;1&quot;, 			Array(List(&quot;1&quot;), 2)).x
-	assert_parse(p, &quot;12 &quot;, 			Array(List(&quot;2&quot;, &quot;1&quot;), 3)).x
-	assert_parse(p, &quot;12345&quot;, 		Array(List(&quot;5&quot;, &quot;4&quot;, &quot;3&quot;, &quot;2&quot;, &quot;1&quot;), 6)).x
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot; &quot;).x
+	assert_parses(p, &quot;1&quot;, 			List(&quot;1&quot;), 2).x
+	assert_parses(p, &quot;12 &quot;, 		List(&quot;2&quot;, &quot;1&quot;), 3).x
+	assert_parses(p, &quot;12345&quot;, 		List(&quot;5&quot;, &quot;4&quot;, &quot;3&quot;, &quot;2&quot;, &quot;1&quot;), 6).x
 End Function
 
 Function test_Parser_many1()
@@ -780,33 +842,33 @@ Function test_Parser_many1()
 		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
 	)
 	p = pMany1(pFail)
-	assert_parse(p, data, parseFailure).x
+	refute_parses(p, data).x
 	
 	&apos;p = pMany1(pReturn(3)) - yields infite sequence of 3s, except on empty string
 	
 	p = pMany1(pItem)
-	assert_parse(p, &quot;&quot;, 			parseFailure).x
-	assert_parse(p, &quot; &quot;, 			Array(List(&quot; &quot;), 2)).x
-	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(List(&quot; &quot;, &quot;\n&quot;), 3)).x
-	assert_parse(p, &quot;asdf&quot;,			Array(List(&quot;a&quot;, &quot;s&quot;, &quot;d&quot;, &quot;f&quot;), 5)).x
+	refute_parses(p, &quot;&quot;).x
+	assert_parses(p, &quot; &quot;, 			List(&quot; &quot;), 2).x
+	assert_parses(p, &quot; &quot; &amp; chr(13),	List(&quot; &quot;, &quot;\n&quot;), 3).x
+	assert_parses(p, &quot;asdf&quot;,		List(&quot;a&quot;, &quot;s&quot;, &quot;d&quot;, &quot;f&quot;), 5).x
 	
 	p = pMany1(pStr(&quot; &quot;))
-	assert_parse(p, &quot;&quot;, 			parseFailure).x
-	assert_parse(p, &quot; &quot;, 			Array(List(&quot; &quot;), 2)).x
-	assert_parse(p, &quot; &quot; &amp; chr(13),	Array(List(&quot; &quot;), 2)).x
-	assert_parse(p, &quot;asdf&quot;,			parseFailure).x
-	assert_parse(p, &quot;  &quot;,			Array(List(&quot; &quot;, &quot; &quot;), 3)).x
-	assert_parse(p, &quot;   &quot;,			Array(List(&quot; &quot;, &quot; &quot;, &quot; &quot;), 4)).x
-	assert_parse(p, &quot; x &quot;,			Array(List(&quot; &quot;), 2)).x
-	assert_parse(p, &quot; x  &quot;,			Array(List(&quot; &quot;), 2)).x
-	assert_parse(p, &quot;  x &quot;,			Array(List(&quot; &quot;, &quot; &quot;), 3)).x
+	refute_parses(p, &quot;&quot;).x
+	assert_parses(p, &quot; &quot;, 			List(&quot; &quot;), 2).x
+	assert_parses(p, &quot; &quot; &amp; chr(13),	List(&quot; &quot;), 2).x
+	refute_parses(p, &quot;asdf&quot;).x
+	assert_parses(p, &quot;  &quot;,			List(&quot; &quot;, &quot; &quot;), 3).x
+	assert_parses(p, &quot;   &quot;,			List(&quot; &quot;, &quot; &quot;, &quot; &quot;), 4).x
+	assert_parses(p, &quot; x &quot;,			List(&quot; &quot;), 2).x
+	assert_parses(p, &quot; x  &quot;,		List(&quot; &quot;), 2).x
+	assert_parses(p, &quot;  x &quot;,		List(&quot; &quot;, &quot; &quot;), 3).x
 	
 	p = pMany1(pDecDigit)
-	assert_parse(p, &quot;&quot;, 			parseFailure).x
-	assert_parse(p, &quot; &quot;, 			parseFailure).x
-	assert_parse(p, &quot;1&quot;, 			Array(List(&quot;1&quot;), 2)).x
-	assert_parse(p, &quot;12 &quot;, 			Array(List(&quot;1&quot;, &quot;2&quot;), 3)).x
-	assert_parse(p, &quot;12345&quot;, 		Array(List(&quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;), 6)).x
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot; &quot;).x
+	assert_parses(p, &quot;1&quot;, 			List(&quot;1&quot;), 2).x
+	assert_parses(p, &quot;12 &quot;, 		List(&quot;1&quot;, &quot;2&quot;), 3).x
+	assert_parses(p, &quot;12345&quot;, 		List(&quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;), 6).x
 End Function
 
 Function test_Parser_seq()
@@ -819,58 +881,58 @@ Function test_Parser_seq()
 	)
 	f = &quot;asc&quot;
 	p = pSeq(Array(pFail), f)
-	assert_parse(p, data, parseFailure).x
+	refute_parses(p, data).x
 	
 	f = &quot;asc&quot;
 	p = pSeq(Array(pItem), f)
-	assert_parse(p, &quot;&quot;, 	parseFailure).x
-	assert_parse(p, &quot;0&quot;, 	Array(asc(&quot;0&quot;), 2)).x
-	assert_parse(p, &quot;1&quot;, 	Array(asc(&quot;1&quot;), 2)).x
-	assert_parse(p, &quot;A&quot;, 	Array(asc(&quot;A&quot;), 2)).x
-	assert_parse(p, &quot;B&quot;, 	Array(asc(&quot;B&quot;), 2)).x
-	assert_parse(p, &quot;AB&quot;,	Array(asc(&quot;A&quot;), 2)).x
-	assert_parse(p, &quot;BA&quot;,	Array(asc(&quot;B&quot;), 2)).x
+	refute_parses(p, &quot;&quot;).x
+	assert_parses(p, &quot;0&quot;, 	asc(&quot;0&quot;), 2).x
+	assert_parses(p, &quot;1&quot;, 	asc(&quot;1&quot;), 2).x
+	assert_parses(p, &quot;A&quot;, 	asc(&quot;A&quot;), 2).x
+	assert_parses(p, &quot;B&quot;, 	asc(&quot;B&quot;), 2).x
+	assert_parses(p, &quot;AB&quot;,	asc(&quot;A&quot;), 2).x
+	assert_parses(p, &quot;BA&quot;,	asc(&quot;B&quot;), 2).x
 	
 	f = &quot;concat&quot;
 	p = pSeq(Array(pItem, pItem), f)
-	assert_parse(p, &quot;&quot;, 	parseFailure).x
-	assert_parse(p, &quot;A&quot;, 	parseFailure).x
-	assert_parse(p, &quot;B&quot;, 	parseFailure).x
-	assert_parse(p, &quot;AB&quot;,	Array(&quot;AB&quot;, 3)).x
-	assert_parse(p, &quot;BA&quot;,	Array(&quot;BA&quot;, 3)).x
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot;A&quot;).x
+	refute_parses(p, &quot;B&quot;).x
+	assert_parses(p, &quot;AB&quot;,	&quot;AB&quot;, 3).x
+	assert_parses(p, &quot;BA&quot;,	&quot;BA&quot;, 3).x
 	
 	p = pSeq(Array(pDecDigit, pDecDigit), f)
-	assert_parse(p, &quot;&quot;, 	parseFailure).x
-	assert_parse(p, &quot;A&quot;, 	parseFailure).x
-	assert_parse(p, &quot;B&quot;, 	parseFailure).x
-	assert_parse(p, &quot;AB&quot;,	parseFailure).x
-	assert_parse(p, &quot;BA&quot;,	parseFailure).x
-	assert_parse(p, &quot;0B&quot;,	parseFailure).x		&apos; *ALL* in sequence must succeed!
-	assert_parse(p, &quot;1A&quot;,	parseFailure).x		&apos; *ALL* in sequence must succeed!
-	assert_parse(p, &quot;01&quot;,	Array(&quot;01&quot;, 3)).x
-	assert_parse(p, &quot;10&quot;,	Array(&quot;10&quot;, 3)).x
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot;A&quot;).x
+	refute_parses(p, &quot;B&quot;).x
+	refute_parses(p, &quot;AB&quot;).x
+	refute_parses(p, &quot;BA&quot;).x
+	refute_parses(p, &quot;0B&quot;).x		&apos; *ALL* in sequence must succeed!
+	refute_parses(p, &quot;1A&quot;).x		&apos; *ALL* in sequence must succeed!
+	assert_parses(p, &quot;01&quot;,	&quot;01&quot;, 3).x
+	assert_parses(p, &quot;10&quot;,	&quot;10&quot;, 3).x
 	
 	f = &quot;asc&quot;
 	p = pSeq(Array(pDecDigit), f)
-	assert_parse(p, &quot;&quot;, 			parseFailure).x
-	assert_parse(p, &quot;A&quot;, 			parseFailure).x
-	assert_parse(p, &quot;B&quot;, 			parseFailure).x
-	assert_parse(p, &quot;AB&quot;,			parseFailure).x
-	assert_parse(p, &quot;BA&quot;,			parseFailure).x
-	assert_parse(p, &quot;0&quot;, 			Array(48, 2)).x
-	assert_parse(p, &quot;1&quot;, 			Array(49, 2)).x
-	assert_parse(p, &quot;123456789&quot;,	Array(49, 2)).x
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot;A&quot;).x
+	refute_parses(p, &quot;B&quot;).x
+	refute_parses(p, &quot;AB&quot;).x
+	refute_parses(p, &quot;BA&quot;).x
+	assert_parses(p, &quot;0&quot;, 			48, 2).x
+	assert_parses(p, &quot;1&quot;, 			49, 2).x
+	assert_parses(p, &quot;123456789&quot;,	49, 2).x
 	
 	p = pMany1(pSeq(Array(pDecDigit), f))
-	assert_parse(p, &quot;&quot;, 			parseFailure).x
-	assert_parse(p, &quot;A&quot;, 			parseFailure).x
-	assert_parse(p, &quot;B&quot;, 			parseFailure).x
-	assert_parse(p, &quot;AB&quot;,			parseFailure).x
-	assert_parse(p, &quot;BA&quot;,			parseFailure).x
-	assert_parse(p, &quot;0&quot;, 			Array(List(48), 2)).x
-	assert_parse(p, &quot;1&quot;, 			Array(List(49), 2)).x
-	assert_parse(p, &quot;123456789&quot;,	Array(List(49, 50, 51, 52, 53, 54, 55, 56, 57), 10)).x
-	assert_parse(p, &quot;123456789 0&quot;,	Array(List(49, 50, 51, 52, 53, 54, 55, 56, 57), 10)).x
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot;A&quot;).x
+	refute_parses(p, &quot;B&quot;).x
+	refute_parses(p, &quot;AB&quot;).x
+	refute_parses(p, &quot;BA&quot;).x
+	assert_parses(p, &quot;0&quot;, 			List(48), 2).x
+	assert_parses(p, &quot;1&quot;, 			List(49), 2).x
+	assert_parses(p, &quot;123456789&quot;,	List(49, 50, 51, 52, 53, 54, 55, 56, 57), 10).x
+	assert_parses(p, &quot;123456789 0&quot;,	List(49, 50, 51, 52, 53, 54, 55, 56, 57), 10).x
 End Function
 
 
