@@ -839,6 +839,17 @@ Function test_Parser_seq()
 	assert_parse(p, &quot;AB&quot;,	Array(&quot;AB&quot;, 3)).x
 	assert_parse(p, &quot;BA&quot;,	Array(&quot;BA&quot;, 3)).x
 	
+	p = pSeq(Array(pDecDigit, pDecDigit), f)
+	assert_parse(p, &quot;&quot;, 	parseFailure).x
+	assert_parse(p, &quot;A&quot;, 	parseFailure).x
+	assert_parse(p, &quot;B&quot;, 	parseFailure).x
+	assert_parse(p, &quot;AB&quot;,	parseFailure).x
+	assert_parse(p, &quot;BA&quot;,	parseFailure).x
+	assert_parse(p, &quot;0B&quot;,	parseFailure).x		&apos; *ALL* in sequence must succeed!
+	assert_parse(p, &quot;1A&quot;,	parseFailure).x		&apos; *ALL* in sequence must succeed!
+	assert_parse(p, &quot;01&quot;,	Array(&quot;01&quot;, 3)).x
+	assert_parse(p, &quot;10&quot;,	Array(&quot;10&quot;, 3)).x
+	
 	f = &quot;asc&quot;
 	p = pSeq(Array(pDecDigit), f)
 	assert_parse(p, &quot;&quot;, 			parseFailure).x
