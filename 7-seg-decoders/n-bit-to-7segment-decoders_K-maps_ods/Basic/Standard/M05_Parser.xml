@@ -120,7 +120,7 @@ End Function
 &apos; otherwise returns a *REVERSED list* of p results + last pos
 &apos; matches as many as possible
 Function pManyRev(p As Parser)
-	pManyRev = mkParser(&quot;manyRev&quot;, p)
+	pManyRev = pChoice( pMany1Rev(p), pReturn(nil) )
 End Function
 
 &apos; same as pManyRev but with the list in the order as in the parsed string
@@ -317,7 +317,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		Else
 			result = Array(List(result(0)), result(1))
 		End If
-	ElseIf (p.tp = &quot;manyRev&quot;) Or (p.tp = &quot;many1Rev&quot;) Then
+	ElseIf (p.tp = &quot;many1Rev&quot;) Then
 		Dim lstLen As Integer
 		nxtPos = pos
 		lstLen = 0
@@ -330,7 +330,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 			lstLen = lstLen + 1
 			result = applyP(innerParser, s, nxtPos)
 		Wend
-		If (p.tp = &quot;many1Rev&quot;) And isNil(lst) Then
+		If isNil(lst) Then
 			result = parseFailure
 		Else
 			result = Array(lst, nxtPos)
@@ -404,17 +404,17 @@ Function test_Parser()
 	test_Parser_decDigit()
 &apos; 1 sec for 340 ~&gt; 340 aPerSec
 	test_Parser_hexDigit()
-&apos; 1 sec for 389 ~&gt; 389 aPerSec
+&apos; 2 sec for 389 ~&gt; 195 aPerSec
 	test_Parser_manyRev()
 	test_Parser_many()
-&apos; 2 sec for 521 ~&gt; 174 aPerSec
+&apos; 4 sec for 521 ~&gt; 130 aPerSec
 	test_Parser_many1Rev()
 	test_Parser_many1()
-&apos; 4 sec for 613 ~&gt; 153 aPerSec
+&apos; 5 sec for 613 ~&gt; 123 aPerSec
 	test_Parser_seq()
-&apos; 5 sec for 683 ~&gt; 137 aPerSec
+&apos; 6 sec for 683 ~&gt; 114 aPerSec
 	test_Parser_hexNum()
-&apos; 7 sec for 762 ~&gt; 109 aPerSec
+&apos; 8 sec for 762 ~&gt; 95 aPerSec
 Goto end_of_Parser_tests
 end_of_Parser_tests:	
 	aCount = assertionCount - aCount
