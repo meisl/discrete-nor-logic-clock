@@ -36,6 +36,10 @@ Function fnObjs()
 			List(&quot;cdr&quot;,				True, 1), _
 			List(&quot;cadr&quot;,			True, 1), _
 			List(&quot;caddr&quot;,			True, 1), _
+			List(&quot;foldl&quot;,			True, 3), _
+			List(&quot;foldr&quot;,			True, 3), _
+			List(&quot;foldl1&quot;,			True, 2), _
+			List(&quot;foldr1&quot;,			True, 2), _
 			List(&quot;map&quot;,				True, 2), _
 			List(&quot;filter&quot;,			True, 2), _
 			List(&quot;adjoin&quot;,			True, 2), _
@@ -176,6 +180,7 @@ Function applyBuiltinRev(ByVal fn As Object, ByVal reverseArgs As Object)
 		Case &quot;concat&quot;:			result = concat(		a(0), a(1)			)
 		Case &quot;asc&quot;:				result = asc(			a(0)				)
 		Case &quot;chr&quot;:				result = chr(			a(0)				)
+		Case &quot;readHex&quot;:			result = readHex(		a(0)				)
 		Case &quot;isString&quot;:		result = isString(		a(0)				)
 		Case &quot;toString&quot;:		result = toString(		a(0)				)
 		Case &quot;TList_toString&quot;:	result = TList_toString(a(0)				)
@@ -188,6 +193,10 @@ Function applyBuiltinRev(ByVal fn As Object, ByVal reverseArgs As Object)
 		Case &quot;cadr&quot;:			result = cadr(			a(0)				)
 		Case &quot;caddr&quot;:			result = caddr(			a(0)				)
 		Case &quot;map&quot;:				result = map(			a(0), a(1)			)
+		Case &quot;foldl&quot;:			result = foldl(			a(0), a(1), a(2)	)
+		Case &quot;foldr&quot;:			result = foldr(			a(0), a(1), a(2)	)
+		Case &quot;foldl1&quot;:			result = foldl1(		a(0), a(1)			)
+		Case &quot;foldr1&quot;:			result = foldr1(		a(0), a(1)			)
 		Case &quot;filter&quot;:			result = filter(		a(0), a(1)			)
 		Case &quot;adjoin&quot;:			result = adjoin(		a(0), a(1)			)
 		Case &quot;flatten&quot;:			result = flatten(		a(0)				)
@@ -340,6 +349,27 @@ Function test_Fn()
 	assertEqual(apply(fChr, 65), 	Chr(65)).x
 	assertEqual(apply(fChr, 66), 	Chr(66)).x
 	assertEqual(apply(fChr, 90), 	Chr(90)).x
+
+
+	Dim fReadhex As Variant
+	fReadHex = lookupFn(&quot;readHex&quot;)
+	assertEqual(arity(fReadHex), 1).x
+	assertEqual(apply(fReadHex,  &quot;0&quot;),  readHex(&quot;0&quot;)).x
+	assertEqual(apply(fReadHex,  &quot;1&quot;),  readHex(&quot;1&quot;)).x
+	assertEqual(apply(fReadHex,  &quot;2&quot;),  readHex(&quot;2&quot;)).x
+	assertEqual(apply(fReadHex,  &quot;3&quot;),  readHex(&quot;3&quot;)).x
+	assertEqual(apply(fReadHex,  &quot;4&quot;),  readHex(&quot;4&quot;)).x
+	assertEqual(apply(fReadHex,  &quot;5&quot;),  readHex(&quot;5&quot;)).x
+	assertEqual(apply(fReadHex,  &quot;6&quot;),  readHex(&quot;6&quot;)).x
+	assertEqual(apply(fReadHex,  &quot;7&quot;),  readHex(&quot;7&quot;)).x
+	assertEqual(apply(fReadHex,  &quot;8&quot;),  readHex(&quot;8&quot;)).x
+	assertEqual(apply(fReadHex,  &quot;9&quot;),  readHex(&quot;9&quot;)).x
+
+	assertEqual(apply(fReadHex,  &quot;A&quot;),  readHex(&quot;A&quot;)).x
+	assertEqual(apply(fReadHex,  &quot;a&quot;),  readHex(&quot;a&quot;)).x
+
+	assertEqual(apply(fReadHex,  &quot;F&quot;),  readHex(&quot;F&quot;)).x
+	assertEqual(apply(fReadHex,  &quot;f&quot;),  readHex(&quot;f&quot;)).x
 
 
 	assertEqual(existsF(&quot;i do not exist&quot;), False).x

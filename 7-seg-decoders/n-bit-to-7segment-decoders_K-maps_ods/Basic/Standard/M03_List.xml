@@ -132,6 +132,13 @@ Function foldl(fn As Variant, acc As Variant, ByVal xs As Variant)
 	foldl = result
 End Function
 
+Function foldl1(fn As Variant, ByVal xs As Variant)
+	If isNil(xs) Then
+		croak(&quot;foldl1 on nil&quot;)
+	End If
+	foldl1 = foldl(fn, car(xs), cdr(xs))
+End Function
+
 Function foldr(fn As Variant, ByVal acc As Variant, xs As Variant)
 	Dim result As Variant
 	If IsNil(xs) Then

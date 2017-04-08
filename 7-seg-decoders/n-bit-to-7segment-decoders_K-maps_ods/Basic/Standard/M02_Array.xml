@@ -25,7 +25,6 @@ End Function
 
 Function getSizes(a As Array)
 	getSizes = map(&quot;caddr&quot;, getBounds(a))
-
 End Function
 
 Function getDim(a As Array)

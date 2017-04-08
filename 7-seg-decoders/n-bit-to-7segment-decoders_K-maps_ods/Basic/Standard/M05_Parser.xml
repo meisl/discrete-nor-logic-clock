@@ -16,8 +16,8 @@ Sub Main
 	Stop
 	Dim s As String
 	Dim pHexNum As Parser, pHexLit As Parser
-	Set pHexNum = mkSeq(Array(pMany(pHexDigit)), &quot;readHex&quot;)
-	Set pHexLit = mkSeq(Array(pStr(&quot;0x&quot;), pHexNum), &quot;snd&quot;)
+	Set pHexNum = pSeq(Array(pMany1(pHexDigit)), &quot;readHex&quot;)
+	Set pHexLit = pSeq(Array(pStr(&quot;0x&quot;), pHexNum), &quot;snd&quot;)
 	Dim p As Parser 
 	&apos;pChoice(pItem(), pReturn(&quot;bar&quot;))
 	Set p = pSeq(Array(pHexLit, pMany(pWhite)), &quot;fst&quot;)
@@ -148,16 +148,17 @@ End Function
 &apos; which is then passed on the the given function. The result
 &apos; of this function application is then packed up with the last
 &apos; parsers pos to give the overall result
-Function pSeq(ps As Array, fName As String)
-	Dim f As Variant
-	If isString(fName) Then
+Function pSeq(ps As Array, ByVal f As Variant)
+	Dim fName As String
+	If isString(f) Then
+		fName = f
 		f = lookupFn(fName)
+		If isEmpty(f) Then
+			croak(&quot;pSeq: unknown function &quot; &amp; toString(fName))
+		End If
 	End If
-	If isEmpty(f) Then
-		croak(&quot;pSeq: unknown function &quot; &amp; toString(fName))
-	Else
-		pSeq = mkParser(&quot;seq&quot;, Array(ps, f))
-	End If
+	&apos; TODO: pSeq: check if f is proper fn
+	pSeq = mkParser(&quot;seq&quot;, Array(ps, f))
 End Function
 
 Function mkBind(fName As String, p As Parser)
@@ -217,6 +218,17 @@ Function pHexDigit()
 	pHexDigit = result
 End Function
 
+Function pHexNum()
+	Static result As Object
+	If isNull(result) Then
+		Set result = pSeq(Array(pMany1(pHexDigit)), apply(&quot;foldl1&quot;, lookupFn(&quot;concat&quot;))
+		Set result = pSeq(Array(result), &quot;readHex&quot;)
+	End If
+	pHexNum = result
+End Function
+
+&apos; ===================================================================
+
 Function lookupParser(pName As String) As Parser
 	Dim result As Parser
 	Select Case pName
@@ -228,8 +240,6 @@ Function lookupParser(pName As String) As Parser
 	End Select
 	lookupParser = result
 End Function
-
-&apos;==================================================================
 
 Function parse(pName As String, s As String)
 	Dim result As String
@@ -387,6 +397,11 @@ Function test_Parser()
 	Dim failure As String
 	failure = toString(parseFailure)
 	refute_parses_pass = assertEqual(failure, failure)
+
+	test_Parser_hexNum()
+&apos; ? sec for ? ~&gt; ? aPerSec
+Goto end_of_Parser_tests
+
 	
 	test_Parser_fail()
 	test_Parser_item()
@@ -410,12 +425,15 @@ Function test_Parser()
 &apos; 15 sec for 475 ~&gt; 34 aPerSec
 	test_Parser_seq()
 &apos; 19 sec for 509 ~&gt; 27 aPerSec
-Goto end_of_Parser_tests
 end_of_Parser_tests:	
 	aCount = assertionCount - aCount
 	tm = TimeValue(Time) - tm
 	tmSecs = Second(tm) + 60 * (Minute(tm) + 60 * Hour(tm))
-	aPerSec = aCount/tmSecs
+	If (tmSecs = 0) Then
+		aPerSec = aCount
+	Else
+		aPerSec = aCount/tmSecs
+	End If
 	MsgBox(TimeSerial(Hour(tm), Minute(tm), Second(tm)) &amp; &quot; for &quot; &amp; aCount &amp; &quot; assertions&quot;_
 		&amp; chr(13) &amp; &quot;that&apos;s ~&quot; &amp; aPerSec &amp; &quot; assertions/sec&quot;_
 	)
@@ -430,12 +448,14 @@ Function refute_parses(p As Parser, ByVal ss As Variant)
 		Dim i As Integer
 		For i = LBound(ss) To UBound(ss)
 			actual = applyP(p, ss(i))
+			assertionCount = assertionCount + 1
 			If Not(isParseFailure(actual)) Then
 				Goto refute_parses_failed
 			End If
 		Next i
 	Else
 		actual = applyP(p, ss)
+		assertionCount = assertionCount + 1
 		If Not(isParseFailure(actual)) Then
 			Goto refute_parses_failed
 		End If
@@ -971,5 +991,63 @@ Function test_Parser_seq()
 	assert_parses(p, &quot;123456789 0&quot;,	List(49, 50, 51, 52, 53, 54, 55, 56, 57), 10).x
 End Function
 
+Function test_Parser_hexNum()
+	Dim p As Parser
+	Dim data As Variant
+	p = pHexNum
+
+	refute_parses(p, &quot;&quot;).x
+		
+	data = Array(&quot; &quot;, &quot; &quot; &amp; chr(13), &quot;qasdf&quot;, &quot; bar&quot;, &quot;qb&quot;, &quot;qba&quot;, &quot;qbar&quot;, &quot;qbarb&quot;,_
+		&quot;qbarba&quot;, &quot;qbarbar&quot;, chr(13), chr(13) &amp; &quot;qbar&quot;, chr(13) &amp; chr(13),_
+		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
+	)
+	refute_parses(p, data).x
+	
+	assert_parses(p, &quot;0&quot;, 	0, 2).x
+	assert_parses(p, &quot;1&quot;, 	1, 2).x
+	assert_parses(p, &quot;2&quot;, 	2, 2).x
+	assert_parses(p, &quot;3&quot;, 	3, 2).x
+	assert_parses(p, &quot;4&quot;, 	4, 2).x
+	assert_parses(p, &quot;5&quot;, 	5, 2).x
+	assert_parses(p, &quot;6&quot;, 	6, 2).x
+	assert_parses(p, &quot;7&quot;, 	7, 2).x
+	assert_parses(p, &quot;8&quot;, 	8, 2).x
+	assert_parses(p, &quot;9&quot;, 	9, 2).x
+
+	assert_parses(p, &quot;a&quot;, 	10, 2).x
+	assert_parses(p, &quot;b&quot;, 	11, 2).x
+	assert_parses(p, &quot;c&quot;, 	12, 2).x
+	assert_parses(p, &quot;d&quot;, 	13, 2).x
+	assert_parses(p, &quot;e&quot;, 	14, 2).x
+	assert_parses(p, &quot;f&quot;, 	15, 2).x
+	assert_parses(p, &quot;A&quot;, 	10, 2).x
+	assert_parses(p, &quot;B&quot;, 	11, 2).x
+	assert_parses(p, &quot;C&quot;, 	12, 2).x
+	assert_parses(p, &quot;D&quot;, 	13, 2).x
+	assert_parses(p, &quot;E&quot;, 	14, 2).x
+	assert_parses(p, &quot;F&quot;, 	15, 2).x
+
+	assert_parses(p, &quot;FF&quot;, 		readHex(&quot;FF&quot;), 	3).x
+	assert_parses(p, &quot;123&quot;, 	readHex(&quot;123&quot;), 4).x
+
+	assert_parses(p, &quot;0FF&quot;, 	readHex(&quot;FF&quot;), 	4).x	&apos; leading 0s don&apos;t matter
+	assert_parses(p, &quot;0123&quot;, 	readHex(&quot;123&quot;), 5).x	&apos; leading 0s don&apos;t matter
+
+	assert_parses(p, &quot;00FF&quot;, 	readHex(&quot;FF&quot;), 	5).x	&apos; leading 0s don&apos;t matter
+	assert_parses(p, &quot;00123&quot;, 	readHex(&quot;123&quot;), 6).x	&apos; leading 0s don&apos;t matter
+
+	&apos; 31 bit
+	assert_parses(p, &quot;CAFEBAB&quot;, readHex(&quot;CAFEBAB&quot;), 	8).x
+	assert_parses(p, &quot;DEADBEE&quot;, readHex(&quot;DEADBEE&quot;), 	8).x
+	assert_parses(p, &quot;CAFEBAB&quot;, readHex(&quot;cafebab&quot;), 	8).x	&apos; case doesn&apos;t matter
+	assert_parses(p, &quot;dEaDbEe&quot;, readHex(&quot;DeAdBeE&quot;), 	8).x	&apos; case doesn&apos;t matter
+
+&apos;	&apos; 32 bit
+&apos;	assert_parses(p, &quot;CAFEBABE&quot;, readHex(&quot;CAFEBABE&quot;), 	9).x
+&apos;	assert_parses(p, &quot;DEADBEEF&quot;, readHex(&quot;DEADBEEF&quot;), 	9).x
+&apos;	assert_parses(p, &quot;CAFEBABE&quot;, readHex(&quot;cafebabe&quot;), 	9).x	&apos; case doesn&apos;t matter
+&apos;	assert_parses(p, &quot;dEaDbEeF&quot;, readHex(&quot;DeAdBeEf&quot;), 	9).x	&apos; case doesn&apos;t matter
+End Function
 
 </script:module>

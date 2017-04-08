@@ -156,8 +156,8 @@ Function toString(ByVal v As Variant) As String
 	toString = result
 End Function
 
-Function readHex(arg As Variant) As Integer
-	Dim result As Integer, t As String
+Function readHex(arg As Variant) As Long
+	Dim result As Long, t As String
 	t = typeOf(arg)
 	Select Case t
 		Case &quot;Array&quot;
@@ -168,7 +168,7 @@ Function readHex(arg As Variant) As Integer
 			If l = 0 Then
 				croak(&quot;readHex: got empty String&quot;)
 			Else
-				Dim digits As String, d As Integer, x As Integer, i As Integer
+				Dim digits As String, d As Integer, x As Long, i As Integer
 				digits = arg
 				result = 0
 				For i = 1 To Len(digits)
@@ -182,6 +182,7 @@ Function readHex(arg As Variant) As Integer
 					Else
 						croak(&quot;readHex: invalid hex digit &apos;&quot; &amp; chr(d) &amp; &quot;&apos; in &quot; &amp; toString(arg))
 					End If
+&apos;On Local Error Goto readHex_blows		
 					result = (result * 16) + x
 				Next i
 			End If
@@ -189,6 +190,11 @@ Function readHex(arg As Variant) As Integer
 			croak(&quot;readHex: expected Array or String - got &quot; &amp; t &amp; &quot;:&quot; &amp; chr(13) &amp; toString(arg))
 	End Select
 	readHex = result
+	Exit Function
+	
+readHex_blows:
+	MsgBox(toString(result))
+	Exit Function
 End Function
 
 &apos;= tests ============================================================
@@ -445,6 +451,18 @@ Function test_readHex()
 	assertEqual(readHex( &quot;1f&quot;),  31).x
 	assertEqual(readHex( &quot;ff&quot;), 255).x
 	assertEqual(readHex( &quot;Ff&quot;), 255).x
+	
+	Dim aLong As Long
+	&apos;31 bit
+	aLong = 212855723
+	assertEqual(typeOf(readHex( &quot;CAFEBAB&quot;)), typeOf(aLong)).x
+	assertEqual(readHex( &quot;CAFEBAB&quot;), aLong).x
+	aLong = 233495534
+	assertEqual(readHex( &quot;deadbee&quot;), aLong).x
+	
+&apos;	&apos;32 bit
+&apos;	assertEqual(readHex( &quot;CAFEBABE&quot;), 3405691582).x
+&apos;	assertEqual(readHex( &quot;deadbeef&quot;), 3735928559).x
 
 	assertThrows(&quot;readHex&quot;, Array(3)).x
 	assertThrows(&quot;readHex&quot;, Array(&quot;&quot;)).x
