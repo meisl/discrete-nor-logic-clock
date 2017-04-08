@@ -15,8 +15,6 @@ Sub Main
 	test_Parser()
 	Stop
 	Dim s As String
-	Dim pHexNum As Parser, pHexLit As Parser
-	Set pHexNum = pSeq(Array(pMany1(pHexDigit)), &quot;readHex&quot;)
 	Set pHexLit = pSeq(Array(pStr(&quot;0x&quot;), pHexNum), &quot;snd&quot;)
 	Dim p As Parser 
 	&apos;pChoice(pItem(), pReturn(&quot;bar&quot;))
@@ -50,7 +48,7 @@ Function pFail()
 End Function
 
 Function parseFailure()
-	parseFailure = nil
+	parseFailure = Empty
 End Function
 
 Function isParseFailure(parseResult) As Boolean
@@ -342,7 +340,9 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		result(0) = reverse(result(0))
 	ElseIf p.tp = &quot;many1&quot; Then
 		result = applyP(pMany1Rev(p.st), s, pos)
-		result(0) = reverse(result(0))
+		If Not(isParseFailure(result)) Then
+			result(0) = reverse(result(0))
+		End If
 	ElseIf p.tp = &quot;bind&quot; Then
 		result = applyP(p.st(0), s, pos)
 		If Not isParseFailure(result) Then
@@ -392,13 +392,12 @@ Function test_Parser()
 	tm = TimeValue(Time)
 	
 	Dim aCount As Integer
+	assertionCount = 0
 	aCount = assertionCount
 	
 	Dim failure As String
 	failure = toString(parseFailure)
 	refute_parses_pass = assertEqual(failure, failure)
-
-
 	
 	test_Parser_fail()
 	test_Parser_item()
@@ -406,24 +405,24 @@ Function test_Parser()
 	test_Parser_str()
 	test_Parser_choice()
 	test_Parser_zeroOrOne()
-&apos; 1 sec for 254 ~&gt; 254 aPerSec
+&apos; 0 sec for 254 ~&gt; &gt;254 aPerSec
 	test_Parser_white()
 	test_Parser_binDigit()
-&apos; 2 sec for 303 ~&gt; 152 aPerSec
+&apos; 0 sec for 303 ~&gt; 303 aPerSec
 	test_Parser_decDigit()
-&apos; 4 sec for 340 ~&gt; 85 aPerSec
+&apos; 1 sec for 340 ~&gt; 340 aPerSec
 	test_Parser_hexDigit()
-&apos; 7 sec for 389 ~&gt; 56 aPerSec
+&apos; 1 sec for 389 ~&gt; 389 aPerSec
 	test_Parser_manyRev()
 	test_Parser_many()
-&apos; 10 sec for 521 ~&gt; 47 aPerSec
+&apos; 2 sec for 521 ~&gt; 174 aPerSec
 	test_Parser_many1Rev()
 	test_Parser_many1()
-&apos; 15 sec for 613 ~&gt; 41 aPerSec
+&apos; 4 sec for 613 ~&gt; 153 aPerSec
 	test_Parser_seq()
-&apos; 19 sec for 683 ~&gt; 36 aPerSec
+&apos; 5 sec for 683 ~&gt; 137 aPerSec
 	test_Parser_hexNum()
-&apos; 38 sec for 762 ~&gt; 20 aPerSec
+&apos; 7 sec for 762 ~&gt; 109 aPerSec
 Goto end_of_Parser_tests
 end_of_Parser_tests:	
 	aCount = assertionCount - aCount
