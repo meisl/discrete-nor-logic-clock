@@ -90,8 +90,8 @@ End Function
 Function pChoice(p1 As Parser, p2 As Parser)
 	&apos; TODO: @pChoice: strip out always failing parsers
 	&apos; TODO: @pChoice: if p1 always succeeds strip out p2
-	pChoice = mkParser(&quot;choice&quot;, List(p1, p2))
-	Exit Function
+&apos;	pChoice = mkParser(&quot;choice&quot;, List(p1, p2))
+&apos;	Exit Function
 	Dim choices As Variant
 	If p2.tp = &quot;choice&quot; Then
 		If p1.tp = &quot;choice&quot; Then
@@ -303,10 +303,10 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 			End If
 		ElseIf k &gt; 2 Then	&apos; more than 2 alternatives
 			Do
-				innerParser = car(lst)
+				innerParser = car(innerParsers)
 				result = applyP(innerParser, s, pos)
-				lst = cdr(lst)
-			Loop Until (isNil(lst) Or Not(isParseFailure(result)))
+				innerParsers = cdr(innerParsers)
+			Loop Until (isNil(innerParsers) Or Not(isParseFailure(result)))
 		Else
 			croak(&quot;applying pChoice: invalid list of alternatives &quot; &amp; chr(13) &amp; toString(innerParsers))
 		End If
