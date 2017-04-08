@@ -398,9 +398,6 @@ Function test_Parser()
 	failure = toString(parseFailure)
 	refute_parses_pass = assertEqual(failure, failure)
 
-	test_Parser_hexNum()
-&apos; ? sec for ? ~&gt; ? aPerSec
-Goto end_of_Parser_tests
 
 	
 	test_Parser_fail()
@@ -409,22 +406,25 @@ Goto end_of_Parser_tests
 	test_Parser_str()
 	test_Parser_choice()
 	test_Parser_zeroOrOne()
-&apos; 1 sec for 209 ~&gt; 209 aPerSec
+&apos; 1 sec for 254 ~&gt; 254 aPerSec
 	test_Parser_white()
 	test_Parser_binDigit()
-&apos; 2 sec for 227 ~&gt; 117 aPerSec
+&apos; 2 sec for 303 ~&gt; 152 aPerSec
 	test_Parser_decDigit()
-&apos; 4 sec for 247 ~&gt; 62 aPerSec
+&apos; 4 sec for 340 ~&gt; 85 aPerSec
 	test_Parser_hexDigit()
-&apos; 7 sec for 291 ~&gt; 42 aPerSec
+&apos; 7 sec for 389 ~&gt; 56 aPerSec
 	test_Parser_manyRev()
 	test_Parser_many()
-&apos; 10 sec for 423 ~&gt; 42 aPerSec
+&apos; 10 sec for 521 ~&gt; 47 aPerSec
 	test_Parser_many1Rev()
 	test_Parser_many1()
-&apos; 15 sec for 475 ~&gt; 34 aPerSec
+&apos; 15 sec for 613 ~&gt; 41 aPerSec
 	test_Parser_seq()
-&apos; 19 sec for 509 ~&gt; 27 aPerSec
+&apos; 19 sec for 683 ~&gt; 36 aPerSec
+	test_Parser_hexNum()
+&apos; 38 sec for 762 ~&gt; 20 aPerSec
+Goto end_of_Parser_tests
 end_of_Parser_tests:	
 	aCount = assertionCount - aCount
 	tm = TimeValue(Time) - tm
@@ -1003,7 +1003,7 @@ Function test_Parser_hexNum()
 		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
 	)
 	refute_parses(p, data).x
-	
+
 	assert_parses(p, &quot;0&quot;, 	0, 2).x
 	assert_parses(p, &quot;1&quot;, 	1, 2).x
 	assert_parses(p, &quot;2&quot;, 	2, 2).x
