@@ -125,7 +125,7 @@ End Function
 
 &apos; same as pManyRev but with the list in the order as in the parsed string
 Function pMany(p As Parser)
-	pMany = mkParser(&quot;many&quot;, p)
+	pMany = pSeq(Array(pManyRev(p)), &quot;reverse&quot;)
 End Function
 
 &apos; same as pManyRev but fails if there is no match at all
@@ -137,7 +137,7 @@ End Function
 &apos; same as pMany but fails if there is no match at all
 &apos; matches as many as possible
 Function pMany1(p As Parser)
-	pMany1 = mkParser(&quot;many1&quot;, p)
+	pMany1 = pSeq(Array(pMany1Rev(p)), &quot;reverse&quot;)
 End Function
 
 &apos; pSeq - make a sequence of parsers and finally process the results (list)
@@ -334,14 +334,6 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 			result = parseFailure
 		Else
 			result = Array(lst, nxtPos)
-		End If
-	ElseIf p.tp = &quot;many&quot; Then
-		result = applyP(pManyRev(p.st), s, pos)
-		result(0) = reverse(result(0))
-	ElseIf p.tp = &quot;many1&quot; Then
-		result = applyP(pMany1Rev(p.st), s, pos)
-		If Not(isParseFailure(result)) Then
-			result(0) = reverse(result(0))
 		End If
 	ElseIf p.tp = &quot;bind&quot; Then
 		result = applyP(p.st(0), s, pos)
