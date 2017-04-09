@@ -166,12 +166,17 @@ Function pSeq(ps As Array, ByVal f As Variant)
 	pSeq = mkParser(&quot;seq&quot;, Array(ps, f))
 End Function
 
-Function mkBind(fName As String, p As Parser)
-	If Not existsF(fName) Then
-		croak(&quot;mkBind: unknown function &quot; &amp; toString(fName))
-	Else
-		mkBind = mkParser(&quot;bind&quot;, Array(p, fName))
+Function pBind(p As Parser, ByVal f As Variant)
+	Dim fName As String
+	If isString(f) Then
+		fName = f
+		f = lookupFn(fName)
+		If isEmpty(f) Then
+			croak(&quot;pBind: unknown function &quot; &amp; toString(fName))
+		End If
 	End If
+	&apos; TODO: pBind: check if f is proper fn
+	pBind = mkParser(&quot;bind&quot;, Array(p, f))
 End Function
 
 
@@ -190,7 +195,11 @@ End Function
 Function pBinDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pChoice(pStr(&quot;0&quot;), pStr(&quot;1&quot;))
+		Dim konst0 As Object
+		Dim konst1 As Object
+		Set konst0 = apply(&quot;fstArg&quot;, 0)
+		Set konst1 = apply(&quot;fstArg&quot;, 1)
+		result = pChoice(pBind(pStr(&quot;0&quot;), konst0), pBind(pStr(&quot;1&quot;), konst1))
 	End If
 	pBinDigit = result
 End Function
@@ -226,13 +235,22 @@ End Function
 Function pHexNum()
 	Static result As Object
 	If isNull(result) Then
-		Set result = pSeq(Array(pMany1(pHexDigit)), apply(&quot;foldl1&quot;, lookupFn(&quot;concat&quot;))
+		&apos;compose(plus, mul 16)
+		Set result = pSeq(Array(pMany1(pHexDigit)), apply(&quot;foldl1&quot;, lookupFn(&quot;concat&quot;), 0)
 		Set result = pSeq(Array(result), &quot;readHex&quot;)
 	End If
 	pHexNum = result
 End Function
 
-&apos; ===================================================================
+Function pHexLit()
+	Static result As Parser	&apos; an uninitialized instance of Parser at first
+	If result.tp = &quot;&quot; Then
+		result = pSeq(Array(pStr(&quot;0x&quot;), pHexNum), &quot;sndArg&quot;)
+	End If
+	pHexLit = result
+End Function
+
+&apos; =============================================================================
 
 Function lookupParser(pName As String) As Parser
 	Dim result As Parser
@@ -345,8 +363,9 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 	ElseIf p.tp = &quot;bind&quot; Then
 		result = applyP(p.st(0), s, pos)
 		If Not isParseFailure(result) Then
-			fResult = applyToList(p.st(1), toList(result(0)))
-			result(0) = fResult
+			nxtPos = result(1)
+			fResult = apply1(p.st(1), result(0))
+			result = Array(fResult, nxtPos)	&apos; DO NOT reuse result!
 		End If
 	ElseIf p.tp = &quot;seq&quot; Then
 		Dim t As Variant
@@ -382,7 +401,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 End Function
 
 
-&apos;= tests ============================================================
+&apos;= tests ======================================================================
 
 Global refute_parses_pass As Object
 
@@ -421,6 +440,8 @@ Function test_Parser()
 &apos; 6 sec for 683 ~&gt; 114 aPerSec
 	test_Parser_hexNum()
 &apos; 8 sec for 762 ~&gt; 95 aPerSec
+	test_Parser_hexLit()
+&apos; 12 sec for 864 ~&gt; 72 aPerSec
 Goto end_of_Parser_tests
 end_of_Parser_tests:	
 	aCount = assertionCount - aCount
@@ -436,7 +457,7 @@ end_of_Parser_tests:
 	)
 End Function
 
-&apos;= test helpers =====================================================
+&apos;= test helpers ===============================================================
 
 Function refute_parses(p As Parser, ByVal ss As Variant)
 	Dim actual As Variant, testResult As Variant
@@ -511,13 +532,13 @@ assert_parse_failed:
 	assert_parses = testResult
 End Function
 
+&apos;= actual tests ===============================================================
+
 Function test_Parser_fail()
 	refute_parses(pFail, Array( _
 		&quot;&quot;,	&quot; &quot;, &quot;   &quot;, chr(13), chr(9), &quot;a&quot;, &quot;1&quot;, &quot;[]&quot;, &quot;asdf&quot; _
 	)).x
 End Function
-
-&apos;= actual tests =====================================================
 
 Function test_Parser_item()
 	refute_parses(pItem, &quot;&quot;).x
@@ -674,8 +695,8 @@ Function test_Parser_binDigit()
 	refute_parses(p, &quot;&quot;).x
 	refute_parses(p, &quot; &quot;).x
 	refute_parses(p, &quot;sadf&quot;).x
-	assert_parses(p, &quot;0sadf&quot;,	&quot;0&quot;, 2).x
-	assert_parses(p, &quot;1sadf&quot;,	&quot;1&quot;, 2).x
+	assert_parses(p, &quot;0sadf&quot;,	0, 2).x
+	assert_parses(p, &quot;1sadf&quot;,	1, 2).x
 	refute_parses(p, &quot;2sadf&quot;).x
 	refute_parses(p, &quot;3sadf&quot;).x
 	refute_parses(p, &quot;4sadf&quot;).x
@@ -707,8 +728,8 @@ Function test_Parser_decDigit()
 	refute_parses(p, &quot;&quot;).x
 	refute_parses(p, &quot; &quot;).x
 	refute_parses(p, &quot;sadf&quot;).x
-	assert_parses(p, &quot;0sadf&quot;,	&quot;0&quot;, 2).x
-	assert_parses(p, &quot;1sadf&quot;,	&quot;1&quot;, 2).x
+	assert_parses(p, &quot;0sadf&quot;,	0, 2).x
+	assert_parses(p, &quot;1sadf&quot;,	1, 2).x
 	assert_parses(p, &quot;2sadf&quot;,	&quot;2&quot;, 2).x
 	assert_parses(p, &quot;3sadf&quot;,	&quot;3&quot;, 2).x
 	assert_parses(p, &quot;4sadf&quot;,	&quot;4&quot;, 2).x
@@ -740,8 +761,8 @@ Function test_Parser_hexDigit()
 	refute_parses(p, &quot;&quot;).x
 	refute_parses(p, &quot; &quot;).x
 	refute_parses(p, &quot;sadf&quot;).x
-	assert_parses(p, &quot;0sadf&quot;,	&quot;0&quot;, 2).x
-	assert_parses(p, &quot;1sadf&quot;,	&quot;1&quot;, 2).x
+	assert_parses(p, &quot;0sadf&quot;,	0, 2).x
+	assert_parses(p, &quot;1sadf&quot;,	1, 2).x
 	assert_parses(p, &quot;2sadf&quot;,	&quot;2&quot;, 2).x
 	assert_parses(p, &quot;3sadf&quot;,	&quot;3&quot;, 2).x
 	assert_parses(p, &quot;4sadf&quot;,	&quot;4&quot;, 2).x
@@ -802,9 +823,9 @@ Function test_Parser_manyRev()
 	p = pManyRev(pDecDigit)
 	assert_parses(p, &quot;&quot;, 			zeroMatches, 1).x
 	assert_parses(p, &quot; &quot;, 			zeroMatches, 1).x
-	assert_parses(p, &quot;1&quot;, 			List(&quot;1&quot;), 2).x
-	assert_parses(p, &quot;12 &quot;, 		List(&quot;2&quot;, &quot;1&quot;), 3).x
-	assert_parses(p, &quot;12345&quot;, 		List(&quot;5&quot;, &quot;4&quot;, &quot;3&quot;, &quot;2&quot;, &quot;1&quot;), 6).x
+	assert_parses(p, &quot;1&quot;, 			List(1), 2).x
+	assert_parses(p, &quot;10 &quot;, 		List(0, 1), 3).x
+	assert_parses(p, &quot;102345&quot;, 		List(&quot;5&quot;, &quot;4&quot;, &quot;3&quot;, &quot;2&quot;, 0, 1), 7).x
 End Function
 
 Function test_Parser_many()
@@ -842,9 +863,9 @@ Function test_Parser_many()
 	p = pMany(pDecDigit)
 	assert_parses(p, &quot;&quot;, 			zeroMatches, 1).x
 	assert_parses(p, &quot; &quot;, 			zeroMatches, 1).x
-	assert_parses(p, &quot;1&quot;, 			List(&quot;1&quot;), 2).x
-	assert_parses(p, &quot;12 &quot;, 		List(&quot;1&quot;, &quot;2&quot;), 3).x
-	assert_parses(p, &quot;12345&quot;, 		List(&quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;), 6).x
+	assert_parses(p, &quot;1&quot;, 			List(1), 2).x
+	assert_parses(p, &quot;10 &quot;, 		List(1, 0), 3).x
+	assert_parses(p, &quot;102345&quot;, 		List(1, 0, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;), 7).x
 End Function
 
 
@@ -881,9 +902,9 @@ Function test_Parser_many1Rev()
 	p = pMany1Rev(pDecDigit)
 	refute_parses(p, &quot;&quot;).x
 	refute_parses(p, &quot; &quot;).x
-	assert_parses(p, &quot;1&quot;, 			List(&quot;1&quot;), 2).x
-	assert_parses(p, &quot;12 &quot;, 		List(&quot;2&quot;, &quot;1&quot;), 3).x
-	assert_parses(p, &quot;12345&quot;, 		List(&quot;5&quot;, &quot;4&quot;, &quot;3&quot;, &quot;2&quot;, &quot;1&quot;), 6).x
+	assert_parses(p, &quot;1&quot;, 			List(1), 2).x
+	assert_parses(p, &quot;10 &quot;, 		List(0, 1), 3).x
+	assert_parses(p, &quot;102345&quot;, 		List(&quot;5&quot;, &quot;4&quot;, &quot;3&quot;, &quot;2&quot;, 0, 1), 7).x
 End Function
 
 Function test_Parser_many1()
@@ -919,9 +940,9 @@ Function test_Parser_many1()
 	p = pMany1(pDecDigit)
 	refute_parses(p, &quot;&quot;).x
 	refute_parses(p, &quot; &quot;).x
-	assert_parses(p, &quot;1&quot;, 			List(&quot;1&quot;), 2).x
-	assert_parses(p, &quot;12 &quot;, 		List(&quot;1&quot;, &quot;2&quot;), 3).x
-	assert_parses(p, &quot;12345&quot;, 		List(&quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;), 6).x
+	assert_parses(p, &quot;1&quot;, 			List(1), 2).x
+	assert_parses(p, &quot;10 &quot;, 		List(1, 0), 3).x
+	assert_parses(p, &quot;102345&quot;, 		List(1, 0, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;), 7).x
 End Function
 
 Function test_Parser_seq()
@@ -1045,6 +1066,68 @@ Function test_Parser_hexNum()
 &apos;	assert_parses(p, &quot;DEADBEEF&quot;, readHex(&quot;DEADBEEF&quot;), 	9).x
 &apos;	assert_parses(p, &quot;CAFEBABE&quot;, readHex(&quot;cafebabe&quot;), 	9).x	&apos; case doesn&apos;t matter
 &apos;	assert_parses(p, &quot;dEaDbEeF&quot;, readHex(&quot;DeAdBeEf&quot;), 	9).x	&apos; case doesn&apos;t matter
+End Function
+
+Function test_Parser_hexLit()
+	Dim p As Parser
+	Dim data As Variant
+	p = pHexLit
+
+	refute_parses(p, &quot;&quot;).x
+		
+	data = Array(&quot; &quot;, &quot; &quot; &amp; chr(13), &quot;qasdf&quot;, &quot; bar&quot;, &quot;qb&quot;, &quot;qba&quot;, &quot;qbar&quot;, &quot;qbarb&quot;,_
+		&quot;qbarba&quot;, &quot;qbarbar&quot;, chr(13), chr(13) &amp; &quot;qbar&quot;, chr(13) &amp; chr(13),_
+		chr(13) &amp; chr(13) &amp; &quot;bar&quot;,_
+		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;,_
+		&quot;a&quot;, &quot;A&quot;, &quot;b&quot;, &quot;B&quot;, &quot;c&quot;, &quot;C&quot;, &quot;d&quot;, &quot;D&quot;, &quot;e&quot;, &quot;E&quot;, &quot;f&quot;, &quot;F&quot;,_
+		&quot;0x&quot;_
+	)
+	refute_parses(p, data).x
+
+	assert_parses(p, &quot;0x0&quot;, 	0, 4).x
+	assert_parses(p, &quot;0x1&quot;, 	1, 4).x
+	assert_parses(p, &quot;0x2&quot;, 	2, 4).x
+	assert_parses(p, &quot;0x3&quot;, 	3, 4).x
+	assert_parses(p, &quot;0x4&quot;, 	4, 4).x
+	assert_parses(p, &quot;0x5&quot;, 	5, 4).x
+	assert_parses(p, &quot;0x6&quot;, 	6, 4).x
+	assert_parses(p, &quot;0x7&quot;, 	7, 4).x
+	assert_parses(p, &quot;0x8&quot;, 	8, 4).x
+	assert_parses(p, &quot;0x9&quot;, 	9, 4).x
+
+	assert_parses(p, &quot;0xa&quot;, 	10, 4).x
+	assert_parses(p, &quot;0xb&quot;, 	11, 4).x
+	assert_parses(p, &quot;0xc&quot;, 	12, 4).x
+	assert_parses(p, &quot;0xd&quot;, 	13, 4).x
+	assert_parses(p, &quot;0xe&quot;, 	14, 4).x
+	assert_parses(p, &quot;0xf&quot;, 	15, 4).x
+	assert_parses(p, &quot;0xA&quot;, 	10, 4).x
+	assert_parses(p, &quot;0xB&quot;, 	11, 4).x
+	assert_parses(p, &quot;0xC&quot;, 	12, 4).x
+	assert_parses(p, &quot;0xD&quot;, 	13, 4).x
+	assert_parses(p, &quot;0xE&quot;, 	14, 4).x
+	assert_parses(p, &quot;0xF&quot;, 	15, 4).x
+
+	assert_parses(p, &quot;0xFF&quot;, 	readHex(&quot;FF&quot;), 	5).x
+	assert_parses(p, &quot;0x123&quot;, 	readHex(&quot;123&quot;), 6).x
+
+	assert_parses(p, &quot;0x0FF&quot;, 	readHex(&quot;FF&quot;), 	6).x	&apos; leading 0s don&apos;t matter
+	assert_parses(p, &quot;0x0123&quot;, 	readHex(&quot;123&quot;), 7).x	&apos; leading 0s don&apos;t matter
+
+	assert_parses(p, &quot;0x00FF&quot;, 	readHex(&quot;FF&quot;), 	7).x	&apos; leading 0s don&apos;t matter
+	assert_parses(p, &quot;0x00123&quot;, readHex(&quot;123&quot;), 8).x	&apos; leading 0s don&apos;t matter
+
+	&apos; 31 bit
+	assert_parses(p, &quot;0xCAFEBAB&quot;, readHex(&quot;CAFEBAB&quot;), 	10).x
+	assert_parses(p, &quot;0xDEADBEE&quot;, readHex(&quot;DEADBEE&quot;), 	10).x
+	assert_parses(p, &quot;0xCAFEBAB&quot;, readHex(&quot;cafebab&quot;), 	10).x	&apos; case doesn&apos;t matter
+	assert_parses(p, &quot;0xdEaDbEe&quot;, readHex(&quot;DeAdBeE&quot;), 	10).x	&apos; case doesn&apos;t matter
+
+&apos;	&apos; 32 bit
+&apos;	assert_parses(p, &quot;0xCAFEBABE&quot;, readHex(&quot;CAFEBABE&quot;), 	11).x
+&apos;	assert_parses(p, &quot;0xDEADBEEF&quot;, readHex(&quot;DEADBEEF&quot;), 	11).x
+&apos;	assert_parses(p, &quot;0xCAFEBABE&quot;, readHex(&quot;cafebabe&quot;), 	11).x	&apos; case doesn&apos;t matter
+&apos;	assert_parses(p, &quot;0xdEaDbEeF&quot;, readHex(&quot;DeAdBeEf&quot;), 	11).x	&apos; case doesn&apos;t matter
 End Function
 
 </script:module>
