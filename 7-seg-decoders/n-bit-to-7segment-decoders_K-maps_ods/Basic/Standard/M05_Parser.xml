@@ -391,7 +391,6 @@ Function test_Parser()
 	tm = TimeValue(Time)
 	
 	Dim aCount As Integer
-	assertionCount = 0
 	aCount = assertionCount
 	
 	Dim failure As String

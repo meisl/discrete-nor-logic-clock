@@ -3,6 +3,7 @@
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M04_Fn" script:language="StarBasic">REM  *****  BASIC  *****
 Option Explicit
 
+
 Sub Main
 	test_Fn()
 End Sub

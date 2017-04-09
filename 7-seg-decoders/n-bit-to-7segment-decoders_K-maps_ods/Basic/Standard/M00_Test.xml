@@ -20,8 +20,8 @@ End Type
 Type TTest_Dummy
 End Type
 
-Global testLevel As Integer
-Global assertionCount As Integer
+Public testLevel As Integer
+Public assertionCount As Integer
 
 Sub Main
 	test_Test()
