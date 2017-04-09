@@ -22,6 +22,7 @@ Function fnObjs()
 			List(&quot;compose&quot;,			True, 3), _
 			List(&quot;add&quot;,				True, 2), _
 			List(&quot;mul&quot;,				True, 2), _
+			List(&quot;inRange&quot;,			True, 3), _
 			List(&quot;equ&quot;,				True, 2), _
 			List(&quot;ite&quot;,				True, 3), _
 			List(&quot;concat&quot;,			True, 2), _
@@ -185,6 +186,7 @@ Function applyBuiltinRev(ByVal fn As Object, ByVal reverseArgs As Object)
 		Case &quot;compose&quot;:			result = compose(		a(0), a(1), a(2)	)
 		Case &quot;add&quot;:				result = add(			a(0), a(1)			)
 		Case &quot;mul&quot;:				result = mul(			a(0), a(1)			)
+		Case &quot;inRange&quot;:			result = inRange(		a(0), a(1), a(2)	)
 		Case &quot;equ&quot;:				result = equ(			a(0), a(1)			)
 		Case &quot;concat&quot;:			result = concat(		a(0), a(1)			)
 		Case &quot;asc&quot;:				result = asc(			a(0)				)

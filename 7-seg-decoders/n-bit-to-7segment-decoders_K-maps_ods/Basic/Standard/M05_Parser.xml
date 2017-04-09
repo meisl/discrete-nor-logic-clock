@@ -84,6 +84,10 @@ Function pStr(t As String)
 	End If
 End Function
 
+&apos;Function pSat(ByVal predicate As Variant)
+&apos;	pBind(pItem, apply1(&quot;ite&quot;, compose(predicate, &quot;asc&quot;), pReturn
+&apos;End Function
+
 &apos; succeeds if either p1 succeeds (then returning p1&apos;s result and pos)
 &apos; or (and only if p1 fails) if p2 succeeds, returns p2&apos;s result and pos.
 &apos; fails if both, p1 and p2 fail
@@ -196,8 +200,8 @@ Function pBinDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
 		result = pChoice(_
-			pBind(pStr(&quot;0&quot;), apply(&quot;fstArg&quot;, 0)), _
-			pBind(pStr(&quot;1&quot;), apply(&quot;fstArg&quot;, 1))_
+			pBind(pStr(&quot;0&quot;), apply(&quot;fstArg&quot;, pReturn(0))), _
+			pBind(pStr(&quot;1&quot;), apply(&quot;fstArg&quot;, pReturn(1)))_
 		)
 	End If
 	pBinDigit = result
@@ -206,14 +210,14 @@ End Function
 Function pDecDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pChoice(pBinDigit,	pBind(pStr(&quot;2&quot;), apply(&quot;fstArg&quot;, 2)))
-		result = pChoice(result,	pBind(pStr(&quot;3&quot;), apply(&quot;fstArg&quot;, 3)))
-		result = pChoice(result,	pBind(pStr(&quot;4&quot;), apply(&quot;fstArg&quot;, 4)))
-		result = pChoice(result,	pBind(pStr(&quot;5&quot;), apply(&quot;fstArg&quot;, 5)))
-		result = pChoice(result,	pBind(pStr(&quot;6&quot;), apply(&quot;fstArg&quot;, 6)))
-		result = pChoice(result,	pBind(pStr(&quot;7&quot;), apply(&quot;fstArg&quot;, 7)))
-		result = pChoice(result,	pBind(pStr(&quot;8&quot;), apply(&quot;fstArg&quot;, 8)))
-		result = pChoice(result,	pBind(pStr(&quot;9&quot;), apply(&quot;fstArg&quot;, 9)))
+		result = pChoice(pBinDigit,	pBind(pStr(&quot;2&quot;), apply(&quot;fstArg&quot;, pReturn(2))))
+		result = pChoice(result,	pBind(pStr(&quot;3&quot;), apply(&quot;fstArg&quot;, pReturn(3))))
+		result = pChoice(result,	pBind(pStr(&quot;4&quot;), apply(&quot;fstArg&quot;, pReturn(4))))
+		result = pChoice(result,	pBind(pStr(&quot;5&quot;), apply(&quot;fstArg&quot;, pReturn(5))))
+		result = pChoice(result,	pBind(pStr(&quot;6&quot;), apply(&quot;fstArg&quot;, pReturn(6))))
+		result = pChoice(result,	pBind(pStr(&quot;7&quot;), apply(&quot;fstArg&quot;, pReturn(7))))
+		result = pChoice(result,	pBind(pStr(&quot;8&quot;), apply(&quot;fstArg&quot;, pReturn(8))))
+		result = pChoice(result,	pBind(pStr(&quot;9&quot;), apply(&quot;fstArg&quot;, pReturn(9))))
 	End If
 	pDecDigit = result
 End Function
@@ -221,12 +225,12 @@ End Function
 Function pHexDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pChoice(pDecDigit,	pBind(pChoice(pStr(&quot;A&quot;), pStr(&quot;a&quot;)), apply(&quot;fstArg&quot;, 10)) )
-		result = pChoice(result,	pBind(pChoice(pStr(&quot;B&quot;), pStr(&quot;b&quot;)), apply(&quot;fstArg&quot;, 11)) )
-		result = pChoice(result,	pBind(pChoice(pStr(&quot;C&quot;), pStr(&quot;c&quot;)), apply(&quot;fstArg&quot;, 12)) )
-		result = pChoice(result,	pBind(pChoice(pStr(&quot;D&quot;), pStr(&quot;d&quot;)), apply(&quot;fstArg&quot;, 13)) )
-		result = pChoice(result,	pBind(pChoice(pStr(&quot;E&quot;), pStr(&quot;e&quot;)), apply(&quot;fstArg&quot;, 14)) )
-		result = pChoice(result,	pBind(pChoice(pStr(&quot;F&quot;), pStr(&quot;f&quot;)), apply(&quot;fstArg&quot;, 15)) )
+		result = pChoice(pDecDigit,	pBind(pChoice(pStr(&quot;A&quot;), pStr(&quot;a&quot;)), apply(&quot;fstArg&quot;, pReturn(10))) )
+		result = pChoice(result,	pBind(pChoice(pStr(&quot;B&quot;), pStr(&quot;b&quot;)), apply(&quot;fstArg&quot;, pReturn(11))) )
+		result = pChoice(result,	pBind(pChoice(pStr(&quot;C&quot;), pStr(&quot;c&quot;)), apply(&quot;fstArg&quot;, pReturn(12))) )
+		result = pChoice(result,	pBind(pChoice(pStr(&quot;D&quot;), pStr(&quot;d&quot;)), apply(&quot;fstArg&quot;, pReturn(13))) )
+		result = pChoice(result,	pBind(pChoice(pStr(&quot;E&quot;), pStr(&quot;e&quot;)), apply(&quot;fstArg&quot;, pReturn(14))) )
+		result = pChoice(result,	pBind(pChoice(pStr(&quot;F&quot;), pStr(&quot;f&quot;)), apply(&quot;fstArg&quot;, pReturn(15))) )
 	End If
 	pHexDigit = result
 End Function
@@ -364,7 +368,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		If Not isParseFailure(result) Then
 			nxtPos = result(1)
 			fResult = apply1(p.st(1), result(0))
-			result = Array(fResult, nxtPos)	&apos; DO NOT reuse result!
+			result = applyP(fResult, s, nxtPos)
 		End If
 	ElseIf p.tp = &quot;seq&quot; Then
 		Dim t As Variant

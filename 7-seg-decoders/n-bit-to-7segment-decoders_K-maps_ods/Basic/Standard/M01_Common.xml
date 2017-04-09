@@ -71,7 +71,7 @@ Function swap(fn As Variant, x As Variant, y As Variant)
 End Function
 
 &apos; B = \f g x.f (g x)
-Function compose(Optional ByVal f As Variant, Optional ByVal g As Variant, Optional x As Variant)
+Function compose(Optional ByVal f, Optional ByVal g, Optional x)
 	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;compose&quot;) : End If
 	Dim result As Variant
 	If isMissing(f) Then
@@ -99,6 +99,10 @@ End Function
 
 Function concat(a As String, b As String) As String
 	concat = a &amp; b
+End Function
+
+Function startsWith(s As String, prefix As String) 
+	startsWith = ((Len(prefix) &lt;= Len(s)) And (Mid(s, 1, Len(prefix)) = prefix))
 End Function
 
 Function add(Optional a As Long, Optional b As Long)
@@ -131,8 +135,8 @@ Function mul(Optional a As Long, Optional b As Long)
 	mul = result
 End Function
 
-Function startsWith(s As String, prefix As String) 
-	startsWith = ((Len(prefix) &lt;= Len(s)) And (Mid(s, 1, Len(prefix)) = prefix))
+Function inRange(lo As Long, hi As Long, x As Long)
+	inRange = (lo &lt;= x) And (x &lt;= hi)
 End Function
 
 Function equ(a As Variant, b As Variant) As Boolean
