@@ -235,9 +235,7 @@ Function pHexNum()
 	Static result As Object
 	If isNull(result) Then
 		&apos;foldl1 compose(plus, mul 16)
-		Dim agg As Object
-		Set agg = apply(&quot;compose&quot;, lookupFn(&quot;add&quot;), apply(&quot;mul&quot;, 16))
-		Set result = pSeq(Array(pMany1(pHexDigit)), apply(&quot;foldl1&quot;, agg))
+		Set result = pSeq(Array(pMany1(pHexDigit)), apply(&quot;foldl1&quot;, compose(add, mul(16))))
 	End If
 	pHexNum = result
 End Function
@@ -249,6 +247,7 @@ Function pHexLit()
 	End If
 	pHexLit = result
 End Function
+
 
 &apos; =============================================================================
 

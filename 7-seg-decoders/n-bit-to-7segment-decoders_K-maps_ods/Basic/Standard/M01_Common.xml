@@ -71,20 +71,64 @@ Function swap(fn As Variant, x As Variant, y As Variant)
 End Function
 
 &apos; B = \f g x.f (g x)
-Function compose(f As Variant, g As Variant, x As Variant)
-	compose = apply(f, apply(g, x))
+Function compose(Optional ByVal f As Variant, Optional ByVal g As Variant, Optional x As Variant)
+	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;compose&quot;) : End If
+	Dim result As Variant
+	If isMissing(f) Then
+		result = oFn
+	Else
+		If isString(f) Then
+			f = lookupFn(f)
+		End If
+		If isMissing(g) Then
+			result = apply1(result, f)
+		Else
+			If isString(g) Then
+				g = lookupFn(g)
+			End If
+			If isMissing(x) Then
+				result = apply1(apply1(oFn, f), g)
+			Else
+				result = apply1(f, apply1(g, x))
+			End If
+		End If
+	End If
+	&apos;compose = apply(f, apply(g, x))
+	compose = result
 End Function
 
 Function concat(a As String, b As String) As String
 	concat = a &amp; b
 End Function
 
-Function add(a As Long, b As Long) As Long
-	add = a + b
+Function add(Optional a As Long, Optional b As Long)
+	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;add&quot;) : End If
+	Dim result As Variant
+	If isMissing(a) Then
+		result = oFn
+	Else
+		If isMissing(b) Then
+			result = apply1(oFn, a)
+		Else
+			result = CLng(a + b)
+		End If
+	End If
+	add = result
 End Function
 
-Function mul(a As Long, b As Long) As Long
-	mul = a * b
+Function mul(Optional a As Long, Optional b As Long)
+	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;mul&quot;) : End If
+	Dim result As Variant
+	If isMissing(a) Then
+		result = oFn
+	Else
+		If isMissing(b) Then
+			result = apply1(oFn, a)
+		Else
+			result = CLng(a * b)
+		End If
+	End If
+	mul = result
 End Function
 
 Function startsWith(s As String, prefix As String) 
