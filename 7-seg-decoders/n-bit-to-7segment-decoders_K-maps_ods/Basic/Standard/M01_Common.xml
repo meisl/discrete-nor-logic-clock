@@ -51,21 +51,28 @@ Sub croak(msg As String)
 	MsgBox(provoke.AnError)
 End Sub
 
+&apos; I = \x.x
 Function id(x As Variant)
 	id = x
 End Function
-&apos; K I = \b x.b) (\y.y) = \x.\y.y = \x y.y
 
+&apos; K = \x y.x
 Function fstArg(x As Variant, y As Variant)
 	fstArg = x
 End Function
 
+&apos; K I = (\b x.b) (\y.y) = \x.\y.y = \x y.y
 Function sndArg(x As Variant, y As Variant)
 	sndArg = y
 End Function
 
 Function swap(fn As Variant, x As Variant, y As Variant)
 	swap = apply(fn, y, x)
+End Function
+
+&apos; B = \f g x.f (g x)
+Function compose(f As Variant, g As Variant, x As Variant)
+	compose = apply(f, apply(g, x))
 End Function
 
 Function concat(a As String, b As String) As String

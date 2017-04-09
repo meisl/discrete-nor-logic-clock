@@ -19,6 +19,7 @@ Function fnObjs()
 			List(&quot;fstArg&quot;,			True, 2), _
 			List(&quot;sndArg&quot;,			True, 2), _
 			List(&quot;swap&quot;,			True, 3), _
+			List(&quot;compose&quot;,			True, 3), _
 			List(&quot;add&quot;,				True, 2), _
 			List(&quot;mul&quot;,				True, 2), _
 			List(&quot;equ&quot;,				True, 2), _
@@ -181,6 +182,7 @@ Function applyBuiltinRev(ByVal fn As Object, ByVal reverseArgs As Object)
 		Case &quot;fstArg&quot;:			result = fstArg(		a(0), a(1)			)
 		Case &quot;sndArg&quot;:			result = sndArg(		a(0), a(1)			)
 		Case &quot;swap&quot;:			result = swap(			a(0), a(1), a(2)	)
+		Case &quot;compose&quot;:			result = compose(		a(0), a(1), a(2)	)
 		Case &quot;add&quot;:				result = add(			a(0), a(1)			)
 		Case &quot;mul&quot;:				result = mul(			a(0), a(1)			)
 		Case &quot;equ&quot;:				result = equ(			a(0), a(1)			)
@@ -215,7 +217,8 @@ Function applyBuiltinRev(ByVal fn As Object, ByVal reverseArgs As Object)
 End Function
 
 Function applyToList(ByVal fn As Variant, ByVal args As Object)
-	Dim result As Variant, fName As String
+	Dim result As Variant
+	Dim fName As String
 	If isString(fn) Then
 		fName = fn
 		fn = lookupFn(fName)
@@ -239,8 +242,18 @@ Function applyToList(ByVal fn As Variant, ByVal args As Object)
 	applyToList = result
 End Function
 
-Function apply(fn As Variant, Optional a0, Optional a1, Optional a2, Optional a3, Optional a4, Optional a5, Optional a6, Optional a7, Optional a8, Optional a9, Optional a10)
+Function apply(ByVal fn As Variant, a0, Optional a1, Optional a2, Optional a3, Optional a4, Optional a5, Optional a6, Optional a7, Optional a8, Optional a9, Optional a10)
 	Dim args As Object
+	Dim fName As String
+	If isString(fn) Then
+		fName = fn
+		fn = lookupFn(fName)
+		If isEmpty(fn) Or isNull(fn) Then
+			croak(&quot;apply: unknown function &quot; &amp; fName)
+		End If
+	ElseIf isEmpty(fn) Or isNull(fn) Then
+		croak(&quot;apply: invalid fn &quot; &amp; toString(fn))
+	End If
 	args = List(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10)
 	apply = applyToList(fn, args)
 End Function

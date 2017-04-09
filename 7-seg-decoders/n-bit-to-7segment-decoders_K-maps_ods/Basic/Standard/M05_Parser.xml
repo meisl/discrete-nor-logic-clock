@@ -195,11 +195,10 @@ End Function
 Function pBinDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		Dim konst0 As Object
-		Dim konst1 As Object
-		Set konst0 = apply(&quot;fstArg&quot;, 0)
-		Set konst1 = apply(&quot;fstArg&quot;, 1)
-		result = pChoice(pBind(pStr(&quot;0&quot;), konst0), pBind(pStr(&quot;1&quot;), konst1))
+		result = pChoice(_
+			pBind(pStr(&quot;0&quot;), apply(&quot;fstArg&quot;, 0)), _
+			pBind(pStr(&quot;1&quot;), apply(&quot;fstArg&quot;, 1))_
+		)
 	End If
 	pBinDigit = result
 End Function
@@ -207,14 +206,14 @@ End Function
 Function pDecDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pChoice(pBinDigit,	pStr(&quot;2&quot;))
-		result = pChoice(result,	pStr(&quot;3&quot;))
-		result = pChoice(result,	pStr(&quot;4&quot;))
-		result = pChoice(result,	pStr(&quot;5&quot;))
-		result = pChoice(result,	pStr(&quot;6&quot;))
-		result = pChoice(result,	pStr(&quot;7&quot;))
-		result = pChoice(result,	pStr(&quot;8&quot;))
-		result = pChoice(result,	pStr(&quot;9&quot;))
+		result = pChoice(pBinDigit,	pBind(pStr(&quot;2&quot;), apply(&quot;fstArg&quot;, 2)))
+		result = pChoice(result,	pBind(pStr(&quot;3&quot;), apply(&quot;fstArg&quot;, 3)))
+		result = pChoice(result,	pBind(pStr(&quot;4&quot;), apply(&quot;fstArg&quot;, 4)))
+		result = pChoice(result,	pBind(pStr(&quot;5&quot;), apply(&quot;fstArg&quot;, 5)))
+		result = pChoice(result,	pBind(pStr(&quot;6&quot;), apply(&quot;fstArg&quot;, 6)))
+		result = pChoice(result,	pBind(pStr(&quot;7&quot;), apply(&quot;fstArg&quot;, 7)))
+		result = pChoice(result,	pBind(pStr(&quot;8&quot;), apply(&quot;fstArg&quot;, 8)))
+		result = pChoice(result,	pBind(pStr(&quot;9&quot;), apply(&quot;fstArg&quot;, 9)))
 	End If
 	pDecDigit = result
 End Function
@@ -222,12 +221,12 @@ End Function
 Function pHexDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pChoice(pDecDigit,	pChoice(pStr(&quot;A&quot;), pStr(&quot;a&quot;)))
-		result = pChoice(result,	pChoice(pStr(&quot;B&quot;), pStr(&quot;b&quot;)))
-		result = pChoice(result,	pChoice(pStr(&quot;C&quot;), pStr(&quot;c&quot;)))
-		result = pChoice(result,	pChoice(pStr(&quot;D&quot;), pStr(&quot;d&quot;)))
-		result = pChoice(result,	pChoice(pStr(&quot;E&quot;), pStr(&quot;e&quot;)))
-		result = pChoice(result,	pChoice(pStr(&quot;F&quot;), pStr(&quot;f&quot;)))
+		result = pChoice(pDecDigit,	pBind(pChoice(pStr(&quot;A&quot;), pStr(&quot;a&quot;)), apply(&quot;fstArg&quot;, 10)) )
+		result = pChoice(result,	pBind(pChoice(pStr(&quot;B&quot;), pStr(&quot;b&quot;)), apply(&quot;fstArg&quot;, 11)) )
+		result = pChoice(result,	pBind(pChoice(pStr(&quot;C&quot;), pStr(&quot;c&quot;)), apply(&quot;fstArg&quot;, 12)) )
+		result = pChoice(result,	pBind(pChoice(pStr(&quot;D&quot;), pStr(&quot;d&quot;)), apply(&quot;fstArg&quot;, 13)) )
+		result = pChoice(result,	pBind(pChoice(pStr(&quot;E&quot;), pStr(&quot;e&quot;)), apply(&quot;fstArg&quot;, 14)) )
+		result = pChoice(result,	pBind(pChoice(pStr(&quot;F&quot;), pStr(&quot;f&quot;)), apply(&quot;fstArg&quot;, 15)) )
 	End If
 	pHexDigit = result
 End Function
@@ -235,9 +234,10 @@ End Function
 Function pHexNum()
 	Static result As Object
 	If isNull(result) Then
-		&apos;compose(plus, mul 16)
-		Set result = pSeq(Array(pMany1(pHexDigit)), apply(&quot;foldl1&quot;, lookupFn(&quot;concat&quot;), 0)
-		Set result = pSeq(Array(result), &quot;readHex&quot;)
+		&apos;foldl1 compose(plus, mul 16)
+		Dim agg As Object
+		Set agg = apply(&quot;compose&quot;, lookupFn(&quot;add&quot;), apply(&quot;mul&quot;, 16))
+		Set result = pSeq(Array(pMany1(pHexDigit)), apply(&quot;foldl1&quot;, agg))
 	End If
 	pHexNum = result
 End Function
@@ -730,14 +730,14 @@ Function test_Parser_decDigit()
 	refute_parses(p, &quot;sadf&quot;).x
 	assert_parses(p, &quot;0sadf&quot;,	0, 2).x
 	assert_parses(p, &quot;1sadf&quot;,	1, 2).x
-	assert_parses(p, &quot;2sadf&quot;,	&quot;2&quot;, 2).x
-	assert_parses(p, &quot;3sadf&quot;,	&quot;3&quot;, 2).x
-	assert_parses(p, &quot;4sadf&quot;,	&quot;4&quot;, 2).x
-	assert_parses(p, &quot;5sadf&quot;,	&quot;5&quot;, 2).x
-	assert_parses(p, &quot;6sadf&quot;,	&quot;6&quot;, 2).x
-	assert_parses(p, &quot;7sadf&quot;,	&quot;7&quot;, 2).x
-	assert_parses(p, &quot;8sadf&quot;,	&quot;8&quot;, 2).x
-	assert_parses(p, &quot;9sadf&quot;,	&quot;9&quot;, 2).x
+	assert_parses(p, &quot;2sadf&quot;,	2, 2).x
+	assert_parses(p, &quot;3sadf&quot;,	3, 2).x
+	assert_parses(p, &quot;4sadf&quot;,	4, 2).x
+	assert_parses(p, &quot;5sadf&quot;,	5, 2).x
+	assert_parses(p, &quot;6sadf&quot;,	6, 2).x
+	assert_parses(p, &quot;7sadf&quot;,	7, 2).x
+	assert_parses(p, &quot;8sadf&quot;,	8, 2).x
+	assert_parses(p, &quot;9sadf&quot;,	9, 2).x
 	refute_parses(p, &quot;Asadf&quot;).x
 	refute_parses(p, &quot;asadf&quot;).x
 	refute_parses(p, &quot;Bsadf&quot;).x
@@ -761,28 +761,28 @@ Function test_Parser_hexDigit()
 	refute_parses(p, &quot;&quot;).x
 	refute_parses(p, &quot; &quot;).x
 	refute_parses(p, &quot;sadf&quot;).x
-	assert_parses(p, &quot;0sadf&quot;,	0, 2).x
-	assert_parses(p, &quot;1sadf&quot;,	1, 2).x
-	assert_parses(p, &quot;2sadf&quot;,	&quot;2&quot;, 2).x
-	assert_parses(p, &quot;3sadf&quot;,	&quot;3&quot;, 2).x
-	assert_parses(p, &quot;4sadf&quot;,	&quot;4&quot;, 2).x
-	assert_parses(p, &quot;5sadf&quot;,	&quot;5&quot;, 2).x
-	assert_parses(p, &quot;6sadf&quot;,	&quot;6&quot;, 2).x
-	assert_parses(p, &quot;7sadf&quot;,	&quot;7&quot;, 2).x
-	assert_parses(p, &quot;8sadf&quot;,	&quot;8&quot;, 2).x
-	assert_parses(p, &quot;9sadf&quot;,	&quot;9&quot;, 2).x
-	assert_parses(p, &quot;Asadf&quot;,	&quot;A&quot;, 2).x
-	assert_parses(p, &quot;asadf&quot;,	&quot;a&quot;, 2).x
-	assert_parses(p, &quot;Bsadf&quot;,	&quot;B&quot;, 2).x
-	assert_parses(p, &quot;bsadf&quot;,	&quot;b&quot;, 2).x
-	assert_parses(p, &quot;Csadf&quot;,	&quot;C&quot;, 2).x
-	assert_parses(p, &quot;csadf&quot;,	&quot;c&quot;, 2).x
-	assert_parses(p, &quot;Dsadf&quot;,	&quot;D&quot;, 2).x
-	assert_parses(p, &quot;dsadf&quot;,	&quot;d&quot;, 2).x
-	assert_parses(p, &quot;Esadf&quot;,	&quot;E&quot;, 2).x
-	assert_parses(p, &quot;esadf&quot;,	&quot;e&quot;, 2).x
-	assert_parses(p, &quot;Fsadf&quot;,	&quot;F&quot;, 2).x
-	assert_parses(p, &quot;fsadf&quot;,	&quot;f&quot;, 2).x
+	assert_parses(p, &quot;0sadf&quot;,	 0, 2).x
+	assert_parses(p, &quot;1sadf&quot;,	 1, 2).x
+	assert_parses(p, &quot;2sadf&quot;,	 2, 2).x
+	assert_parses(p, &quot;3sadf&quot;,	 3, 2).x
+	assert_parses(p, &quot;4sadf&quot;,	 4, 2).x
+	assert_parses(p, &quot;5sadf&quot;,	 5, 2).x
+	assert_parses(p, &quot;6sadf&quot;,	 6, 2).x
+	assert_parses(p, &quot;7sadf&quot;,	 7, 2).x
+	assert_parses(p, &quot;8sadf&quot;,	 8, 2).x
+	assert_parses(p, &quot;9sadf&quot;,	 9, 2).x
+	assert_parses(p, &quot;Asadf&quot;,	10, 2).x
+	assert_parses(p, &quot;asadf&quot;,	10, 2).x
+	assert_parses(p, &quot;Bsadf&quot;,	11, 2).x
+	assert_parses(p, &quot;bsadf&quot;,	11, 2).x
+	assert_parses(p, &quot;Csadf&quot;,	12, 2).x
+	assert_parses(p, &quot;csadf&quot;,	12, 2).x
+	assert_parses(p, &quot;Dsadf&quot;,	13, 2).x
+	assert_parses(p, &quot;dsadf&quot;,	13, 2).x
+	assert_parses(p, &quot;Esadf&quot;,	14, 2).x
+	assert_parses(p, &quot;esadf&quot;,	14, 2).x
+	assert_parses(p, &quot;Fsadf&quot;,	15, 2).x
+	assert_parses(p, &quot;fsadf&quot;,	15, 2).x
 	refute_parses(p, &quot;Gsadf&quot;).x
 	refute_parses(p, &quot;gsadf&quot;).x
 End Function
@@ -825,7 +825,7 @@ Function test_Parser_manyRev()
 	assert_parses(p, &quot; &quot;, 			zeroMatches, 1).x
 	assert_parses(p, &quot;1&quot;, 			List(1), 2).x
 	assert_parses(p, &quot;10 &quot;, 		List(0, 1), 3).x
-	assert_parses(p, &quot;102345&quot;, 		List(&quot;5&quot;, &quot;4&quot;, &quot;3&quot;, &quot;2&quot;, 0, 1), 7).x
+	assert_parses(p, &quot;102345&quot;, 		List(5, 4, 3, 2, 0, 1), 7).x
 End Function
 
 Function test_Parser_many()
@@ -865,7 +865,7 @@ Function test_Parser_many()
 	assert_parses(p, &quot; &quot;, 			zeroMatches, 1).x
 	assert_parses(p, &quot;1&quot;, 			List(1), 2).x
 	assert_parses(p, &quot;10 &quot;, 		List(1, 0), 3).x
-	assert_parses(p, &quot;102345&quot;, 		List(1, 0, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;), 7).x
+	assert_parses(p, &quot;102345&quot;, 		List(1, 0, 2, 3, 4, 5), 7).x
 End Function
 
 
@@ -904,7 +904,7 @@ Function test_Parser_many1Rev()
 	refute_parses(p, &quot; &quot;).x
 	assert_parses(p, &quot;1&quot;, 			List(1), 2).x
 	assert_parses(p, &quot;10 &quot;, 		List(0, 1), 3).x
-	assert_parses(p, &quot;102345&quot;, 		List(&quot;5&quot;, &quot;4&quot;, &quot;3&quot;, &quot;2&quot;, 0, 1), 7).x
+	assert_parses(p, &quot;102345&quot;, 		List(5, 4, 3, 2, 0, 1), 7).x
 End Function
 
 Function test_Parser_many1()
@@ -942,7 +942,7 @@ Function test_Parser_many1()
 	refute_parses(p, &quot; &quot;).x
 	assert_parses(p, &quot;1&quot;, 			List(1), 2).x
 	assert_parses(p, &quot;10 &quot;, 		List(1, 0), 3).x
-	assert_parses(p, &quot;102345&quot;, 		List(1, 0, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;), 7).x
+	assert_parses(p, &quot;102345&quot;, 		List(1, 0, 2, 3, 4, 5), 7).x
 End Function
 
 Function test_Parser_seq()
@@ -1022,18 +1022,18 @@ Function test_Parser_hexNum()
 	)
 	refute_parses(p, data).x
 
-	assert_parses(p, &quot;0&quot;, 	0, 2).x
-	assert_parses(p, &quot;1&quot;, 	1, 2).x
-	assert_parses(p, &quot;2&quot;, 	2, 2).x
-	assert_parses(p, &quot;3&quot;, 	3, 2).x
-	assert_parses(p, &quot;4&quot;, 	4, 2).x
-	assert_parses(p, &quot;5&quot;, 	5, 2).x
-	assert_parses(p, &quot;6&quot;, 	6, 2).x
-	assert_parses(p, &quot;7&quot;, 	7, 2).x
-	assert_parses(p, &quot;8&quot;, 	8, 2).x
-	assert_parses(p, &quot;9&quot;, 	9, 2).x
+	assert_parses(p, &quot;0&quot;,	 0, 2).x
+	assert_parses(p, &quot;1&quot;,	 1, 2).x
+	assert_parses(p, &quot;2&quot;,	 2, 2).x
+	assert_parses(p, &quot;3&quot;,	 3, 2).x
+	assert_parses(p, &quot;4&quot;,	 4, 2).x
+	assert_parses(p, &quot;5&quot;,	 5, 2).x
+	assert_parses(p, &quot;6&quot;,	 6, 2).x
+	assert_parses(p, &quot;7&quot;,	 7, 2).x
+	assert_parses(p, &quot;8&quot;,	 8, 2).x
+	assert_parses(p, &quot;9&quot;,	 9, 2).x
 
-	assert_parses(p, &quot;a&quot;, 	10, 2).x
+	assert_parses(p, &quot;a&quot;,	10, 2).x
 	assert_parses(p, &quot;b&quot;, 	11, 2).x
 	assert_parses(p, &quot;c&quot;, 	12, 2).x
 	assert_parses(p, &quot;d&quot;, 	13, 2).x
@@ -1084,19 +1084,19 @@ Function test_Parser_hexLit()
 	)
 	refute_parses(p, data).x
 
-	assert_parses(p, &quot;0x0&quot;, 	0, 4).x
-	assert_parses(p, &quot;0x1&quot;, 	1, 4).x
-	assert_parses(p, &quot;0x2&quot;, 	2, 4).x
-	assert_parses(p, &quot;0x3&quot;, 	3, 4).x
-	assert_parses(p, &quot;0x4&quot;, 	4, 4).x
-	assert_parses(p, &quot;0x5&quot;, 	5, 4).x
-	assert_parses(p, &quot;0x6&quot;, 	6, 4).x
-	assert_parses(p, &quot;0x7&quot;, 	7, 4).x
-	assert_parses(p, &quot;0x8&quot;, 	8, 4).x
-	assert_parses(p, &quot;0x9&quot;, 	9, 4).x
+	assert_parses(p, &quot;0x0&quot;, 	 0, 4).x
+	assert_parses(p, &quot;0x1&quot;, 	 1, 4).x
+	assert_parses(p, &quot;0x2&quot;, 	 2, 4).x
+	assert_parses(p, &quot;0x3&quot;, 	 3, 4).x
+	assert_parses(p, &quot;0x4&quot;, 	 4, 4).x
+	assert_parses(p, &quot;0x5&quot;, 	 5, 4).x
+	assert_parses(p, &quot;0x6&quot;, 	 6, 4).x
+	assert_parses(p, &quot;0x7&quot;, 	 7, 4).x
+	assert_parses(p, &quot;0x8&quot;, 	 8, 4).x
+	assert_parses(p, &quot;0x9&quot;,		 9, 4).x
 
-	assert_parses(p, &quot;0xa&quot;, 	10, 4).x
-	assert_parses(p, &quot;0xb&quot;, 	11, 4).x
+	assert_parses(p, &quot;0xa&quot;,		10, 4).x
+	assert_parses(p, &quot;0xb&quot;,		11, 4).x
 	assert_parses(p, &quot;0xc&quot;, 	12, 4).x
 	assert_parses(p, &quot;0xd&quot;, 	13, 4).x
 	assert_parses(p, &quot;0xe&quot;, 	14, 4).x
