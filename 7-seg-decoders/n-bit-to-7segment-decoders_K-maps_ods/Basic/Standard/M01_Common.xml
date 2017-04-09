@@ -15,7 +15,6 @@ Sub Main
 	test_Common()
 End Sub
 
-
 Function typeOf(x As Variant)
 	Dim result As String
 	result = TypeName(x)
@@ -55,17 +54,18 @@ End Sub
 Function id(x As Variant)
 	id = x
 End Function
+&apos; K I = \b x.b) (\y.y) = \x.\y.y = \x y.y
+
+Function fstArg(x As Variant, y As Variant)
+	fstArg = x
+End Function
+
+Function sndArg(x As Variant, y As Variant)
+	sndArg = y
+End Function
 
 Function swap(fn As Variant, x As Variant, y As Variant)
 	swap = apply(fn, y, x)
-End Function
-
-Function fst(x As Variant, y As Variant)
-	fst = x
-End Function
-
-Function snd(x As Variant, y As Variant)
-	snd = y
 End Function
 
 Function concat(a As String, b As String) As String
@@ -216,8 +216,8 @@ Function test_Common()
 	test_isString()
 	test_toString()
 	test_id()
-	test_fst()
-	test_snd()
+	test_fstArg()
+	test_sndArg()
 	test_add()
 	test_mul()
 	test_equ()
@@ -349,22 +349,22 @@ Function test_id()
 	assertEqual(id(&quot;b&quot;), &quot;b&quot;).x
 End Function
 
-Function test_fst()
-	assertEqual(arityF(&quot;fst&quot;), 2).x
+Function test_fstArg()
+	assertEqual(arityF(&quot;fstArg&quot;), 2).x
 
-	assertEqual(fst(1, 2), 1).x
-	assertEqual(fst(2, 1), 2).x
-	assertEqual(fst(&quot;a&quot;, &quot;b&quot;), &quot;a&quot;).x
-	assertEqual(fst(&quot;b&quot;, &quot;a&quot;), &quot;b&quot;).x
+	assertEqual(fstArg(1, 2), 1).x
+	assertEqual(fstArg(2, 1), 2).x
+	assertEqual(fstArg(&quot;a&quot;, &quot;b&quot;), &quot;a&quot;).x
+	assertEqual(fstArg(&quot;b&quot;, &quot;a&quot;), &quot;b&quot;).x
 End Function
 
-Function test_snd()
-	assertEqual(arityF(&quot;snd&quot;), 2).x
+Function test_sndArg()
+	assertEqual(arityF(&quot;sndArg&quot;), 2).x
 
-	assertEqual(snd(1, 2), 2).x
-	assertEqual(snd(2, 1), 1).x
-	assertEqual(snd(&quot;a&quot;, &quot;b&quot;), &quot;b&quot;).x
-	assertEqual(snd(&quot;b&quot;, &quot;a&quot;), &quot;a&quot;).x
+	assertEqual(sndArg(1, 2), 2).x
+	assertEqual(sndArg(2, 1), 1).x
+	assertEqual(sndArg(&quot;a&quot;, &quot;b&quot;), &quot;b&quot;).x
+	assertEqual(sndArg(&quot;b&quot;, &quot;a&quot;), &quot;a&quot;).x
 End Function
 
 Function test_add()

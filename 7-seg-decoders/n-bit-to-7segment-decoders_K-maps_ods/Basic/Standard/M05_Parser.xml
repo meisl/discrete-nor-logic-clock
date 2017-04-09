@@ -15,10 +15,10 @@ Sub Main
 	test_Parser()
 	Stop
 	Dim s As String
-	Set pHexLit = pSeq(Array(pStr(&quot;0x&quot;), pHexNum), &quot;snd&quot;)
+	Set pHexLit = pSeq(Array(pStr(&quot;0x&quot;), pHexNum), &quot;sndArg&quot;)
 	Dim p As Parser 
 	&apos;pChoice(pItem(), pReturn(&quot;bar&quot;))
-	Set p = pSeq(Array(pHexLit, pMany(pWhite)), &quot;fst&quot;)
+	Set p = pSeq(Array(pHexLit, pMany(pWhite)), &quot;fstArg&quot;)
 	s = &quot;FF 0x1F __µ 0&quot;
 
 	MsgBox( _

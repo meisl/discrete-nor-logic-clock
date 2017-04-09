@@ -15,9 +15,9 @@ Function fnObjs()
 			List(&quot;isString&quot;,		True, 1), _
 			List(&quot;toString&quot;,		True, 1), _
 			List(&quot;id&quot;,				True, 1), _
+			List(&quot;fstArg&quot;,			True, 2), _
+			List(&quot;sndArg&quot;,			True, 2), _
 			List(&quot;swap&quot;,			True, 3), _
-			List(&quot;fst&quot;,				True, 2), _
-			List(&quot;snd&quot;,				True, 2), _
 			List(&quot;add&quot;,				True, 2), _
 			List(&quot;mul&quot;,				True, 2), _
 			List(&quot;equ&quot;,				True, 2), _
@@ -177,9 +177,9 @@ Function applyBuiltinRev(ByVal fn As Object, ByVal reverseArgs As Object)
 		Case &quot;existsF&quot;:			result = existsF(		a(0)				)
 		Case &quot;applyToList&quot;:		result = applyToList(	a(0), a(1)			)
 		Case &quot;id&quot;:				result = id(			a(0)				)
+		Case &quot;fstArg&quot;:			result = fstArg(		a(0), a(1)			)
+		Case &quot;sndArg&quot;:			result = sndArg(		a(0), a(1)			)
 		Case &quot;swap&quot;:			result = swap(			a(0), a(1), a(2)	)
-		Case &quot;fst&quot;:				result = fst(			a(0), a(1)			)
-		Case &quot;snd&quot;:				result = snd(			a(0), a(1)			)
 		Case &quot;add&quot;:				result = add(			a(0), a(1)			)
 		Case &quot;mul&quot;:				result = mul(			a(0), a(1)			)
 		Case &quot;equ&quot;:				result = equ(			a(0), a(1)			)
@@ -264,7 +264,7 @@ Function test_Fn()
 	fId = lookupFn(&quot;id&quot;)
 	assertEqual(arity(fId), 1).x
 	assertEqual(apply(fId, 0), id(0)).x
-				
+
 	Dim fCar As Variant
 	fCar = lookupFn(&quot;car&quot;)
 	assertEqual(isPartialApp(fCar), False).x
@@ -301,19 +301,19 @@ Function test_Fn()
 	eq5_5 = apply1(eq5, 5)
 	assertEqual(eq5_5, True).x
 
-	Dim fst5 As Variant
-	fst5 = apply1(lookupFn(&quot;fst&quot;), 5)
-	assertEqual(isPartialApp(fst5), True).x
-	assertEqual(isBuiltinFn(fst5), False).x
-	assertEqual(arity(fst5), 1).x
-	assertEqual(apply1(fst5, 7), 5).x
+	Dim konst5 As Variant
+	konst5 = apply1(lookupFn(&quot;fstArg&quot;), 5)
+	assertEqual(isPartialApp(konst5), True).x
+	assertEqual(isBuiltinFn(konst5), False).x
+	assertEqual(arity(konst5), 1).x
+	assertEqual(apply1(konst5, 7), 5).x
 		
-	Dim snd5 As Variant
-	snd5 = apply1(lookupFn(&quot;snd&quot;), 5)
-	assertEqual(isPartialApp(snd5), True).x
-	assertEqual(isBuiltinFn(snd5), False).x
-	assertEqual(arity(snd5), 1).x
-	assertEqual(apply1(snd5, 7), 7).x
+	Dim sndArg5 As Variant
+	sndArg5 = apply1(lookupFn(&quot;sndArg&quot;), 5)
+	assertEqual(isPartialApp(sndArg5), True).x
+	assertEqual(isBuiltinFn(sndArg5), False).x
+	assertEqual(arity(sndArg5), 1).x
+	assertEqual(apply1(sndArg5, 7), 7).x
 		
 	Dim ite As Variant
 	ite = lookupFn(&quot;ite&quot;)
