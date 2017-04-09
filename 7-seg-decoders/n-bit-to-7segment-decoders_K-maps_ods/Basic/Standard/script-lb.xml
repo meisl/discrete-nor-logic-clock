@@ -4,8 +4,8 @@
  <library:element library:name="M03_List"/>
  <library:element library:name="M02_Array"/>
  <library:element library:name="M04_Fn"/>
- <library:element library:name="M00_Test"/>
+ <library:element library:name="M06_Scratch"/>
  <library:element library:name="M01_Common"/>
  <library:element library:name="M05_Parser"/>
- <library:element library:name="M06_Scratch"/>
+ <library:element library:name="M00_Test"/>
 </library:library>

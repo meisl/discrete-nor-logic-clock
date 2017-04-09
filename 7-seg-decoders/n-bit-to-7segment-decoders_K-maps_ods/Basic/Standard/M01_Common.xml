@@ -4,7 +4,6 @@
 Option Explicit
 
 Type TTest_NoTyname
-
 End Type
 
 Type TTest_Tyname
@@ -53,6 +52,10 @@ Sub croak(msg As String)
 	MsgBox(provoke.AnError)
 End Sub
 
+Function id(x As Variant)
+	id = x
+End Function
+
 Function swap(fn As Variant, x As Variant, y As Variant)
 	swap = apply(fn, y, x)
 End Function
@@ -67,6 +70,14 @@ End Function
 
 Function concat(a As String, b As String) As String
 	concat = a &amp; b
+End Function
+
+Function add(a As Long, b As Long) As Long
+	add = a + b
+End Function
+
+Function mul(a As Long, b As Long) As Long
+	mul = a * b
 End Function
 
 Function startsWith(s As String, prefix As String) 
@@ -204,8 +215,11 @@ Function test_Common()
 	test_typeOf()
 	test_isString()
 	test_toString()
+	test_id()
 	test_fst()
 	test_snd()
+	test_add()
+	test_mul()
 	test_equ()
 	test_readHex()
 End Function
@@ -322,6 +336,19 @@ Function test_toString()
 	assertThrows(&quot;toString&quot;, Array(t2)).x
 End Function
 
+Function test_id()
+	assertEqual(arityF(&quot;id&quot;), 1).x
+
+	assertEqual(id(Empty), Empty).x
+	assertEqual(id(Nothing), Nothing).x
+	
+	assertEqual(id(0), 0).x
+	assertEqual(id(1), 1).x
+	assertEqual(id(-2), -2).x
+	assertEqual(id(&quot;a&quot;), &quot;a&quot;).x
+	assertEqual(id(&quot;b&quot;), &quot;b&quot;).x
+End Function
+
 Function test_fst()
 	assertEqual(arityF(&quot;fst&quot;), 2).x
 
@@ -338,6 +365,31 @@ Function test_snd()
 	assertEqual(snd(2, 1), 1).x
 	assertEqual(snd(&quot;a&quot;, &quot;b&quot;), &quot;b&quot;).x
 	assertEqual(snd(&quot;b&quot;, &quot;a&quot;), &quot;a&quot;).x
+End Function
+
+Function test_add()
+	assertEqual(add( 0,  0),  0).x
+	assertEqual(add( 0,  1),  1).x
+	assertEqual(add( 1,  1),  2).x
+	assertEqual(add( 1,  1),  2).x
+	assertEqual(add( 1, -1),  0).x
+	assertEqual(add(-1, -1), -2).x
+	assertEqual(add( 2,  2),  4).x
+	
+	assertEqual(add(42, 4711), 		42 + 4711).x
+	assertEqual(add(65535, 65535), 	CLng(65535 * 2)).x	&apos; not limited to 16 bit
+End Function
+
+Function test_mul()
+	assertEqual(mul( 0,  0),  0).x
+	assertEqual(mul( 0,  1),  0).x
+	assertEqual(mul( 1,  1),  1).x
+	assertEqual(mul( 1, -1), -1).x
+	assertEqual(mul(-1, -1),  1).x
+	assertEqual(mul( 2,  2),  4).x
+	
+	assertEqual(mul(42, 4711),		CLng(42 * 4711)).x
+	assertEqual(mul(65535, 32767),  CLng(65535 * 32767)).x	&apos; not limited to 16 bit
 End Function
 
 Function test_equ()

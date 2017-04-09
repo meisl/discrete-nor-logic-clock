@@ -113,7 +113,13 @@ End Function
 &apos; otherwise returns a singleton list of p&apos;s result + pos
 &apos; matches at most once
 Function pZeroOrOne(p As Parser)
-	pZeroOrOne = mkParser(&quot;zeroOrOne&quot;, p)
+&apos;	pZeroOrOne = mkParser(&quot;zeroOrOne&quot;, p)
+&apos;	Exit Function
+	
+	Dim swappedCons As Object, singletonList As Object
+	Set swappedCons = apply(&quot;swap&quot;, lookupFn(&quot;cons&quot;))
+	Set singletonList = apply(swappedCons, nil)
+	pZeroOrOne = pChoice( pSeq(Array(p), singletonList), pReturn(nil))
 End Function
 
 &apos; never fails: if p fails than pMany(p) returns nil + same pos as result,
@@ -125,6 +131,7 @@ End Function
 
 &apos; same as pManyRev but with the list in the order as in the parsed string
 Function pMany(p As Parser)
+	&apos; Note: direct impl might give a little more perf
 	pMany = pSeq(Array(pManyRev(p)), &quot;reverse&quot;)
 End Function
 
@@ -438,14 +445,14 @@ Function refute_parses(p As Parser, ByVal ss As Variant)
 	If isArray(ss) Then
 		Dim i As Integer
 		For i = LBound(ss) To UBound(ss)
-			actual = applyP(p, ss(i))
+			actual = applyP(p, ss(i), 1)
 			assertionCount = assertionCount + 1
 			If Not(isParseFailure(actual)) Then
 				Goto refute_parses_failed
 			End If
 		Next i
 	Else
-		actual = applyP(p, ss)
+		actual = applyP(p, ss, 1)
 		assertionCount = assertionCount + 1
 		If Not(isParseFailure(actual)) Then
 			Goto refute_parses_failed
@@ -471,7 +478,7 @@ Function assert_parses(p As Parser, ByVal ss As Variant, expVal As Variant, expP
 	If isArray(ss) Then
 		Dim i As Integer
 		For i = LBound(ss) To UBound(ss)
-			actual = applyP(p, ss(i))
+			actual = applyP(p, ss(i), 1)
 			testResult = assertEqual(actual(1), expPos)
 			If (testResult.isFail) Then
 				MsgBox(toString(actual))
@@ -483,7 +490,7 @@ Function assert_parses(p As Parser, ByVal ss As Variant, expVal As Variant, expP
 			End If
 		Next i
 	Else
-		actual = applyP(p, ss)
+		actual = applyP(p, ss, 1)
 		testResult = assertEqual(actual(1), expPos)
 		If (testResult.isFail) Then
 			Goto assert_parse_failed
