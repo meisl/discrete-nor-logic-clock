@@ -136,7 +136,9 @@ Function mul(Optional a As Long, Optional b As Long)
 End Function
 
 Function inRange(lo As Long, hi As Long, x As Long)
-	inRange = (lo &lt;= x) And (x &lt;= hi)
+	Dim result As Boolean
+	result = (lo &lt;= x) And (x &lt;= hi)
+	inRange = result
 End Function
 
 Function equ(a As Variant, b As Variant) As Boolean
@@ -275,6 +277,7 @@ Function test_Common()
 	test_sndArg()
 	test_add()
 	test_mul()
+	test_inRange()
 	test_equ()
 	test_readHex()
 End Function
@@ -445,6 +448,14 @@ Function test_mul()
 	
 	assertEqual(mul(42, 4711),		CLng(42 * 4711)).x
 	assertEqual(mul(65535, 32767),  CLng(65535 * 32767)).x	&apos; not limited to 16 bit
+End Function
+
+Function test_inRange()
+	assertEqual(inRange(48, 57, 47), False).x
+	assertEqual(inRange(48, 57, 48), True).x
+	assertEqual(inRange(48, 57, 55), True).x
+	assertEqual(inRange(48, 57, 57), True).x
+	assertEqual(inRange(48, 57, 58), False).x
 End Function
 
 Function test_equ()
