@@ -52,6 +52,7 @@ Sub croak(msg As String)
 End Sub
 
 &apos; I = \x.x
+&apos;	:: a -&gt; a
 Function id(Optional x As Variant)
 	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;id&quot;) : End If
 	If isMissing(x) Then
@@ -62,20 +63,40 @@ Function id(Optional x As Variant)
 End Function
 
 &apos; K = \x y.x
+&apos;     :: a -&gt; b -&gt; a
 Function fstArg(x As Variant, y As Variant)
 	fstArg = x
 End Function
 
 &apos; K I = (\b x.b) (\y.y) = \x.\y.y = \x y.y
+&apos;     :: a -&gt; b -&gt; b
 Function sndArg(x As Variant, y As Variant)
 	sndArg = y
 End Function
 
-Function swap(fn As Variant, x As Variant, y As Variant)
-	swap = apply(fn, y, x)
+&apos; :: (b -&gt; a) -&gt; a -&gt; b = (b -&gt; a) -&gt; (a -&gt; b)
+Function swap(Optional ByVal f, Optional x, Optional y)
+	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;swap&quot;) : End If
+	Dim result As Variant
+	If isMissing(f) Then
+		result = oFn
+	Else
+		f = asFn(f, &quot;swap: invalid 1st arg&quot;)	&apos; make sure it&apos;s a function
+		If isMissing(x) Then
+			result = apply1(oFn, f)
+		Else
+			If isMissing(y) Then
+				result = apply1(apply1(oFn, f), x)
+			Else
+				result = apply(f, y, x)
+			End If
+		End If
+	End If
+	swap = result
 End Function
 
 &apos; B = \f g x.f (g x)
+&apos;   :: (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c  =  (b -&gt; c) -&gt; (a -&gt; b) -&gt; (a -&gt; c)
 Function compose(Optional ByVal f, Optional ByVal g, Optional x)
 	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;compose&quot;) : End If
 	Dim result As Variant
@@ -275,6 +296,7 @@ Function test_Common()
 	test_id()
 	test_fstArg()
 	test_sndArg()
+	test_swap()
 	test_compose()
 	test_add()
 	test_mul()
@@ -427,6 +449,60 @@ Function test_sndArg()
 	assertEqual(sndArg(&quot;b&quot;, &quot;a&quot;), &quot;a&quot;).x
 End Function
 
+Function test_swap()
+	assertEqual(arityF(&quot;swap&quot;), 3).x
+
+	assertEqual(swap(lookupFn(&quot;fstArg&quot;), 1, 2), 2).x
+	assertEqual(swap(lookupFn(&quot;sndArg&quot;), 1, 2), 1).x
+
+	assertEqual(swap(&quot;fstArg&quot;, 1, 2), 2).x
+	assertEqual(swap(&quot;sndArg&quot;, 1, 2), 1).x
+
+	Dim f As Variant &apos; test partial application
+	
+	f = swap
+	assertEqual(arity(f), 3).x
+	assertEqual(apply(f, lookupFn(&quot;fstArg&quot;), 1, 2), 2).x
+	assertEqual(apply(f, lookupFn(&quot;sndArg&quot;), 1, 2), 1).x
+
+	assertEqual(apply(f, &quot;fstArg&quot;, 1, 2), 2).x
+	assertEqual(apply(f, &quot;sndArg&quot;, 1, 2), 1).x
+	
+	&apos; partially applied to 1 arg:
+	f = swap(lookupFn(&quot;fstArg&quot;))
+	assertEqual(arity(f), 2).x
+	assertEqual(apply(f, 1, 2), 2).x
+	
+	f = swap(&quot;fstArg&quot;)
+	assertEqual(arity(f), 2).x
+	assertEqual(apply(f, 1, 2), 2).x
+	
+	f = swap(lookupFn(&quot;sndArg&quot;))
+	assertEqual(arity(f), 2).x
+	assertEqual(apply(f, 1, 2), 1).x
+	
+	f = swap(&quot;sndArg&quot;)
+	assertEqual(arity(f), 2).x
+	assertEqual(apply(f, 1, 2), 1).x
+	
+	&apos; partially applied to 2 args:
+	f = swap(lookupFn(&quot;fstArg&quot;), 1)
+	assertEqual(arity(f), 1).x
+	assertEqual(apply(f, 2), 2).x
+	
+	f = swap(&quot;fstArg&quot;, 1)
+	assertEqual(arity(f), 1).x
+	assertEqual(apply(f, 2), 2).x
+	
+	f = swap(lookupFn(&quot;sndArg&quot;), 1)
+	assertEqual(arity(f), 1).x
+	assertEqual(apply(f, 2), 1).x
+	
+	f = swap(&quot;sndArg&quot;, 1)
+	assertEqual(arity(f), 1).x
+	assertEqual(apply(f, 2), 1).x
+End Function
+
 Function test_compose()
 	assertEqual(arityF(&quot;compose&quot;), 3).x
 
@@ -481,6 +557,16 @@ Function test_add()
 	
 	assertEqual(add(42, 4711), 		42 + 4711).x
 	assertEqual(add(65535, 65535), 	CLng(65535 * 2)).x	&apos; not limited to 16 bit
+
+	Dim f As Object
+	Set f = add
+	assertEqual(arity(f), 2).x
+	Set f = add(1)
+	assertEqual(arity(f), 1).x
+	assertEqual(apply(f,  0),  1).x
+	assertEqual(apply(f,  1),  2).x
+	assertEqual(apply(f,  2),  3).x
+	assertEqual(apply(f, -2), -1).x	
 End Function
 
 Function test_mul()

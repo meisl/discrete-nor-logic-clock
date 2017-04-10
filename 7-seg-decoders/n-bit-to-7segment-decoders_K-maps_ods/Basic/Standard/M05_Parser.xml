@@ -49,15 +49,6 @@ Function mkParser(Optional tp As String, Optional st As Variant)
 	mkParser = result
 End Function
 
-&apos; always fails on any string; failure is indicated by returning parseFailure()
-Function pFail()
-	Static result As New Parser
-	If result.tp = &quot;&quot; Then
-		result = mkParser(&quot;fail&quot;, Nothing)
-	End If
-	pFail = result
-End Function
-
 Function parseFailure()
 	parseFailure = Empty
 End Function
@@ -70,23 +61,38 @@ Function isParseFailure(parseResult) As Boolean
 	End If
 End Function
 
+&apos; always fails on any string; failure is indicated by returning parseFailure()
+Function pFail()
+	Static result As Object
+	If isNull(result) Then : result = mkParser(&quot;fail&quot;, Nothing) : End If
+	pFail = result
+End Function
+
 &apos; always succeeds by returning the provided value; without increasing pos
 Function pReturn(Optional v As Variant)
-	pReturn = mkParser(&quot;return&quot;, v)
+	Static oFn As Object
+	If isMissing(v) Then
+		If isNull(oFn) Then
+			oFn = mkParser(&quot;return&quot;)
+		End If
+		pReturn = oFn
+	Else
+		pReturn = mkParser(&quot;return&quot;, v)
+	End If
 End Function
 
 &apos; fails on empty string but succeeds on all others
 &apos; by returning the first character; and increasing pos by 1
 Function pItem()
-	Static result As New Parser
-	If result.tp = &quot;&quot; Then
-		result = mkParser(&quot;item&quot;, Nothing)
-	End If
+	Static result As Object
+	If isNull(result) Then : result = mkParser(&quot;item&quot;, Nothing) : End If
 	pItem = result
 End Function
 
 Function pNextAsc()
-	pNextAsc = pBind(pItem, compose(pReturn, &quot;asc&quot;))
+	Static result As Object
+	If isNull(result) Then : Set result = pBind(pItem, compose(pReturn, &quot;asc&quot;)) : End If
+	pNextAsc = result
 End Function
 
 &apos; succeeds on strings with the given prefix t by returning t,
@@ -132,13 +138,13 @@ End Function
 &apos; otherwise returns a singleton list of p&apos;s result + pos
 &apos; matches at most once
 Function pZeroOrOne(p As Parser)
-&apos;	pZeroOrOne = mkParser(&quot;zeroOrOne&quot;, p)
-&apos;	Exit Function
+	pZeroOrOne = mkParser(&quot;zeroOrOne&quot;, p)
+	Exit Function
 	
-	Dim swappedCons As Object, singletonList As Object
-	Set swappedCons = apply(&quot;swap&quot;, lookupFn(&quot;cons&quot;))
-	Set singletonList = apply(swappedCons, nil)
-	pZeroOrOne = pChoice( pSeq(Array(p), singletonList), pReturn(nil))
+&apos;	Dim singletonList As Object
+&apos;	Set singletonList = swap(&quot;cons&quot;, nil)
+&apos;	pZeroOrOne = pChoice( pSeq(Array(p), singletonList), pReturn(nil))
+&apos;	pZeroOrOne = pChoice( pBind(p, compose(pReturn, singletonList)), pReturn(nil))
 End Function
 
 &apos; never fails: if p fails than pMany(p) returns nil + same pos as result,
@@ -166,38 +172,24 @@ Function pMany1(p As Parser)
 	pMany1 = pSeq(Array(pMany1Rev(p)), &quot;reverse&quot;)
 End Function
 
-&apos; pSeq - make a sequence of parsers and finally process the results (list)
+&apos; pSeq - make a sequence of parsers, collect their results in a list 
+&apos; and finally process that list by passing it to the given function
 &apos; fails if any of the given parsers fails
 &apos; if instead all succeed, collects their results in a list 
 &apos; which is then passed on the the given function. The result
 &apos; of this function application is then packed up with the last
 &apos; parsers pos to give the overall result
 Function pSeq(ps As Array, ByVal f As Variant)
-	Dim fName As String
-	If isString(f) Then
-		fName = f
-		f = lookupFn(fName)
-		If isEmpty(f) Then
-			croak(&quot;pSeq: unknown function &quot; &amp; toString(fName))
-		End If
-	End If
-	&apos; TODO: pSeq: check if f is proper fn
+	&apos;TODO: pSeq: check if ps is proper Array of Parsers
+	f = asFn(f, &quot;pSeq: invalid 2nd arg&quot;)
 	pSeq = mkParser(&quot;seq&quot;, Array(ps, f))
 End Function
 
 Function pBind(p As Parser, ByVal f As Variant)
-	Dim fName As String
-	If isString(f) Then
-		fName = f
-		f = lookupFn(fName)
-		If isEmpty(f) Then
-			croak(&quot;pBind: unknown function &quot; &amp; toString(fName))
-		End If
-	End If
-	&apos; TODO: pBind: check if f is proper fn
+	&apos; TODO: pBind: check if p is proper Parser
+	f = asFn(f, &quot;pBind: invalid 2nd arg&quot;)
 	pBind = mkParser(&quot;bind&quot;, Array(p, f))
 End Function
-
 
 
 &apos;==================================================================
@@ -427,6 +419,12 @@ Function test_Parser()
 	Dim tm As Date, tmSecs As Long, aPerSec As Integer
 	tm = TimeValue(Time)
 	
+	&apos;Dim lTick As Long
+	&apos;lTick = GetSystemTicks()
+	&apos;wait 2000
+	&apos;lTick = (GetSystemTicks() - lTick)
+	&apos;MsgBox &quot;&quot; &amp; lTick &amp; &quot; Ticks&quot; ,0,&quot;Die Pause dauerte&quot;
+
 	Dim aCount As Integer
 	aCount = assertionCount
 	

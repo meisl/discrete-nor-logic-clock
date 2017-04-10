@@ -91,7 +91,7 @@ Function isFn(ByVal fn As Variant) As Boolean
 		k = length(fn)
 		Select Case k
 			Case 2
-				isFn = isFn(car(fn))
+				isFn = True	&apos;(typeOf(car(fn)) = typeOf(nil))	&apos; isFn(car(fn))
 				&apos;TODO: check if partialArgs is proper list
 				Exit Function
 			Case 3
@@ -172,13 +172,9 @@ Function apply1(ByVal fn As Variant, ByVal arg As Variant)
 	apply1 = result
 End Function
 
-Function applyLast(ByVal fn As Variant, ByVal arg As Variant)
+Function applyLast(fn As Object, ByVal arg As Variant)
 	Dim result As Variant
-	fn = asFn(fn)	&apos; makes sure it really is a function
-	If arity(fn) &lt;&gt; 1 Then
-		croak(&quot;applyLast: cannot apply &quot; &amp; chr(13) &amp; &quot;  &quot; &amp; toString(fn) &amp; chr(13) &amp; &quot;arity=&quot; &amp; arity(fn))
-	End If
-	Dim fName As String, reverseArgs As Object
+	Dim reverseArgs As Object
 	If isPartialApp(fn) Then
 		reverseArgs = cadr(fn)
 		fn = car(fn)
@@ -186,11 +182,10 @@ Function applyLast(ByVal fn As Variant, ByVal arg As Variant)
 		reverseArgs = nil
 	End If
 	reverseArgs = cons(arg, reverseArgs)
-	fName = car(fn)
 	If isBuiltinFn(fn) Then
 		result = applyBuiltinRev(fn, reverseArgs)
 	Else
-		croak(&quot;NYI: applyLast/non-builtin &quot; &amp; fName)
+		croak(&quot;NYI: applyLast/non-builtin &quot; &amp; toString(fn))
 	End If
 	applyLast = result
 End Function
@@ -259,16 +254,7 @@ End Function
 
 Function applyToList(ByVal fn As Variant, ByVal args As Object)
 	Dim result As Variant
-	Dim fName As String
-	If isString(fn) Then
-		fName = fn
-		fn = lookupFn(fName)
-		If isEmpty(fn) Or isNull(fn) Then
-			croak(&quot;applyToList: unknown function &quot; &amp; fName)
-		End If
-	ElseIf isEmpty(fn) Or isNull(fn) Then
-		croak(&quot;applyToList: invalid fn &quot; &amp; toString(fn))
-	End If
+	fn = asFn(fn, &quot;applyToList: invalid 1st arg&quot;)
 	If isNil(args) Then
 		Dim fstr As String
 		fstr = toString(fn)
@@ -285,18 +271,17 @@ End Function
 
 Function apply(ByVal fn As Variant, a0, Optional a1, Optional a2, Optional a3, Optional a4, Optional a5, Optional a6, Optional a7, Optional a8, Optional a9, Optional a10)
 	Dim args As Object
-	Dim fName As String
-	If isString(fn) Then
-		fName = fn
-		fn = lookupFn(fName)
-		If isEmpty(fn) Or isNull(fn) Then
-			croak(&quot;apply: unknown function &quot; &amp; fName)
-		End If
-	ElseIf isEmpty(fn) Or isNull(fn) Then
-		croak(&quot;apply: invalid fn &quot; &amp; toString(fn))
+	fn = asFn(fn, &quot;apply: invalid 1st arg&quot;)
+	If isMissing(a1) Then
+		apply = apply1(fn, a0)
+	ElseIf isMissing(a2) Then
+		apply = apply1(apply1(fn, a0), a1)
+	ElseIf isMissing(a3) Then
+		apply = apply1(apply1(apply1(fn, a0), a1), a2)
+	Else
+		args = List(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10)
+		apply = applyToList(fn, args)
 	End If
-	args = List(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10)
-	apply = applyToList(fn, args)
 End Function
 
 &apos;= tests ============================================================
