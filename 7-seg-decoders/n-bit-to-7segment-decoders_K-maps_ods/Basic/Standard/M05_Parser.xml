@@ -30,11 +30,22 @@ End Sub
 
 &apos;==================================================================
 
-Function mkParser(tp As String, st As Variant)
-	Dim result As New Parser
-	result.tyname = &quot;TParser&quot;
-	result.tp = tp
-	result.st = st
+Function mkParser(Optional tp As String, Optional st As Variant)
+	Static oFn As Object
+	Dim result As Object
+	If isMissing(st) Then
+		If isNull(oFn) Then : Set oFn = lookupFn(&quot;mkParser&quot;) : End If
+		If isMissing(tp) Then
+			result = oFn
+		Else
+			result = apply1(oFn, tp)
+		End If
+	Else
+		Set result = New Parser
+		result.tyname = &quot;TParser&quot;
+		result.tp = tp
+		result.st = st
+	End If
 	mkParser = result
 End Function
 
@@ -60,7 +71,7 @@ Function isParseFailure(parseResult) As Boolean
 End Function
 
 &apos; always succeeds by returning the provided value; without increasing pos
-Function pReturn(v As Variant)
+Function pReturn(Optional v As Variant)
 	pReturn = mkParser(&quot;return&quot;, v)
 End Function
 
@@ -72,6 +83,10 @@ Function pItem()
 		result = mkParser(&quot;item&quot;, Nothing)
 	End If
 	pItem = result
+End Function
+
+Function pNextAsc()
+	pNextAsc = pBind(pItem, compose(pReturn, &quot;asc&quot;))
 End Function
 
 &apos; succeeds on strings with the given prefix t by returning t,
@@ -420,32 +435,33 @@ Function test_Parser()
 	refute_parses_pass = assertEqual(failure, failure)
 	
 	test_Parser_fail()
-	test_Parser_item()
 	test_Parser_return()
+	test_Parser_item()
+	test_Parser_nextAsc()
 	test_Parser_str()
 	test_Parser_choice()
 	test_Parser_zeroOrOne()
-&apos; 0 sec for 254 ~&gt; &gt;254 aPerSec
+&apos; 1 sec for 273 ~&gt; &gt;273 aPerSec
 	test_Parser_white()
 	test_Parser_binDigit()
-&apos; 0 sec for 303 ~&gt; 303 aPerSec
+&apos; 1 sec for 322 ~&gt; 322 aPerSec
 	test_Parser_decDigit()
-&apos; 1 sec for 340 ~&gt; 340 aPerSec
+&apos; 2 sec for 359 ~&gt; 180 aPerSec
 	test_Parser_hexDigit()
-&apos; 2 sec for 389 ~&gt; 195 aPerSec
+&apos; 3 sec for 408 ~&gt; 136 aPerSec
 	test_Parser_manyRev()
 	test_Parser_many()
-&apos; 4 sec for 521 ~&gt; 130 aPerSec
+&apos; 5 sec for 540 ~&gt; 108 aPerSec
 	test_Parser_many1Rev()
 	test_Parser_many1()
-&apos; 5 sec for 613 ~&gt; 123 aPerSec
+&apos; 7 sec for 632 ~&gt; 90 aPerSec
 	test_Parser_seq()
-&apos; 6 sec for 683 ~&gt; 114 aPerSec
+&apos; 8 sec for 702 ~&gt; 88 aPerSec
 	test_Parser_hexNum()
-&apos; 8 sec for 762 ~&gt; 95 aPerSec
-	test_Parser_hexLit()
-&apos; 12 sec for 864 ~&gt; 72 aPerSec
 Goto end_of_Parser_tests
+&apos; 12 sec for 781 ~&gt; 65 aPerSec
+	test_Parser_hexLit()
+&apos; 16 sec for 883 ~&gt; 55 aPerSec
 end_of_Parser_tests:	
 	aCount = assertionCount - aCount
 	tm = TimeValue(Time) - tm
@@ -543,19 +559,13 @@ Function test_Parser_fail()
 	)).x
 End Function
 
-Function test_Parser_item()
-	refute_parses(pItem, &quot;&quot;).x
-	assert_parses(pItem, &quot; &quot;,		&quot; &quot;, 2).x
-	assert_parses(pItem, &quot;a&quot;,		&quot;a&quot;, 2).x
-	assert_parses(pItem, &quot;1&quot;,		&quot;1&quot;, 2).x
-	assert_parses(pItem, &quot;[]&quot;,		&quot;[&quot;, 2).x
-	assert_parses(pItem, &quot;abcd&quot;,		&quot;a&quot;, 2).x
-	assert_parses(pItem, chr(13),	chr(13), 2).x
-End Function
-
 Function test_Parser_return()
-	Dim p As Parser
+	Dim p As Variant
 	Dim expected As Variant
+	
+	p = pReturn
+	assertEqual(typeOf(p), typeOf(nil)).x
+	assertEqual(arity(p),  1).x
 
 	p = pReturn(&quot;bar&quot;)
 	assert_parses(p, &quot;&quot;,		&quot;bar&quot;, 1).x
@@ -575,6 +585,34 @@ Function test_Parser_return()
 	assert_parses(p, &quot;abcd&quot;,	4711, 1).x
 	assert_parses(p, chr(13),	4711, 1).x
 End Function
+
+Function test_Parser_item()
+	Dim p As Parser
+	Set p = pItem
+	refute_parses(p, &quot;&quot;).x
+	assert_parses(p, &quot; &quot;,		&quot; &quot;, 2).x
+	assert_parses(p, &quot;a&quot;,		&quot;a&quot;, 2).x
+	assert_parses(p, &quot;1&quot;,		&quot;1&quot;, 2).x
+	assert_parses(p, &quot;[]&quot;,		&quot;[&quot;, 2).x
+	assert_parses(p, &quot;abcd&quot;,	&quot;a&quot;, 2).x
+	assert_parses(p, chr(13),	chr(13), 2).x
+	assert_parses(p, chr( 9),	chr( 9), 2).x
+End Function
+
+Function test_Parser_nextAsc()
+	Dim p As Parser
+	Set p = pNextAsc
+	
+	refute_parses(p, &quot;&quot;).x
+	assert_parses(p, &quot; &quot;,		asc(&quot; &quot;), 2).x
+	assert_parses(p, &quot;a&quot;,		asc(&quot;a&quot;), 2).x
+	assert_parses(p, &quot;1&quot;,		asc(&quot;1&quot;), 2).x
+	assert_parses(p, &quot;[]&quot;,		asc(&quot;[&quot;), 2).x
+	assert_parses(p, &quot;abcd&quot;,	asc(&quot;a&quot;), 2).x
+	assert_parses(p, chr(13),	      13, 2).x
+	assert_parses(p, chr( 9),	       9, 2).x
+End Function
+
 
 Function test_Parser_str()
 	Dim p As Parser

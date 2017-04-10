@@ -78,20 +78,36 @@ Function assertThrows(fName As String, args As Array, Optional errNo As Integer)
 			End If
 	End Select
 On Local Error Goto Boom
-	testLevel = testLevel + 1
 	Select Case fName
-		Case &quot;assertEqual&quot;: 	fResult = assertEqual(args(k), args(k+1))
+		Case &quot;assertEqual&quot;:
+			testLevel = testLevel + 1
+		 	fResult = assertEqual(args(k), args(k+1))
 		Case &quot;assertThrows&quot;
 			If n = 2 Then
+				testLevel = testLevel + 1
 				fResult = assertThrows(args(k), args(k+1))
 			ElseIf n = 3 Then
+				testLevel = testLevel + 1
 				fResult = assertThrows(args(k), args(k+1), args(k+2))
 			Else
 				croak(&quot;assertThrows: expected Array of 2 or 3 args but got&quot; &amp; chr(13) &amp; toString(args))
+				&apos; ATTENTION: inc testLevel *only AFTER* this croak
+				testLevel = testLevel + 1
 			End If
-		Case &quot;i_will_throw0&quot;:	fResult = i_will_throw0()
+		Case &quot;i_will_throw0&quot;:
+			testLevel = testLevel + 1
+			fResult = i_will_throw0()
 		Case Else
-			fResult = applyToList(fName, toList(args))
+			Dim argsList As Object
+			argsList = toList(args)
+			If isNil(argsList) Then
+				croak(&quot;assertThrows: don&apos;t know how to apply zero args - fn:&quot; &amp; chr(13) &amp; toString(fName))
+				&apos; ATTENTION: inc testLevel *only AFTER* this croak
+				testLevel = testLevel + 1
+			Else 
+				testLevel = testLevel + 1
+				fResult = applyToList(fName, argsList)
+			End If
 	End Select
 	testLevel = testLevel - 1
 	a = &quot;no error&quot;

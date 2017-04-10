@@ -52,8 +52,13 @@ Sub croak(msg As String)
 End Sub
 
 &apos; I = \x.x
-Function id(x As Variant)
-	id = x
+Function id(Optional x As Variant)
+	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;id&quot;) : End If
+	If isMissing(x) Then
+		id = oFn
+	Else
+		id = x
+	End If
 End Function
 
 &apos; K = \x y.x
@@ -77,15 +82,11 @@ Function compose(Optional ByVal f, Optional ByVal g, Optional x)
 	If isMissing(f) Then
 		result = oFn
 	Else
-		If isString(f) Then
-			f = lookupFn(f)
-		End If
+		f = asFn(f, &quot;compose: invalid 1st arg&quot;)	&apos; make sure it&apos;s a function
 		If isMissing(g) Then
-			result = apply1(result, f)
+			result = apply1(oFn, f)
 		Else
-			If isString(g) Then
-				g = lookupFn(g)
-			End If
+			g = asFn(g, &quot;compose: invalid 2nd arg&quot;)
 			If isMissing(x) Then
 				result = apply1(apply1(oFn, f), g)
 			Else
@@ -93,7 +94,6 @@ Function compose(Optional ByVal f, Optional ByVal g, Optional x)
 			End If
 		End If
 	End If
-	&apos;compose = apply(f, apply(g, x))
 	compose = result
 End Function
 
@@ -275,6 +275,7 @@ Function test_Common()
 	test_id()
 	test_fstArg()
 	test_sndArg()
+	test_compose()
 	test_add()
 	test_mul()
 	test_inRange()
@@ -396,6 +397,7 @@ End Function
 
 Function test_id()
 	assertEqual(arityF(&quot;id&quot;), 1).x
+	assertEqual(arity(id), 1).x
 
 	assertEqual(id(Empty), Empty).x
 	assertEqual(id(Nothing), Nothing).x
@@ -423,6 +425,49 @@ Function test_sndArg()
 	assertEqual(sndArg(2, 1), 1).x
 	assertEqual(sndArg(&quot;a&quot;, &quot;b&quot;), &quot;b&quot;).x
 	assertEqual(sndArg(&quot;b&quot;, &quot;a&quot;), &quot;a&quot;).x
+End Function
+
+Function test_compose()
+	assertEqual(arityF(&quot;compose&quot;), 3).x
+
+	Dim f As Variant
+	
+	f = compose
+	assertEqual(typeOf(f), typeOf(nil)).x
+	assertEqual(arity(f), 3).x
+	
+	f = compose(compose)
+	assertEqual(typeOf(f), typeOf(nil)).x
+	assertEqual(arity(f), 2).x
+
+	f = compose(compose, compose)
+	assertEqual(typeOf(f), typeOf(nil)).x
+	assertEqual(arity(f), 1).x
+	
+	assertEqual(compose(id, id, &quot;asdf&quot;), &quot;asdf&quot;).x
+	assertEqual(compose(&quot;id&quot;, id, 42), 42).x
+	assertEqual(compose(&quot;id&quot;, &quot;id&quot;, 4711), 4711).x
+
+	assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;, id, 42)).x
+	assertThrows(&quot;compose&quot;, Array(Nothing, 		  id, 42)).x
+	assertThrows(&quot;compose&quot;, Array(Empty, 		  id, 42)).x
+	assertThrows(&quot;compose&quot;, Array(4711, 		  id, 42)).x
+	
+	&apos;&apos;assertThrows doesn&apos;t really work with partial app
+	&apos;assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;, id)).x	
+	&apos;assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;)).x
+
+	assertThrows(&quot;compose&quot;, Array(id, &quot;i-dont-exist&quot;, 42)).x
+	assertThrows(&quot;compose&quot;, Array(id, Nothing, 		  42)).x
+	assertThrows(&quot;compose&quot;, Array(id, Empty, 		  42)).x
+	assertThrows(&quot;compose&quot;, Array(id, 4711, 		  42)).x
+	&apos;&apos;assertThrows doesn&apos;t really work with partial app
+	&apos;assertThrows(&quot;compose&quot;, Array(id, &quot;i-dont-exist&quot;)).x
+
+	assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;, &quot;i-dont-exist-either&quot;, 42)).x
+	&apos;&apos;assertThrows doesn&apos;t really work with partial app
+	&apos;assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;, &quot;i-dont-exist-either&quot;)).x
+
 End Function
 
 Function test_add()

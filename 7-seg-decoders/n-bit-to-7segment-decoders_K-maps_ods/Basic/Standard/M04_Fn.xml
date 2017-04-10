@@ -50,8 +50,9 @@ Function fnObjs()
 			List(&quot;filter&quot;,			True, 2), _
 			List(&quot;adjoin&quot;,			True, 2), _
 			List(&quot;flatten&quot;,			True, 1), _
-			List(&quot;reverse&quot;,			True, 1)_
+			List(&quot;reverse&quot;,			True, 1), _
 			_
+			List(&quot;mkParser&quot;,		True, 2)_
 		))
 	End If
 	fnObjs = result
@@ -82,6 +83,41 @@ Function arityF(fName As String) As Integer
 	Else
 		arityF = arity(lookupFn(fName))
 	End If
+End Function
+
+Function isFn(ByVal fn As Variant) As Boolean
+	If (typeOf(fn) = typeOf(nil)) Then
+		Dim k As Integer
+		k = length(fn)
+		Select Case k
+			Case 2
+				isFn = isFn(car(fn))
+				&apos;TODO: check if partialArgs is proper list
+				Exit Function
+			Case 3
+				isFn = (isString(car(fn)) And (typeOf(cadr(fn)) = &quot;Boolean&quot;) And (typeOf(caddr(fn)) = &quot;Integer&quot;))
+				Exit Function
+		End Select
+	End If
+	isFn = False
+End Function
+
+Function asFn(fn As Variant, Optional ByVal msg As String)
+	Dim f As Variant
+	If isString(fn) Then
+		f = lookupFn(fn)
+		If isEmpty(f) Then
+			If isMissing(msg) Then : msg = &quot;&quot; : Else : msg = msg &amp; chr(13) : End If
+			croak(msg &amp; &quot;unknown function: &quot; &amp; toString(fn))
+		End If
+	Else
+		f = fn
+	End If
+	If Not(isFn(f)) Then
+		If isMissing(msg) Then : msg = &quot;&quot; : Else : msg = msg &amp; chr(13) : End If
+		croak(msg &amp; &quot;not a valid function: &quot; &amp; toString(f))
+	End If
+	asFn = f
 End Function
 
 Function isPartialApp(fn As Object) As Boolean
@@ -118,8 +154,9 @@ Function arity(fn As Object) As Integer
 	arity = result
 End Function
 
-Function apply1(ByVal fn As Object, ByVal arg As Variant)
+Function apply1(ByVal fn As Variant, ByVal arg As Variant)
 	Dim result As Variant, r As Integer
+	fn = asFn(fn)	&apos; makes sure it really is a function
 	r = arity(fn)
 	If r &lt; 1 Then
 		croak(&quot;apply1: cannot apply &quot; &amp; chr(13) &amp; &quot;  &quot; &amp; toString(fn) &amp; chr(13) &amp; &quot;arity=&quot; &amp; r)
@@ -135,8 +172,9 @@ Function apply1(ByVal fn As Object, ByVal arg As Variant)
 	apply1 = result
 End Function
 
-Function applyLast(ByVal fn As Object, ByVal arg As Variant)
+Function applyLast(ByVal fn As Variant, ByVal arg As Variant)
 	Dim result As Variant
+	fn = asFn(fn)	&apos; makes sure it really is a function
 	If arity(fn) &lt;&gt; 1 Then
 		croak(&quot;applyLast: cannot apply &quot; &amp; chr(13) &amp; &quot;  &quot; &amp; toString(fn) &amp; chr(13) &amp; &quot;arity=&quot; &amp; arity(fn))
 	End If
@@ -212,6 +250,7 @@ Function applyBuiltinRev(ByVal fn As Object, ByVal reverseArgs As Object)
 		Case &quot;adjoin&quot;:			result = adjoin(		a(0), a(1)			)
 		Case &quot;flatten&quot;:			result = flatten(		a(0)				)
 		Case &quot;reverse&quot;:			result = reverse(		a(0)				)
+		Case &quot;mkParser&quot;:		result = mkParser(		a(0), a(1)			)
 		Case Else
 			croak(&quot;applyBuiltinRev: unknown function &apos;&quot; &amp; car(fn) &amp; &quot;&apos;&quot;)
 	End Select	
