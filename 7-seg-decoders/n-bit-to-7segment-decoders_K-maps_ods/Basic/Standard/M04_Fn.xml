@@ -20,11 +20,11 @@ Function fnObjs()
 			List(&quot;sndArg&quot;,			True, 2), _
 			List(&quot;swap&quot;,			True, 3), _
 			List(&quot;compose&quot;,			True, 3), _
+			List(&quot;ite&quot;,				True, 4), _
 			List(&quot;add&quot;,				True, 2), _
 			List(&quot;mul&quot;,				True, 2), _
 			List(&quot;inRange&quot;,			True, 3), _
 			List(&quot;equ&quot;,				True, 2), _
-			List(&quot;ite&quot;,				True, 3), _
 			List(&quot;concat&quot;,			True, 2), _
 			List(&quot;asc&quot;,				True, 1), _
 			List(&quot;chr&quot;,				True, 1), _
@@ -217,6 +217,7 @@ Function applyBuiltinRev(ByVal fn As Object, ByVal reverseArgs As Object)
 		Case &quot;sndArg&quot;:			result = sndArg(		a(0), a(1)			)
 		Case &quot;swap&quot;:			result = swap(			a(0), a(1), a(2)	)
 		Case &quot;compose&quot;:			result = compose(		a(0), a(1), a(2)	)
+		Case &quot;ite&quot;:				result = ite(			a(0), a(1), a(2), a(3)	)
 		Case &quot;add&quot;:				result = add(			a(0), a(1)			)
 		Case &quot;mul&quot;:				result = mul(			a(0), a(1)			)
 		Case &quot;inRange&quot;:			result = inRange(		a(0), a(1), a(2)	)
@@ -286,6 +287,7 @@ End Function
 
 &apos;= tests ============================================================
 
+
 Function blaha(ByVal xs As Object)
 	xs.len = 1
 	xs = nil
@@ -346,7 +348,13 @@ Function test_Fn()
 	assertEqual(isPartialApp(konst5), True).x
 	assertEqual(isBuiltinFn(konst5), False).x
 	assertEqual(arity(konst5), 1).x
-	assertEqual(apply1(konst5, 7), 5).x
+	assertEqual(apply1(konst5, 7), 	5).x
+	&apos; easy partial application:
+	assertEqual(arity(fstArg), 2).x
+	konst5 = fstArg(5)
+	assertEqual(arity(konst5), 1).x
+	assertEqual(apply(konst5, 7), 	5).x
+	assertEqual(fstArg(5, 7), 		5).x
 		
 	Dim sndArg5 As Variant
 	sndArg5 = apply1(lookupFn(&quot;sndArg&quot;), 5)
@@ -354,28 +362,40 @@ Function test_Fn()
 	assertEqual(isBuiltinFn(sndArg5), False).x
 	assertEqual(arity(sndArg5), 1).x
 	assertEqual(apply1(sndArg5, 7), 7).x
+	&apos; easy partial application:
+	assertEqual(arity(sndArg), 2).x
+	sndArg5 = sndArg(5)
+	assertEqual(arity(sndArg5), 1).x
+	assertEqual(apply(sndArg5, 7), 	7).x
+	assertEqual(sndArg(5, 7), 		7).x
 		
-	Dim ite As Variant
-	ite = lookupFn(&quot;ite&quot;)
-	assertEqual(isPartialApp(ite), False).x
-	assertEqual(isBuiltinFn(ite), True).x
-	assertEqual(arity(ite), 3).x
+	Dim fIte As Variant
+	fIte = lookupFn(&quot;ite&quot;)
+	assertEqual(isPartialApp(fIte), False).x
+	assertEqual(isBuiltinFn(fIte), True).x
+	assertEqual(arity(fIte), 4).x
 
-	Dim iteFalse As Variant
-	iteFalse = apply1(ite, False)
-	assertEqual(isPartialApp(iteFalse), True).x
-	assertEqual(isBuiltinFn(iteFalse), False).x
-	assertEqual(arity(iteFalse), 2).x
+	Dim iteKFalse As Variant
+	iteKFalse = apply1(fIte, fstArg(False))
+	assertEqual(isPartialApp(iteKFalse), True).x
+	assertEqual(isBuiltinFn(iteKFalse), False).x
+	assertEqual(arity(iteKFalse), 3).x
 
-	Dim iteFalse42 As Variant
-	iteFalse42 = apply1(iteFalse, 42)
-	assertEqual(isPartialApp(iteFalse42), True).x
-	assertEqual(isBuiltinFn(iteFalse42), False).x
-	assertEqual(arity(iteFalse42), 1).x
+	Dim iteKFalseK42 As Variant
+	iteKFalseK42 = apply1(iteKFalse, fstArg(42))
+	assertEqual(isPartialApp(iteKFalseK42), True).x
+	assertEqual(isBuiltinFn(iteKFalseK42), False).x
+	assertEqual(arity(iteKFalseK42), 2).x
 	
-	Dim iteFalse42Seven As Variant
-&apos;	iteFalse42Seven = apply1(iteFalse42, &quot;Seven&quot;)
-&apos;	assertEqual(iteFalse42Seven, &quot;Seven&quot;).x
+	Dim iteKFalseK42Id As Variant
+	iteKFalseK42Id = apply1(iteKFalseK42, id)
+	assertEqual(arity(iteKFalseK42Id), 1).x
+
+	assertEqual(apply(iteKFalseK42Id, &quot;Seven&quot;), &quot;Seven&quot;).x
+	Dim iteKTrueK42Id As Variant, KTrue As Variant, K42 As Variant
+	iteKTrueK42Id = ite(fstArg(True), fstArg(42), fId)
+	assertEqual(arity(iteKTrueK42Id), 1).x
+	assertEqual(apply(iteKTrueK42Id, &quot;Seven&quot;), 42).x
 &apos;	MsgBox( toString(iteFalse42Seven) )
 
 	Dim fAsc As Variant

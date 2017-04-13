@@ -5,9 +5,9 @@ Option Explicit
 
 Type TList
 	tyname As String
+	len As Integer
 	head As Variant
 	tail As TList
-	len As Integer
 End Type
 
 Sub Main
@@ -244,7 +244,7 @@ End Function
 
 Function test_List_isNil_and_cons()
 	assertEqual(isNil(nil), True).x
-	assertThrows(&quot;isNil&quot;, Array()).x
+&apos;	assertThrows(&quot;isNil&quot;, Array()).x		&apos; assertThrows can&apos;t test call with 0 args
 	assertThrows(&quot;isNil&quot;, Array(Empty)).x
 	assertThrows(&quot;isNil&quot;, Array(Nothing)).x
 	assertEqual(isNil(cons(nil, nil)), False).x

@@ -64,14 +64,36 @@ End Function
 
 &apos; K = \x y.x
 &apos;     :: a -&gt; b -&gt; a
-Function fstArg(x As Variant, y As Variant)
-	fstArg = x
+Function fstArg(Optional x As Variant, Optional y As Variant)
+	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;fstArg&quot;) : End If
+	Dim result As Variant
+	If isMissing(x) Then
+		result = oFn
+	Else
+		If isMissing(y) Then
+			result = apply1(oFn, x)
+		Else
+			result = x
+		End if
+	End If
+	fstArg = result
 End Function
 
 &apos; K I = (\b x.b) (\y.y) = \x.\y.y = \x y.y
 &apos;     :: a -&gt; b -&gt; b
-Function sndArg(x As Variant, y As Variant)
-	sndArg = y
+Function sndArg(Optional x As Variant, Optional y As Variant)
+	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;sndArg&quot;) : End If
+	Dim result As Variant
+	If isMissing(x) Then
+		result = oFn
+	Else
+		If isMissing(y) Then
+			result = apply1(oFn, x)
+		Else
+			result = y
+		End if
+	End If
+	sndArg = result
 End Function
 
 &apos; :: (b -&gt; a) -&gt; a -&gt; b = (b -&gt; a) -&gt; (a -&gt; b)
@@ -118,6 +140,38 @@ Function compose(Optional ByVal f, Optional ByVal g, Optional x)
 	compose = result
 End Function
 
+&apos;\c t e x.if (c x) then (t x) else (e x)
+&apos;   :: (a -&gt; Bool) -&gt; (a -&gt; b) -&gt; (a -&gt; b) -&gt; a -&gt; b
+Function ite(Optional ByVal cond As Variant, Optional ByVal thn As Variant, Optional ByVal els As Variant, Optional ByVal x As Variant)
+	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;ite&quot;) : End If
+	Dim result As Variant
+	If isMissing(cond) Then
+		result = oFn
+	Else
+		cond = asFn(cond, &quot;ite: invalid 1st arg&quot;)
+		If isMissing(thn) Then
+			result = apply(oFn, cond)
+		Else
+			thn = asFn(thn, &quot;ite: invalid 2nd arg&quot;)
+			If isMissing(els) Then
+				result = apply(oFn, cond, thn)
+			Else
+				els = asFn(els, &quot;ite: invalid 3rd arg&quot;)
+				If isMissing(x) Then
+					result = apply(oFn, cond, thn, els)
+				Else
+					If apply(cond, x) Then
+						result = apply(thn, x)
+					Else
+						result = apply(els, x)
+					End If
+				End If
+			End If
+		End If
+	End If
+	ite = result
+End Function
+
 Function concat(a As String, b As String) As String
 	concat = a &amp; b
 End Function
@@ -156,10 +210,8 @@ Function mul(Optional a As Long, Optional b As Long)
 	mul = result
 End Function
 
-Function inRange(lo As Long, hi As Long, x As Long)
-	Dim result As Boolean
-	result = (lo &lt;= x) And (x &lt;= hi)
-	inRange = result
+Function inRange(Optional lo As Long, Optional hi As Long, Optional x As Long)
+	inRange = CBool( (lo &lt;= x) And (x &lt;= hi) )
 End Function
 
 Function equ(a As Variant, b As Variant) As Boolean

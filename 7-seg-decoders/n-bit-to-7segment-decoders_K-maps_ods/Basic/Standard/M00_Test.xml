@@ -77,35 +77,35 @@ Function assertThrows(fName As String, args As Array, Optional errNo As Integer)
 				croak(&quot;assertThrows: unknown fn &quot; &amp; toString(fName))
 			End If
 	End Select
-On Local Error Goto Boom
 	Select Case fName
 		Case &quot;assertEqual&quot;:
 			testLevel = testLevel + 1
+On Local Error Goto Boom
 		 	fResult = assertEqual(args(k), args(k+1))
 		Case &quot;assertThrows&quot;
 			If n = 2 Then
 				testLevel = testLevel + 1
+On Local Error Goto Boom
 				fResult = assertThrows(args(k), args(k+1))
 			ElseIf n = 3 Then
 				testLevel = testLevel + 1
+On Local Error Goto Boom
 				fResult = assertThrows(args(k), args(k+1), args(k+2))
 			Else
 				croak(&quot;assertThrows: expected Array of 2 or 3 args but got&quot; &amp; chr(13) &amp; toString(args))
-				&apos; ATTENTION: inc testLevel *only AFTER* this croak
-				testLevel = testLevel + 1
 			End If
 		Case &quot;i_will_throw0&quot;:
 			testLevel = testLevel + 1
+On Local Error Goto Boom
 			fResult = i_will_throw0()
 		Case Else
 			Dim argsList As Object
 			argsList = toList(args)
 			If isNil(argsList) Then
 				croak(&quot;assertThrows: don&apos;t know how to apply zero args - fn:&quot; &amp; chr(13) &amp; toString(fName))
-				&apos; ATTENTION: inc testLevel *only AFTER* this croak
-				testLevel = testLevel + 1
 			Else 
 				testLevel = testLevel + 1
+On Local Error Goto Boom
 				fResult = applyToList(fName, argsList)
 			End If
 	End Select
@@ -385,9 +385,10 @@ Function test_assertThrows()
 	assertThrows(&quot;i_will_throw0&quot;, Array(5)).x
 	
 	&apos; inner assertThrows throws because *IT* gets no args (so the outer passes)
-	assertThrows(&quot;assertThrows&quot;, Array()).x
+&apos;	assertThrows(&quot;assertThrows&quot;, Array()).x
 	
 	&apos; inner assertThrows throws because *IT* gets no valid arg array to pass on (so the outer passes)
+	&apos; (inner assertThrows expects Array as 2nd arg)
 	assertThrows(&quot;assertThrows&quot;, Array(&quot;assertEqual&quot;, 2, 2)).x
 
 &apos;	assertFails(&quot;assertThrows&quot;, Array(&quot;assertEqual&quot;, Array(2, 2))).x
