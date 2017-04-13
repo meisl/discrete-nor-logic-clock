@@ -3,11 +3,73 @@
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M04_Fn" script:language="StarBasic">REM  *****  BASIC  *****
 Option Explicit
 
+Type TFn
+	id 		As Object
+	fstArg 	As Object
+	sndArg 	As Object
+	swap 	As Object
+	compose As Object
+	ite		As Object
+	asc		As Object
+	add		As Object
+End Type
+
 
 Sub Main
 	test_Fn()
 End Sub
 
+Function Fn
+	Static result As Object
+	If isNull(result) Then
+		Set result = New TFn
+		result.id      	= lookupFn(&quot;id&quot;)
+		result.fstArg  	= lookupFn(&quot;fstArg&quot;)
+		result.sndArg  	= lookupFn(&quot;sndArg&quot;)
+		result.swap    	= lookupFn(&quot;swap&quot;)
+		result.compose 	= lookupFn(&quot;compose&quot;)
+		result.ite 		= lookupFn(&quot;ite&quot;)
+		result.asc 		= lookupFn(&quot;asc&quot;)
+		result.add 		= lookupFn(&quot;add&quot;)
+	End If
+	Fn = result
+End Function
+
+Function TFn_toString(ByVal f)
+	Dim result As String, r As Integer, n As String, h As Variant, t As Object, k As Integer
+	f = asFn(f)
+	r = arity(f)
+	n = getFnName(f)
+	k = 0
+	If isPartialApp(f) Then
+		t = reverse(partialArgs(f))
+		If n = &quot;compose&quot; Then
+			If r = 1 Then
+				result = &quot;\a&quot; &amp; k &amp; &quot;.&quot; &amp; TFn_toString(car(t)) &amp; &quot; (&quot; &amp; TFn_toString(cadr(t)) &amp; &quot; a&quot; &amp; k &amp; &quot;)&quot;
+				
+				k = k + 1
+			Else &apos; r = 2
+			
+			End If
+		Else
+			result = &quot;(&quot; &amp; n &amp; &quot;_&quot; &amp; r
+			While Not(isNil(t))
+				h = car(t)
+				t = cdr(t)
+				If (isFn(h)) Then
+					result = result &amp; &quot; &quot; &amp; TFn_toString(h)
+				Else
+					result = result &amp; &quot; &quot; &amp; toString(h)
+				End If
+			Wend
+			result = result &amp; &quot;)&quot;
+		End If
+	Else
+		n = car(f)
+		result = n &amp; &quot;_&quot; &amp; r
+	End If
+	TFn_toString = result
+End Function
 
 Function fnObjs()
 	Static result As Object
@@ -154,6 +216,14 @@ Function arity(fn As Object) As Integer
 	arity = result
 End Function
 
+Function getFnName(f As Object)
+	If isPartialApp(f) Then
+		getFnName = car(car(f))
+	Else
+		getFnName = car(f)
+	End If
+End Function
+
 Function apply1(ByVal fn As Variant, ByVal arg As Variant)
 	Dim result As Variant, r As Integer
 	fn = asFn(fn)	&apos; makes sure it really is a function
@@ -166,35 +236,48 @@ Function apply1(ByVal fn As Variant, ByVal arg As Variant)
 		If isPartialApp(fn) Then
 			result = List(car(fn), cons(arg, partialArgs(fn)))
 		Else
-			result = List(fn, List(arg))
+			result = cons( fn, cons(cons(arg, nil), nil) ) &apos; List(fn, List(arg))
 		End If
 	End If
 	apply1 = result
 End Function
 
-Function applyLast(fn As Object, ByVal arg As Variant)
+Function applyLast(fn As Object, arg As Variant)
 	Dim result As Variant
 	Dim reverseArgs As Object
 	If isPartialApp(fn) Then
-		reverseArgs = cadr(fn)
+		reverseArgs = partialArgs(fn)
 		fn = car(fn)
 	Else
 		reverseArgs = nil
 	End If
-	reverseArgs = cons(arg, reverseArgs)
-	If isBuiltinFn(fn) Then
-		result = applyBuiltinRev(fn, reverseArgs)
-	Else
-		croak(&quot;NYI: applyLast/non-builtin &quot; &amp; toString(fn))
-	End If
+	Select Case getFnName(fn)
+		Case &quot;id&quot;: 		result = arg
+		Case &quot;fstArg&quot;:	result = car(reverseArgs)
+		Case &quot;sndArg&quot;:	result = arg
+		Case &quot;swap&quot;:	result = apply1( apply1(cadr(reverseArgs), arg), car(reverseArgs) )
+		Case &quot;compose&quot;:	result = apply1( cadr(reverseArgs), apply1(car(reverseArgs), arg) )
+		Case &quot;ite&quot;
+			&apos;cond = caddr(reverseArgs)
+			&apos;thn = cadr(reverseArgs)
+			&apos;els = car(reverseArgs)
+			If applyLast(caddr(reverseArgs), arg) Then
+				result = apply1(cadr(reverseArgs), arg)
+			Else
+				result = apply1(car(reverseArgs), arg)
+			End if
+		Case &quot;asc&quot;:		result = Asc(arg)
+		Case &quot;add&quot;:		result = CLng(car(reverseArgs) + arg)
+		
+		Case Else
+			reverseArgs = cons(arg, reverseArgs)
+			result = applyBuiltinRev(fn, reverseArgs)
+	End Select
 	applyLast = result
 End Function
 
-Function applyBuiltinRev(ByVal fn As Object, ByVal reverseArgs As Object)
+Function applyBuiltinRev(fn As Object, ByVal reverseArgs As Object)
 	Dim result As Variant
-	If Not(isBuiltinFn(fn)) Then
-		croak(&quot;applyBuiltinRev: not a builtin fn:&quot; &amp; chr(13) &amp; toString(fn))
-	End If
 	Dim r As Integer, n As Integer
 	r = arity(fn)
 	n = length(reverseArgs)
@@ -270,6 +353,22 @@ Function applyToList(ByVal fn As Variant, ByVal args As Object)
 	applyToList = result
 End Function
 
+Function _apply(fn As Object, Optional a0, Optional a1, Optional a2, Optional a3, Optional a4)
+	If isMissing(a0) Then
+		_apply = fn
+	ElseIf isMissing(a1) Then
+		_apply = apply1(fn, a0)
+	ElseIf isMissing(a2) Then
+		_apply = apply1(apply1(fn, a0), a1)
+	ElseIf isMissing(a3) Then
+		_apply = apply1(apply1(apply1(fn, a0), a1), a2)
+	ElseIf isMissing(a4) Then
+		_apply = apply1(apply1(apply1(apply1(fn, a0), a1), a2), a3)
+	Else
+		croak(&quot;_apply/NYI: more than 4 args&quot;)
+	End If
+End Function
+
 Function apply(ByVal fn As Variant, a0, Optional a1, Optional a2, Optional a3, Optional a4, Optional a5, Optional a6, Optional a7, Optional a8, Optional a9, Optional a10)
 	Dim args As Object
 	fn = asFn(fn, &quot;apply: invalid 1st arg&quot;)
@@ -301,7 +400,7 @@ Function test_Fn()
 	assertEqual(toString(blaha(xs)), &quot;[]&quot;).x
 	&apos;assertEqual(toString(xs), &quot;[&apos;x&apos;, &apos;y&apos;]&quot;).x
 	assertEqual(lookupFn(&quot;non-existent&quot;), Empty).x
-	
+		
 	Dim fId As Variant
 	fId = lookupFn(&quot;id&quot;)
 	assertEqual(arity(fId), 1).x

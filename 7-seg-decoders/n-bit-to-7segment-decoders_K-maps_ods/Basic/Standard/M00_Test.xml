@@ -35,7 +35,7 @@ On Local Error Goto JustSomething
 	_argsStr = toString(args)
 	Exit Function
 JustSomething:
-	_argsStr = &quot; some &quot; &amp; typeOf(args)
+	_argsStr = &quot;(???)&quot;
 End Function
 
 Function mkFail(actual As Variant, expected As Variant, msg As String)
@@ -112,11 +112,15 @@ On Local Error Goto Boom
 	testLevel = testLevel - 1
 	a = &quot;no error&quot;
 	x = IIf(IsMissing(errNo), &quot;an error&quot;, &quot;error &quot; &amp; errNo)
-	Set result = mkFail(a, x, _
-		&quot;expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield &quot; &amp; x &amp; &quot; on args&quot; _
-			&amp; chr(13) &amp; _argsStr(fName, args) _
-			&amp; chr(13) &amp; &quot;returned &quot; &amp; _argsStr(fName, fResult) _
-	)
+	Dim msg As String
+	msg = &quot;expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield &quot; &amp; x
+On Local Error Goto skipMsgPart1	
+	 msg = msg &amp; &quot; on args&quot; &amp; chr(13) &amp; _argsStr(fName, args)
+skipMsgPart1:
+On Local Error Goto skipMsgPart2	
+	 msg = msg &amp; chr(13) &amp; &quot;returned &quot; &amp; toString(fResult)
+skipMsgPart2:
+	Set result = mkFail(a, x, msg)
 	assertThrows = result
 	Exit Function
 Boom:

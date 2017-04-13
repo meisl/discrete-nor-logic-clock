@@ -70,15 +70,7 @@ End Function
 
 &apos; always succeeds by returning the provided value; without increasing pos
 Function pReturn(Optional v As Variant)
-	Static oFn As Object
-	If isMissing(v) Then
-		If isNull(oFn) Then
-			oFn = mkParser(&quot;return&quot;)
-		End If
-		pReturn = oFn
-	Else
-		pReturn = mkParser(&quot;return&quot;, v)
-	End If
+	pReturn = mkParser(&quot;return&quot;, v)
 End Function
 
 Function pBind(p As Parser, ByVal f As Variant)
@@ -207,12 +199,12 @@ End Function
 Function pBinDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		&apos;result = pChoice(_
-		&apos;	pBind(pStr(&quot;0&quot;), apply(&quot;fstArg&quot;, pReturn(0))), _
-		&apos;	pBind(pStr(&quot;1&quot;), apply(&quot;fstArg&quot;, pReturn(1)))_
-		&apos;)
+		result = pChoice(_
+			pBind(pStr(&quot;0&quot;), fstArg(pReturn(0))), _
+			pBind(pStr(&quot;1&quot;), fstArg(pReturn(1)))_
+		)
 		&apos;&apos;not paying off (yet):
-		result = pBind(pItem, compose(ite(apply(&quot;inRange&quot;, Asc(&quot;0&quot;), Asc(&quot;1&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), &quot;asc&quot;)
+		&apos;result = pBind(pItem, compose(ite(apply(&quot;inRange&quot;, Asc(&quot;0&quot;), Asc(&quot;1&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), &quot;asc&quot;)
 	End If
 	pBinDigit = result
 End Function
@@ -220,19 +212,23 @@ End Function
 Function pDecDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pChoice(pBinDigit,	pBind(pStr(&quot;2&quot;), apply(&quot;fstArg&quot;, pReturn(2))))
-		result = pChoice(result,	pBind(pStr(&quot;3&quot;), apply(&quot;fstArg&quot;, pReturn(3))))
-		result = pChoice(result,	pBind(pStr(&quot;4&quot;), apply(&quot;fstArg&quot;, pReturn(4))))
-		result = pChoice(result,	pBind(pStr(&quot;5&quot;), apply(&quot;fstArg&quot;, pReturn(5))))
-		result = pChoice(result,	pBind(pStr(&quot;6&quot;), apply(&quot;fstArg&quot;, pReturn(6))))
-		result = pChoice(result,	pBind(pStr(&quot;7&quot;), apply(&quot;fstArg&quot;, pReturn(7))))
-		result = pChoice(result,	pBind(pStr(&quot;8&quot;), apply(&quot;fstArg&quot;, pReturn(8))))
-		result = pChoice(result,	pBind(pStr(&quot;9&quot;), apply(&quot;fstArg&quot;, pReturn(9))))
+		result = pChoice(pBinDigit,	pBind(pStr(&quot;2&quot;), fstArg(pReturn(2))))
+		result = pChoice(result,	pBind(pStr(&quot;3&quot;), fstArg(pReturn(3))))
+		result = pChoice(result,	pBind(pStr(&quot;4&quot;), fstArg(pReturn(4))))
+		result = pChoice(result,	pBind(pStr(&quot;5&quot;), fstArg(pReturn(5))))
+		result = pChoice(result,	pBind(pStr(&quot;6&quot;), fstArg(pReturn(6))))
+		result = pChoice(result,	pBind(pStr(&quot;7&quot;), fstArg(pReturn(7))))
+		result = pChoice(result,	pBind(pStr(&quot;8&quot;), fstArg(pReturn(8))))
+		result = pChoice(result,	pBind(pStr(&quot;9&quot;), fstArg(pReturn(9))))
 		&apos;pDecDigit = result
 		&apos;Exit Function
 
 		&apos;&apos;not really paying off (yet):
-		result = pBind(pItem, compose(ite(apply(&quot;inRange&quot;, Asc(&quot;0&quot;), Asc(&quot;9&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), &quot;asc&quot;)
+		Dim f as Object
+		&apos;Set f = compose(add(-Asc(&quot;0&quot;)), Fn.asc)
+		&apos;MsgBox(TFn_toString(f))
+		Set f = compose(ite(apply(&quot;inRange&quot;, Asc(&quot;0&quot;), Asc(&quot;9&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), &quot;asc&quot;)
+		result = pBind(pItem, f)
 	End If
 	pDecDigit = result
 End Function
@@ -240,12 +236,12 @@ End Function
 Function pHexDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pChoice(pDecDigit,	pBind(pChoice(pStr(&quot;A&quot;), pStr(&quot;a&quot;)), apply(&quot;fstArg&quot;, pReturn(10))) )
-		result = pChoice(result,	pBind(pChoice(pStr(&quot;B&quot;), pStr(&quot;b&quot;)), apply(&quot;fstArg&quot;, pReturn(11))) )
-		result = pChoice(result,	pBind(pChoice(pStr(&quot;C&quot;), pStr(&quot;c&quot;)), apply(&quot;fstArg&quot;, pReturn(12))) )
-		result = pChoice(result,	pBind(pChoice(pStr(&quot;D&quot;), pStr(&quot;d&quot;)), apply(&quot;fstArg&quot;, pReturn(13))) )
-		result = pChoice(result,	pBind(pChoice(pStr(&quot;E&quot;), pStr(&quot;e&quot;)), apply(&quot;fstArg&quot;, pReturn(14))) )
-		result = pChoice(result,	pBind(pChoice(pStr(&quot;F&quot;), pStr(&quot;f&quot;)), apply(&quot;fstArg&quot;, pReturn(15))) )
+		result = pChoice(pDecDigit,	pBind(pChoice(pStr(&quot;A&quot;), pStr(&quot;a&quot;)), fstArg(pReturn(10))) )
+		result = pChoice(result,	pBind(pChoice(pStr(&quot;B&quot;), pStr(&quot;b&quot;)), fstArg(pReturn(11))) )
+		result = pChoice(result,	pBind(pChoice(pStr(&quot;C&quot;), pStr(&quot;c&quot;)), fstArg(pReturn(12))) )
+		result = pChoice(result,	pBind(pChoice(pStr(&quot;D&quot;), pStr(&quot;d&quot;)), fstArg(pReturn(13))) )
+		result = pChoice(result,	pBind(pChoice(pStr(&quot;E&quot;), pStr(&quot;e&quot;)), fstArg(pReturn(14))) )
+		result = pChoice(result,	pBind(pChoice(pStr(&quot;F&quot;), pStr(&quot;f&quot;)), fstArg(pReturn(15))) )
 		&apos;pHexDigit = result
 		&apos;Exit Function
 

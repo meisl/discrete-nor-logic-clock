@@ -54,50 +54,23 @@ End Sub
 &apos; I = \x.x
 &apos;	:: a -&gt; a
 Function id(Optional x As Variant)
-	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;id&quot;) : End If
-	If isMissing(x) Then
-		id = oFn
-	Else
-		id = x
-	End If
+	id = _apply(Fn.id, x)
 End Function
 
 &apos; K = \x y.x
 &apos;     :: a -&gt; b -&gt; a
 Function fstArg(Optional x As Variant, Optional y As Variant)
-	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;fstArg&quot;) : End If
-	Dim result As Variant
-	If isMissing(x) Then
-		result = oFn
-	Else
-		If isMissing(y) Then
-			result = apply1(oFn, x)
-		Else
-			result = x
-		End if
-	End If
-	fstArg = result
+	fstArg = _apply(Fn.fstArg, x, y)
 End Function
 
 &apos; K I = (\b x.b) (\y.y) = \x.\y.y = \x y.y
 &apos;     :: a -&gt; b -&gt; b
 Function sndArg(Optional x As Variant, Optional y As Variant)
-	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;sndArg&quot;) : End If
-	Dim result As Variant
-	If isMissing(x) Then
-		result = oFn
-	Else
-		If isMissing(y) Then
-			result = apply1(oFn, x)
-		Else
-			result = y
-		End if
-	End If
-	sndArg = result
+	sndArg = _apply(Fn.sndArg, x, y)
 End Function
 
 &apos; :: (b -&gt; a) -&gt; a -&gt; b = (b -&gt; a) -&gt; (a -&gt; b)
-Function swap(Optional ByVal f, Optional x, Optional y)
+Function _swap(Optional ByVal f, Optional x, Optional y)
 	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;swap&quot;) : End If
 	Dim result As Variant
 	If isMissing(f) Then
@@ -114,12 +87,16 @@ Function swap(Optional ByVal f, Optional x, Optional y)
 			End If
 		End If
 	End If
-	swap = result
+	_swap = result
+End Function
+
+Function swap(Optional f, Optional x, Optional y)
+	swap = _apply(Fn.swap, f, x, y)
 End Function
 
 &apos; B = \f g x.f (g x)
 &apos;   :: (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c  =  (b -&gt; c) -&gt; (a -&gt; b) -&gt; (a -&gt; c)
-Function compose(Optional ByVal f, Optional ByVal g, Optional x)
+Function _compose(Optional ByVal f, Optional ByVal g, Optional x)
 	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;compose&quot;) : End If
 	Dim result As Variant
 	If isMissing(f) Then
@@ -137,12 +114,16 @@ Function compose(Optional ByVal f, Optional ByVal g, Optional x)
 			End If
 		End If
 	End If
-	compose = result
+	_compose = result
+End Function
+
+Function compose(Optional ByVal f, Optional ByVal g, Optional x)
+	compose = _apply(Fn.compose, f, g, x)
 End Function
 
 &apos;\c t e x.if (c x) then (t x) else (e x)
 &apos;   :: (a -&gt; Bool) -&gt; (a -&gt; b) -&gt; (a -&gt; b) -&gt; a -&gt; b
-Function ite(Optional ByVal cond As Variant, Optional ByVal thn As Variant, Optional ByVal els As Variant, Optional ByVal x As Variant)
+Function _ite(Optional ByVal cond As Variant, Optional ByVal thn As Variant, Optional ByVal els As Variant, Optional ByVal x As Variant)
 	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;ite&quot;) : End If
 	Dim result As Variant
 	If isMissing(cond) Then
@@ -172,6 +153,10 @@ Function ite(Optional ByVal cond As Variant, Optional ByVal thn As Variant, Opti
 	ite = result
 End Function
 
+Function ite(Optional cond, Optional thn, Optional els, Optional x)
+	ite = _apply(Fn.ite, cond, thn, els, x)
+End Function
+
 Function concat(a As String, b As String) As String
 	concat = a &amp; b
 End Function
@@ -180,7 +165,7 @@ Function startsWith(s As String, prefix As String)
 	startsWith = ((Len(prefix) &lt;= Len(s)) And (Mid(s, 1, Len(prefix)) = prefix))
 End Function
 
-Function add(Optional a As Long, Optional b As Long)
+Function _add(Optional a As Long, Optional b As Long)
 	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;add&quot;) : End If
 	Dim result As Variant
 	If isMissing(a) Then
@@ -193,6 +178,10 @@ Function add(Optional a As Long, Optional b As Long)
 		End If
 	End If
 	add = result
+End Function
+
+Function add(Optional a As Long, Optional b As Long)
+	add = _apply(Fn.add, a, b)
 End Function
 
 Function mul(Optional a As Long, Optional b As Long)
@@ -285,7 +274,8 @@ Function toString(ByVal v As Variant) As String
 					&apos;We&apos;ve got an Object with .tyName, so we insist on its _toString to exist
 					&apos;Note: We test for existence separately because apply/croak call toString again...
 					If Not(existsF(toStrFnName)) Then
-						croak(&quot;toString: unknown fn &apos;&quot; &amp; toStrFnName &amp; &quot;&apos;&quot;)
+						&apos;croak(&quot;toString: unknown fn &apos;&quot; &amp; toStrFnName &amp; &quot;&apos;&quot;)
+						result = tyName &amp; &quot;(...)&quot;
 					Else
 						result = apply(toStrFnName, v)
 					End If
@@ -341,6 +331,7 @@ End Function
 &apos;= tests ============================================================
 
 Function test_Common()
+	testLevel = 0
 	test_concat()
 	test_typeOf()
 	test_isString()
@@ -466,7 +457,8 @@ Function test_toString()
 	Dim t2 As New TTest_TyName
 	assertEqual(toString(t2), &quot;Object(tyname=&apos;&apos;)&quot;).x
 	t2.tyname = &quot;foobar&quot;
-	assertThrows(&quot;toString&quot;, Array(t2)).x
+	&apos;assertThrows(&quot;toString&quot;, Array(t2)).x
+	assertEqual(toString(t2), &quot;foobar(...)&quot;).x
 End Function
 
 Function test_id()
@@ -571,6 +563,11 @@ Function test_compose()
 	f = compose(compose, compose)
 	assertEqual(typeOf(f), typeOf(nil)).x
 	assertEqual(arity(f), 1).x
+
+	f = compose(fstArg(5), fstArg(7))
+	assertEqual(typeOf(f), typeOf(nil)).x
+	assertEqual(arity(f), 1).x
+	assertEqual(apply(f, 42), 5).x
 	
 	assertEqual(compose(id, id, &quot;asdf&quot;), &quot;asdf&quot;).x
 	assertEqual(compose(&quot;id&quot;, id, 42), 42).x
@@ -599,6 +596,7 @@ Function test_compose()
 End Function
 
 Function test_add()
+	assertEqual(typeOf(add( 0,  0)),  &quot;Long&quot;).x
 	assertEqual(add( 0,  0),  0).x
 	assertEqual(add( 0,  1),  1).x
 	assertEqual(add( 1,  1),  2).x
