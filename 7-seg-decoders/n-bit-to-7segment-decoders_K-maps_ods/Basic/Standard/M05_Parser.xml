@@ -73,7 +73,7 @@ Function pReturn(Optional v As Variant)
 	Static oFn As Object
 	If isMissing(v) Then
 		If isNull(oFn) Then
-			oFn = mkParser(&quot;return&quot;)
+			Set oFn = mkParser(&quot;return&quot;)
 		End If
 		pReturn = oFn
 	Else
@@ -409,6 +409,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		If Not isParseFailure(result) Then
 			nxtPos = result(1)
 			fResult = apply1(p.st(1), result(0))
+			&apos; do NOT access .tp on fResult - it&apos;s effectively as fixing fResult&apos;s type to Object...!
 			result = applyP(fResult, s, nxtPos)
 		End If
 	ElseIf p.tp = &quot;seq&quot; Then
@@ -434,7 +435,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 			fResult = applyToList(p.st(1), toList(iResults))
 			&apos; ATTENTION: do not reuse t, type of result value may not match
 			&apos;            and an implicit conversion might happen!
-			result = Array(fResult, t(1))
+			result = Array(fResult, nxtPos)
 		End If
 		&apos;MsgBox(&quot;seq/&quot; &amp; p.st(1) &amp; &quot;: &quot; &amp; toString(result))
 	Else
