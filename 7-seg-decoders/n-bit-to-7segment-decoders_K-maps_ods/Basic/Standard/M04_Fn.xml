@@ -7,30 +7,41 @@ Type TFn
 	which		As Variant
 	arity 		As Integer
 	partialArgs As Variant
+	args		As Variant
 End Type
 
 Type TFnObjs
-	id 		As Object
-	fstArg 	As Object
-	sndArg 	As Object
-	swap 	As Object
-	compose As Object
-	ite		As Object
-	asc		As Object
-	chr		As Object
-	add		As Object
-	readHex As Object
-	mul		As Object
-	equ		As Object
-	inRange	As Object
+	id 			As Object
+	fstArg 		As Object
+	sndArg 		As Object
+	swap 		As Object
+	compose 	As Object
+	ite			As Object
+	asc			As Object
+	chr			As Object
+	add			As Object
+	mul			As Object
+	isString	As Object
+	concat		As Object
+	readHex		As Object
+	equ			As Object
+	inRange		As Object
 	
-	isNil	As Object
-	cons	As Object
-	length	As Object
-	car		As Object
-	cdr		As Object
+	isNil		As Object
+	cons		As Object
+	length		As Object
+	car			As Object
+	cdr			As Object
+	cadr		As Object
+	caddr		As Object
+	foldl		As Object
+	foldr		As Object
+	foldl1		As Object
+	foldr1		As Object
+	flatten 	As Object
+	reverse 	As Object
 	
-	mkParser As Object
+	mkParser 	As Object
 End Type
 
 
@@ -59,6 +70,8 @@ Function Fn
 		result.chr 		= lookupFn(&quot;chr&quot;)
 		result.add 		= lookupFn(&quot;add&quot;)
 		result.mul 		= lookupFn(&quot;mul&quot;)
+		result.isString	= lookupFn(&quot;isString&quot;)
+		result.concat	= lookupFn(&quot;concat&quot;)
 		result.readHex	= lookupFn(&quot;readHex&quot;)
 		result.equ		= lookupFn(&quot;equ&quot;)
 		result.inRange	= lookupFn(&quot;inRange&quot;)
@@ -68,6 +81,14 @@ Function Fn
 		result.length	= lookupFn(&quot;length&quot;)
 		result.car 		= lookupFn(&quot;car&quot;)
 		result.cdr 		= lookupFn(&quot;cdr&quot;)
+		result.cadr 	= lookupFn(&quot;cadr&quot;)
+		result.caddr 	= lookupFn(&quot;caddr&quot;)
+		result.foldl	= lookupFn(&quot;foldl&quot;)
+		result.foldr	= lookupFn(&quot;foldr&quot;)
+		result.foldl1	= lookupFn(&quot;foldl1&quot;)
+		result.foldr1	= lookupFn(&quot;foldr1&quot;)
+		result.flatten	= lookupFn(&quot;flatten&quot;)
+		result.reverse	= lookupFn(&quot;reverse&quot;)
 
 		result.mkParser	= lookupFn(&quot;mkParser&quot;)
 	End If
@@ -76,14 +97,35 @@ End Function
 
 Function mkPartialApp(fn As Object, arg As Variant)
 	Dim result As New TFn
+	Dim baseArity As Integer, newArity As Integer
+	Dim args As Variant
 	If isPartialApp(fn) Then
+		Dim innerArity As Integer, argPos As Integer
+		Dim innerArgs As Variant
 		result.which = fn.which
+		innerArity = fn.arity
+		baseArity = fn.which.arity
+		newArity = innerArity - 1
+		argPos = baseArity - newArity - 1
+		ReDim args(0 To baseArity - 2)
+		args(argPos) = arg
+		innerArgs = fn.args
+		Do
+			argPos = argPos - 1
+			args(argPos) = innerArgs(argPos)
+		Loop Until argPos = 0
+		result.args = args
 		result.partialArgs = cons(arg, partialArgs(fn))
 	Else
 		result.which = fn
+		baseArity = fn.arity
+		newArity = baseArity - 1
+		ReDim args(0 To baseArity - 2)
+		args(0) = arg
+		result.args = args
 		result.partialArgs = cons(arg, nil)
 	End If
-	result.arity = arity(fn) - 1
+	result.arity = newArity
 	mkPartialApp = result
 End Function
 
@@ -133,20 +175,20 @@ Function fnObjs()
 			newFn(&quot;fstArg&quot;,			2), _
 			newFn(&quot;sndArg&quot;,			2), _
 			newFn(&quot;swap&quot;,			3), _
-			newFn(&quot;compose&quot;,			3), _
-			newFn(&quot;ite&quot;,				4), _
-			newFn(&quot;add&quot;,				2), _
-			newFn(&quot;mul&quot;,				2), _
-			newFn(&quot;inRange&quot;,			3), _
-			newFn(&quot;equ&quot;,				2), _
+			newFn(&quot;compose&quot;,		3), _
+			newFn(&quot;ite&quot;,			4), _
+			newFn(&quot;add&quot;,			2), _
+			newFn(&quot;mul&quot;,			2), _
+			newFn(&quot;inRange&quot;,		3), _
+			newFn(&quot;equ&quot;,			2), _
 			newFn(&quot;concat&quot;,			2), _
-			newFn(&quot;asc&quot;,				1), _
-			newFn(&quot;chr&quot;,				1), _
-			newFn(&quot;readHex&quot;,			1), _
+			newFn(&quot;asc&quot;,			1), _
+			newFn(&quot;chr&quot;,			1), _
+			newFn(&quot;readHex&quot;,		1), _
 			_
-			newFn(&quot;existsF&quot;,			1), _
-			newFn(&quot;arityF&quot;, 			1), _
-			newFn(&quot;applyToList&quot;,		2), _
+			newFn(&quot;existsF&quot;,		1), _
+			newFn(&quot;arityF&quot;, 		1), _
+			newFn(&quot;applyToList&quot;,	2), _
 			_
 			newFn(&quot;TList_toString&quot;,	1), _
 			newFn(&quot;TList_equ&quot;,		2), _
@@ -206,10 +248,12 @@ End Function
 
 Function isFn(ByVal fn As Variant) As Boolean
 	If isObject(fn) Then
+		Dim oFn As Object
+		Set oFn = fn
 		On Local Error Goto isFn_returnsFalse
-		fn.which
-		fn.arity
-		fn.partialArgs
+		oFn.which
+		oFn.arity
+		oFn.partialArgs
 		isFn = True
 		Exit Function
 	End If
@@ -274,34 +318,97 @@ End Function
 Function applyLast(fn As Object, arg As Variant)
 	Dim result As Variant
 	Dim reverseArgs As Object
+	Dim baseArity As Integer
+	Dim args As Variant
+	Dim name As String
 	If isPartialApp(fn) Then
 		reverseArgs = partialArgs(fn)
+		args = fn.args
 		fn = fn.which
 	Else
 		reverseArgs = nil
 	End If
-	Select Case getFnName(fn)
-		Case &quot;id&quot;: 		result = arg
-		Case &quot;fstArg&quot;:	result = car(reverseArgs)
-		Case &quot;sndArg&quot;:	result = arg
-		Case &quot;swap&quot;:	result = apply1( apply1(cadr(reverseArgs), arg), car(reverseArgs) )
-		Case &quot;compose&quot;:	result = apply1( cadr(reverseArgs), apply1(car(reverseArgs), arg) )
-		Case &quot;ite&quot;
-			&apos;cond = caddr(reverseArgs)
-			&apos;thn = cadr(reverseArgs)
-			&apos;els = car(reverseArgs)
-			If applyLast(caddr(reverseArgs), arg) Then
-				result = apply1(cadr(reverseArgs), arg)
-			Else
-				result = apply1(car(reverseArgs), arg)
-			End if
-		Case &quot;asc&quot;:		result = Asc(arg)
-		Case &quot;add&quot;:		result = CLng(car(reverseArgs) + arg)
-		Case &quot;inRange&quot;:	result = CBool( (cadr(reverseArgs) &lt;= arg) And (arg &lt;= car(reverseArgs)) )
+	baseArity = fn.arity
+	name = fn.which
+	Dim a0 As Variant, a1 As Variant, a2 As Variant, a3 As Variant
+	On baseArity(fn) Goto applyLast_of_one, applyLast_of_two, applyLast_of_three, applyLast_of_four
+	Goto applyLast_of_fiveOrMore
+applyLast_of_one:
+	a0 = arg
+	Select Case name
+		Case &quot;id&quot;: 			result = a0
+		Case &quot;asc&quot;:			result = Asc(		a0)
+		Case &quot;chr&quot;:			result = Chr(		a0)
+		Case &quot;isString&quot;:	result = isString(	a0)
+		Case &quot;readHex&quot;:		result = readHex(	a0)
+		Case &quot;isNil&quot;:		result = isNil(		a0)
+		Case &quot;length&quot;:		result = length(	a0)
+		Case &quot;car&quot;:			result = car(		a0)
+		Case &quot;cdr&quot;:			result = cdr(		a0)
+		Case &quot;cadr&quot;:		result = cadr(		a0)
+		Case &quot;caddr&quot;:		result = caddr(		a0)
+		Case &quot;flatten&quot;:		result = flatten(	a0)
+		Case &quot;reverse&quot;: 	result = reverse(	a0)
+		Case &quot;toArray&quot;: 	result = toArray(	a0)
 		Case Else
-			reverseArgs = cons(arg, reverseArgs)
-			result = applyBuiltinRev(fn, reverseArgs)
+			Goto applyLast_doTheCall
 	End Select
+	applyLast = result
+	Exit Function
+applyLast_of_two:
+	a0 = car(reverseArgs) &apos;fn.args(0)
+	a1 = arg
+	Select Case name
+		Case &quot;fstArg&quot;:		result = a0
+		Case &quot;sndArg&quot;:		result = a1
+		Case &quot;add&quot;:			result = CLng(a0 + a1)
+		Case &quot;mul&quot;:			result = CLng(a0 * a1)
+		Case &quot;concat&quot;:		result = a0 &amp; a1
+		Case &quot;equ&quot;:			result = equ(		a0, a1)
+		Case &quot;cons&quot;:		result = cons(		a0, a1)
+		Case &quot;map&quot;:			result = map(		a0, a1)
+		Case &quot;filter&quot;:		result = filter(	a0, a1)
+		Case &quot;foldl1&quot;:		result = foldl1(	a0, a1)
+		Case &quot;foldr1&quot;:		result = foldr1(	a0, a1)
+		Case &quot;adjoin&quot;:		result = adjoin(	a0, a1)
+		Case &quot;mkParser&quot;:	result = mkParser(	a0, a1)
+		Case Else
+			Goto applyLast_doTheCall
+	End Select
+	applyLast = result
+	Exit Function
+applyLast_of_three:
+	a0 = cadr(reverseArgs) &apos;fn.args(0)
+	a1 = car(reverseArgs) &apos;fn.args(1)
+	a2 = arg
+	Select Case name
+		Case &quot;swap&quot;:	result = apply(a0, a2, a1)
+		Case &quot;compose&quot;:	result = apply(a0, apply(a1, a2))
+		Case &quot;inRange&quot;:	result = CBool( (a0 &lt;= a2) And (a2 &lt;= a1) )
+		Case &quot;foldl&quot;:	result = foldl(a0, a2, a1)
+		Case &quot;foldr&quot;:	result = foldl(a0, a2, a1)
+		Case Else
+			Goto applyLast_doTheCall
+	End Select
+	applyLast = result
+	Exit Function
+applyLast_of_four:
+	a0 = caddr(reverseArgs) &apos;fn.args(0)
+	a1 = cadr(reverseArgs) &apos;fn.args(1)
+	a2 = car(reverseArgs) &apos;fn.args(2)
+	a3 = arg
+	Select Case name
+		Case &quot;ite&quot;: If applyLast(a0, a3) Then : result = apply1(a1, a3) : Else : result = apply1(a2, a3) : End if
+		Case Else
+			Goto applyLast_doTheCall
+	End Select
+	applyLast = result
+	Exit Function
+applyLast_of_fiveOrMore:
+	croak(&quot;NYI: applyLast_fiveOrMore&quot;)
+applyLast_doTheCall:
+	reverseArgs = cons(arg, reverseArgs)
+	result = applyBuiltinRev(fn, reverseArgs)
 	applyLast = result
 End Function
 
@@ -324,44 +431,10 @@ Function applyBuiltinRev(fn As Object, ByVal reverseArgs As Object)
 		Case &quot;arityF&quot;:			result = arityF(		a(0)				)
 		Case &quot;existsF&quot;:			result = existsF(		a(0)				)
 		Case &quot;applyToList&quot;:		result = applyToList(	a(0), a(1)			)
-		Case &quot;id&quot;:				result = id(			a(0)				)
-		Case &quot;fstArg&quot;:			result = fstArg(		a(0), a(1)			)
-		Case &quot;sndArg&quot;:			result = sndArg(		a(0), a(1)			)
-		Case &quot;swap&quot;:			result = swap(			a(0), a(1), a(2)	)
-		Case &quot;compose&quot;:			result = compose(		a(0), a(1), a(2)	)
-		Case &quot;ite&quot;:				result = ite(			a(0), a(1), a(2), a(3)	)
-		Case &quot;add&quot;:				result = add(			a(0), a(1)			)
-		Case &quot;mul&quot;:				result = mul(			a(0), a(1)			)
-		Case &quot;inRange&quot;:			
-			result = _inRange(		a(0), a(1), a(2)	)
-		Case &quot;equ&quot;:				result = equ(			a(0), a(1)			)
-		Case &quot;concat&quot;:			result = concat(		a(0), a(1)			)
-		Case &quot;asc&quot;:				result = asc(			a(0)				)
-		Case &quot;chr&quot;:				result = chr(			a(0)				)
-		Case &quot;readHex&quot;:			result = readHex(		a(0)				)
 		Case &quot;isString&quot;:		result = isString(		a(0)				)
 		Case &quot;toString&quot;:		result = toString(		a(0)				)
 		Case &quot;TList_toString&quot;:	result = TList_toString(a(0)				)
 		Case &quot;TList_equ&quot;:		result = TList_equ(		a(0), a(1)			)
-		Case &quot;isNil&quot;:			result = isNil(			a(0)				)
-		Case &quot;cons&quot;:			result = cons(			a(0), a(1)			)
-		Case &quot;length&quot;
-			result = length(			a(0)			)
-		Case &quot;snoc&quot;:			result = snoc(			a(0), a(1)			)
-		Case &quot;car&quot;:				result = car(			a(0)				)
-		Case &quot;cdr&quot;:				result = cdr(			a(0)				)
-		Case &quot;cadr&quot;:			result = cadr(			a(0)				)
-		Case &quot;caddr&quot;:			result = caddr(			a(0)				)
-		Case &quot;map&quot;:				result = map(			a(0), a(1)			)
-		Case &quot;foldl&quot;:			result = foldl(			a(0), a(1), a(2)	)
-		Case &quot;foldr&quot;:			result = foldr(			a(0), a(1), a(2)	)
-		Case &quot;foldl1&quot;:			result = foldl1(		a(0), a(1)			)
-		Case &quot;foldr1&quot;:			result = foldr1(		a(0), a(1)			)
-		Case &quot;filter&quot;:			result = filter(		a(0), a(1)			)
-		Case &quot;adjoin&quot;:			result = adjoin(		a(0), a(1)			)
-		Case &quot;flatten&quot;:			result = flatten(		a(0)				)
-		Case &quot;reverse&quot;:			result = reverse(		a(0)				)
-		Case &quot;mkParser&quot;:		result = mkParser(		a(0), a(1)			)
 		Case Else
 			croak(&quot;applyBuiltinRev: unknown function &apos;&quot; &amp; car(fn) &amp; &quot;&apos;&quot;)
 	End Select	
@@ -403,6 +476,9 @@ End Function
 
 Function apply(ByVal fn As Variant, a0, Optional a1, Optional a2, Optional a3, Optional a4, Optional a5, Optional a6, Optional a7, Optional a8, Optional a9, Optional a10)
 	Dim args As Object
+	If Not(isFn(fn)) Then
+&apos;		croak(&quot;apply: invalid 1st arg:&quot; &amp; chr(13) &amp; toString(fn))
+	End If
 	fn = asFn(fn, &quot;apply: invalid 1st arg&quot;)
 	If isMissing(a1) Then
 		apply = apply1(fn, a0)
@@ -431,7 +507,6 @@ Function test_Fn()
 	xs = List(&quot;x&quot;, &quot;y&quot;)
 	assertEqual(toString(blaha(xs)), &quot;[]&quot;).x
 	&apos;assertEqual(toString(xs), &quot;[&apos;x&apos;, &apos;y&apos;]&quot;).x
-	assertEqual(lookupFn(&quot;non-existent&quot;), Empty).x
 		
 	Dim fId As Variant
 	fId = Fn.id
@@ -455,8 +530,6 @@ Function test_Fn()
 	assertEqual(arity(fEqu), 2).x
 	assertEqual(apply(fEqu, 1, 2), False).x
 	assertEqual(apply(fEqu, 1, 1), True).x
-	assertEqual(apply(&quot;equ&quot;, 1, 2), False).x
-	assertEqual(apply(&quot;equ&quot;, 1, 1), True).x
 	
 	Dim eq5 As Variant
 	eq5 = apply(fEqu, 5)
@@ -587,12 +660,6 @@ Function test_Fn()
 	assertEqual(apply(fReadHex,  &quot;f&quot;),  readHex(&quot;f&quot;)).x
 
 
-	assertEqual(existsF(&quot;i do not exist&quot;), False).x
-	assertEqual(existsF(&quot;existsF&quot;), True).x
-	assertEqual(existsF(&quot;arityF&quot;), True).x
-	assertEqual(existsF(&quot;applyToList&quot;), True).x
-
-	assertEqual(arityF(&quot;existsF&quot;), 1).x
 	assertEqual(arityF(&quot;arityF&quot;), 1).x
 	assertEqual(arityF(&quot;applyToList&quot;), 2).x
 

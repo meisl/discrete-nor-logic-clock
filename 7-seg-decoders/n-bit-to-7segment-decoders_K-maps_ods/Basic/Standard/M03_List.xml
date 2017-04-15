@@ -73,7 +73,8 @@ Function cons(Optional x As Variant, Optional xs As TList)
 	End If
 End Function
 
-Function car(xs As TList) As Variant
+Function car(Optional xs As TList) As Variant
+	If isMissing(xs) Then : car = Fn.car : Exit Function : End If
 	If isNil(xs) Then
 		croak(&quot;car: nil&quot;)
 	Else
@@ -81,7 +82,8 @@ Function car(xs As TList) As Variant
 	End If
 End Function
 
-Function cdr(xs As TList) As TList
+Function cdr(Optional xs As TList) As TList
+	If isMissing(xs) Then : cdr = Fn.cdr : Exit Function : End If
 	If isNil(xs) Then
 		croak(&quot;cdr: nil&quot;)
 	Else
@@ -162,7 +164,7 @@ End Function
 
 &apos; Cannot name this function &quot;append&quot;, seems to be a BASIC keyword(?)
 Function adjoin(xs As TList, ys As TList)
-	adjoin = foldr(&quot;cons&quot;, ys, xs)
+	adjoin = foldr(cons, ys, xs)
 End Function
 
 &apos; Normally this is called &quot;concat&quot; but we already have that for Strings
@@ -170,7 +172,8 @@ Function flatten(xs As TList)
 	flatten = foldl(&quot;adjoin&quot;, nil, xs)
 End Function
 
-Function reverse(xs As TList)
+Function reverse(Optional xs As TList)
+	If isMissing(xs) Then : reverse = Fn.reverse : Exit Function : End If
 	Dim result As TList
 	If xs.len &lt;= 1 Then
 		result = xs
@@ -260,6 +263,14 @@ Function test_List_isNil_and_cons()
 	assertEqual(isNil(cons(0, nil)), False).x
 	assertEqual(isNil(cons(&quot;&quot;, nil)), False).x
 	
+	assertEqual(isFn(Fn.isNil), True).x	&apos; from Fn object
+	assertEqual(isFn(isNil), 	True).x	&apos; from 0-arg call
+	assertEqual(arity(isNil),	1).x
+
+	assertEqual(isFn(Fn.cons),	True).x	&apos; from Fn object
+	assertEqual(isFn(cons),		True).x	&apos; from 0-arg call
+	assertEqual(arity(cons),	2).x
+
 	assertEqual(apply(isNil, nil), True).x
 		
 	&apos;assertEqual(toString(isNil(Empty)), &quot;[&apos;isNil&apos;, True, 1]&quot;).x
@@ -271,8 +282,8 @@ Function test_List_length()
 	assertEqual(length(			cons(0, nil)), 	1).x
 	assertEqual(length(cons(0, 	cons(0, nil))), 2).x
 
-	assertEqual(isFn(Fn.length), 	True).x
-	assertEqual(isFn(length), 		True).x
+	assertEqual(isFn(Fn.length), 	True).x	&apos; from Fn object
+	assertEqual(isFn(length), 		True).x	&apos; from 0-arg call
 	assertEqual(arity(length), 		   1).x
 	
 	assertEqual(apply(length,						nil), 	0).x
@@ -282,8 +293,7 @@ End Function
 
 Function test_List_fnApp()
 	assertEqual(arityF(&quot;TList_toString&quot;), 1).x
-	assertEqual(arity(cons), 2).x
-	assertEqual(arityF(&quot;reverse&quot;), 1).x
+
 End Function
 
 Function test_List_typeOfAndToString()
@@ -343,14 +353,32 @@ End Function
 
 Function test_List_car()
 	assertThrows(&quot;car&quot;, Array(nil)).x
-	assertEqual(car(List(1   )), 1).x
-	assertEqual(car(List(2, 1)), 2).x
+	assertEqual(car(List(1   	)), 1).x
+	assertEqual(car(List(2, 1	)), 2).x
+	assertEqual(car(List(3, 2, 1)), 3).x
+
+	assertEqual(isFn(Fn.car), 	True).x	&apos; from Fn object
+	assertEqual(isFn(car), 		True).x	&apos; from 0-arg call
+	assertEqual(arity(car), 	   1).x
+
+	assertEqual(apply(car, List(1   	)), 1).x
+	assertEqual(apply(car, List(2, 1	)), 2).x
+	assertEqual(apply(car, List(3, 2, 1	)), 3).x
 End Function
 
 Function test_List_cdr()
 	assertThrows(&quot;cdr&quot;, Array(nil)).x
-	assertEqual(toString(cdr(List(1   ))), &quot;[]&quot;).x
-	assertEqual(toString(cdr(List(2, 1))), &quot;[1]&quot;).x
+	assertEqual(toString(cdr(List(1   	 ))), &quot;[]&quot;).x
+	assertEqual(toString(cdr(List(2, 1	 ))), &quot;[1]&quot;).x
+	assertEqual(toString(cdr(List(3, 2, 1))), &quot;[2, 1]&quot;).x
+
+	assertEqual(isFn(Fn.cdr), 	True).x	&apos; from Fn object
+	assertEqual(isFn(cdr), 		True).x	&apos; from 0-arg call
+	assertEqual(arity(cdr), 	   1).x
+
+	assertEqual(toString(apply(cdr, List(1   	))), &quot;[]&quot;).x
+	assertEqual(toString(apply(cdr, List(2, 1	))), &quot;[1]&quot;).x
+	assertEqual(toString(apply(cdr, List(3, 2, 1))), &quot;[2, 1]&quot;).x
 End Function
 
 Function test_List_map()
@@ -435,6 +463,9 @@ Function test_List_reverse()
 	assertEqual(toString(reverse(lst)), &quot;[1, 2]&quot;).x
 	Set lst = cons(3, lst)
 	assertEqual(toString(reverse(lst)), &quot;[1, 2, 3]&quot;).x
+	
+	assertEqual(isFn(Fn.reverse), True).x &apos; from Fn object
+	assertEqual(isFn(reverse), 	  True).x &apos; from 0-arg call
 End Function
 
 Function test_List_equ()

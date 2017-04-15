@@ -97,7 +97,7 @@ End Function
 
 Function pNextAsc()
 	Static result As Object
-	If isNull(result) Then : Set result = pBind(pItem, compose(pReturn, &quot;asc&quot;)) : End If
+	If isNull(result) Then : Set result = pBind(pItem, compose(pReturn, Fn.asc)) : End If
 	pNextAsc = result
 End Function
 
@@ -111,8 +111,8 @@ Function pStr(t As String)
 	End If
 End Function
 
-&apos;Function pSat(ByVal predicate As Variant)
-&apos;	pBind(pItem, apply1(&quot;ite&quot;, compose(predicate, &quot;asc&quot;), pReturn
+&apos;Function pSat(predicate)
+&apos;	pBind(pItem, ite(predicate, pReturn, fstArg(pFail))
 &apos;End Function
 
 &apos; succeeds if either p1 succeeds (then returning p1&apos;s result and pos)
@@ -212,7 +212,7 @@ Function pBinDigit()
 			pBind(pStr(&quot;1&quot;), fstArg(pReturn(1)))_
 		)
 		&apos;&apos;not paying off (yet):
-		result = pBind(pItem, compose(ite(inRange(Asc(&quot;0&quot;), Asc(&quot;1&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), &quot;asc&quot;)
+		result = pBind(pItem, compose(ite(inRange(Asc(&quot;0&quot;), Asc(&quot;1&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), Fn.asc)
 	End If
 	pBinDigit = result
 End Function
@@ -235,7 +235,7 @@ Function pDecDigit()
 		Dim f as Object
 		&apos;Set f = compose(add(-Asc(&quot;0&quot;)), Fn.asc)
 		&apos;MsgBox(TFn_toString(f))
-		Set f = compose(ite(inRange(Asc(&quot;0&quot;), Asc(&quot;9&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), &quot;asc&quot;)
+		Set f = compose(ite(inRange(Asc(&quot;0&quot;), Asc(&quot;9&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), Fn.asc)
 		result = pBind(pItem, f)
 	End If
 	pDecDigit = result
@@ -269,7 +269,7 @@ Function pHexDigit()
 						fstArg(pFail) _
 					) _
 				) _
-			), &quot;asc&quot;) _
+			), Fn.asc) _
 		)
 
 	End If
@@ -280,7 +280,7 @@ Function pHexNum()
 	Static result As Object
 	If isNull(result) Then
 		&apos;foldl1 compose(plus, mul 16)
-		Set result = pSeq(Array(pMany1(pHexDigit)), apply(&quot;foldl1&quot;, compose(add, mul(16))))
+		Set result = pSeq(Array(pMany1(pHexDigit)), apply(Fn.foldl1, compose(add, mul(16))))
 	End If
 	pHexNum = result
 End Function
@@ -288,7 +288,7 @@ End Function
 Function pHexLit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pSeq(Array(pStr(&quot;0x&quot;), pHexNum), &quot;sndArg&quot;)
+		result = pSeq(Array(pStr(&quot;0x&quot;), pHexNum), Fn.sndArg)
 	End If
 	pHexLit = result
 End Function
@@ -488,9 +488,9 @@ Function test_Parser()
 	test_Parser_seq()
 &apos; 3.4 sec for 702 ~&gt; 206.5 aPerSec
 	test_Parser_hexNum()
-Goto end_of_Parser_tests
 &apos; 4.3 sec for 781 ~&gt; 181.6 aPerSec
 	test_Parser_hexLit()
+Goto end_of_Parser_tests
 &apos; 5.3 sec for 883 ~&gt; 166.6 aPerSec
 
 end_of_Parser_tests:	
@@ -1020,11 +1020,11 @@ Function test_Parser_seq()
 		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
 		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
 	)
-	f = &quot;asc&quot;
+	f = Fn.asc
 	p = pSeq(Array(pFail), f)
 	refute_parses(p, data).x
 	
-	f = &quot;asc&quot;
+	f = Fn.asc
 	p = pSeq(Array(pItem), f)
 	refute_parses(p, &quot;&quot;).x
 	assert_parses(p, &quot;0&quot;, 	asc(&quot;0&quot;), 2).x
@@ -1053,7 +1053,7 @@ Function test_Parser_seq()
 	assert_parses(p, &quot;01&quot;,	&quot;01&quot;, 3).x
 	assert_parses(p, &quot;10&quot;,	&quot;10&quot;, 3).x
 	
-	f = &quot;asc&quot;
+	f = Fn.asc
 	p = pSeq(Array(pDecDigit), f)
 	refute_parses(p, &quot;&quot;).x
 	refute_parses(p, &quot;A&quot;).x

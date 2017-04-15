@@ -35,8 +35,12 @@ ErrorHandler:
 	_typeOf = result
 End Function
 
-Function isString(x As Variant)
-	isString = (typeOf(x) = typeOf(&quot;&quot;))
+Function isString(Optional x As Variant)
+	If isMissing(x) Then
+		isString = Fn.isString
+	Else
+		isString = (typeOf(x) = typeOf(&quot;&quot;))
+	End If
 End Function
 
 Function _tyname(o As Object)
@@ -70,114 +74,28 @@ Function sndArg(Optional x As Variant, Optional y As Variant)
 End Function
 
 &apos; :: (b -&gt; a) -&gt; a -&gt; b = (b -&gt; a) -&gt; (a -&gt; b)
-Function _swap(Optional ByVal f, Optional x, Optional y)
-	Static oFn As Object : If isNull(oFn) Then : Set oFn = Fn.swap : End If
-	Dim result As Variant
-	If isMissing(f) Then
-		result = oFn
-	Else
-		f = asFn(f, &quot;swap: invalid 1st arg&quot;)	&apos; make sure it&apos;s a function
-		If isMissing(x) Then
-			result = apply1(oFn, f)
-		Else
-			If isMissing(y) Then
-				result = apply1(apply1(oFn, f), x)
-			Else
-				result = apply(f, y, x)
-			End If
-		End If
-	End If
-	_swap = result
-End Function
-
 Function swap(Optional f, Optional x, Optional y)
 	swap = _apply(Fn.swap, f, x, y)
 End Function
 
 &apos; B = \f g x.f (g x)
 &apos;   :: (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c  =  (b -&gt; c) -&gt; (a -&gt; b) -&gt; (a -&gt; c)
-Function _compose(Optional ByVal f, Optional ByVal g, Optional x)
-	Static oFn As Object : If isNull(oFn) Then : Set oFn = Fn.compose : End If
-	Dim result As Variant
-	If isMissing(f) Then
-		result = oFn
-	Else
-		f = asFn(f, &quot;compose: invalid 1st arg&quot;)	&apos; make sure it&apos;s a function
-		If isMissing(g) Then
-			result = apply1(oFn, f)
-		Else
-			g = asFn(g, &quot;compose: invalid 2nd arg&quot;)
-			If isMissing(x) Then
-				result = apply1(apply1(oFn, f), g)
-			Else
-				result = apply1(f, apply1(g, x))
-			End If
-		End If
-	End If
-	_compose = result
-End Function
-
 Function compose(Optional ByVal f, Optional ByVal g, Optional x)
 	compose = _apply(Fn.compose, f, g, x)
 End Function
 
 &apos;\c t e x.if (c x) then (t x) else (e x)
 &apos;   :: (a -&gt; Bool) -&gt; (a -&gt; b) -&gt; (a -&gt; b) -&gt; a -&gt; b
-Function _ite(Optional ByVal cond As Variant, Optional ByVal thn As Variant, Optional ByVal els As Variant, Optional ByVal x As Variant)
-	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;ite&quot;) : End If
-	Dim result As Variant
-	If isMissing(cond) Then
-		result = oFn
-	Else
-		cond = asFn(cond, &quot;ite: invalid 1st arg&quot;)
-		If isMissing(thn) Then
-			result = apply(oFn, cond)
-		Else
-			thn = asFn(thn, &quot;ite: invalid 2nd arg&quot;)
-			If isMissing(els) Then
-				result = apply(oFn, cond, thn)
-			Else
-				els = asFn(els, &quot;ite: invalid 3rd arg&quot;)
-				If isMissing(x) Then
-					result = apply(oFn, cond, thn, els)
-				Else
-					If apply(cond, x) Then
-						result = apply(thn, x)
-					Else
-						result = apply(els, x)
-					End If
-				End If
-			End If
-		End If
-	End If
-	ite = result
-End Function
-
 Function ite(Optional cond, Optional thn, Optional els, Optional x)
 	ite = _apply(Fn.ite, cond, thn, els, x)
 End Function
 
-Function concat(a As String, b As String) As String
-	concat = a &amp; b
+Function concat(Optional a As String, Optional b As String)
+	concat = _apply(Fn.concat, a, b)
 End Function
 
 Function startsWith(s As String, prefix As String) 
 	startsWith = ((Len(prefix) &lt;= Len(s)) And (Mid(s, 1, Len(prefix)) = prefix))
-End Function
-
-Function _add(Optional a As Long, Optional b As Long)
-	Static oFn As Object : If isNull(oFn) Then : Set oFn = Fn.add : End If
-	Dim result As Variant
-	If isMissing(a) Then
-		result = oFn
-	Else
-		If isMissing(b) Then
-			result = apply1(oFn, a)
-		Else
-			result = CLng(a + b)
-		End If
-	End If
-	add = result
 End Function
 
 Function add(Optional a As Long, Optional b As Long)
@@ -185,22 +103,7 @@ Function add(Optional a As Long, Optional b As Long)
 End Function
 
 Function mul(Optional a As Long, Optional b As Long)
-	Static oFn As Object : If isNull(oFn) Then : Set oFn = Fn.mul : End If
-	Dim result As Variant
-	If isMissing(a) Then
-		result = oFn
-	Else
-		If isMissing(b) Then
-			result = apply1(oFn, a)
-		Else
-			result = CLng(a * b)
-		End If
-	End If
-	mul = result
-End Function
-
-Function _inRange(lo As Long, hi As Long, x As Long) As Boolean
-	_inRange = (lo &lt;= x) And (x &lt;= hi)
+	mul = _apply(Fn.mul, a, b)
 End Function
 
 Function inRange(Optional lo As Long, Optional hi As Long, Optional x As Long)
@@ -359,12 +262,14 @@ Function test_concat()
 	assertEqual(concat(&quot;a&quot;, &quot;bc&quot;), &quot;abc&quot;).x
 	assertEqual(concat(&quot;ab&quot;, &quot;c&quot;), &quot;abc&quot;).x
 	
-	assertEqual(arityF(&quot;concat&quot;), 2).x
-	assertEqual(apply(&quot;concat&quot;, &quot;&quot;, &quot;&quot;), &quot;&quot;).x
-	assertEqual(apply(&quot;concat&quot;, &quot;a&quot;, &quot;&quot;), &quot;a&quot;).x
-	assertEqual(apply(&quot;concat&quot;, &quot;a&quot;, &quot;b&quot;), &quot;ab&quot;).x
-	assertEqual(apply(&quot;concat&quot;, &quot;a&quot;, &quot;bc&quot;), &quot;abc&quot;).x
-	assertEqual(apply(&quot;concat&quot;, &quot;ab&quot;, &quot;c&quot;), &quot;abc&quot;).x
+	assertEqual(arity(Fn.concat), 2).x	&apos; from Fn object
+	assertEqual(arity(concat), 	  2).x	&apos; from 0-arg call
+
+	assertEqual(apply(concat, &quot;&quot;, &quot;&quot;), &quot;&quot;).x
+	assertEqual(apply(concat, &quot;a&quot;, &quot;&quot;), &quot;a&quot;).x
+	assertEqual(apply(concat, &quot;a&quot;, &quot;b&quot;), &quot;ab&quot;).x
+	assertEqual(apply(concat, &quot;a&quot;, &quot;bc&quot;), &quot;abc&quot;).x
+	assertEqual(apply(concat, &quot;ab&quot;, &quot;c&quot;), &quot;abc&quot;).x
 End Function
 
 Function test_typeOf()
@@ -408,23 +313,25 @@ Function test_isString()
 	assertEqual(isString(&quot;1&quot;),                 True).x
 	assertEqual(isString(&quot;3.14&quot;),              True).x
 	
-	assertEqual(arityF(&quot;isString&quot;),				  1).x
-	assertEqual(apply(&quot;isString&quot;, &quot;&quot;),         True).x
-	assertEqual(apply(&quot;isString&quot;, &quot;a&quot;),        True).x
-	assertEqual(apply(&quot;isString&quot;, &quot;foobar&quot;),   True).x
-	assertEqual(apply(&quot;isString&quot;, Nothing),   False).x
-	assertEqual(apply(&quot;isString&quot;, Empty),     False).x
-	assertEqual(apply(&quot;isString&quot;, True),      False).x
-	assertEqual(apply(&quot;isString&quot;, False),     False).x
-	assertEqual(apply(&quot;isString&quot;, 0),         False).x
-	assertEqual(apply(&quot;isString&quot;, 1),         False).x
-	assertEqual(apply(&quot;isString&quot;, 3.14),      False).x
-	assertEqual(apply(&quot;isString&quot;, Array()),   False).x
-	assertEqual(apply(&quot;isString&quot;, Array(42)), False).x
-	assertEqual(apply(&quot;isString&quot;, Array(42)), False).x
-	assertEqual(apply(&quot;isString&quot;, &quot;0&quot;),        True).x
-	assertEqual(apply(&quot;isString&quot;, &quot;1&quot;),        True).x
-	assertEqual(apply(&quot;isString&quot;, &quot;3.14&quot;),     True).x
+	assertEqual(arity(Fn.isString),	1).x &apos; from Fn object
+	assertEqual(arity(isString),	1).x &apos; from 0-arg call
+	
+	assertEqual(apply(isString, &quot;&quot;),         True).x
+	assertEqual(apply(isString, &quot;a&quot;),        True).x
+	assertEqual(apply(isString, &quot;foobar&quot;),   True).x
+	assertEqual(apply(isString, Nothing),   False).x
+	assertEqual(apply(isString, Empty),     False).x
+	assertEqual(apply(isString, True),      False).x
+	assertEqual(apply(isString, False),     False).x
+	assertEqual(apply(isString, 0),         False).x
+	assertEqual(apply(isString, 1),         False).x
+	assertEqual(apply(isString, 3.14),      False).x
+	assertEqual(apply(isString, Array()),   False).x
+	assertEqual(apply(isString, Array(42)), False).x
+	assertEqual(apply(isString, Array(42)), False).x
+	assertEqual(apply(isString, &quot;0&quot;),        True).x
+	assertEqual(apply(isString, &quot;1&quot;),        True).x
+	assertEqual(apply(isString, &quot;3.14&quot;),     True).x
 End Function
 
 Function test_toString()
@@ -554,8 +461,6 @@ Function test_compose()
 	assertEqual(apply(f, 42), 5).x
 	
 	assertEqual(compose(id, id, &quot;asdf&quot;), &quot;asdf&quot;).x
-	assertEqual(compose(&quot;id&quot;, id, 42), 42).x
-	assertEqual(compose(&quot;id&quot;, &quot;id&quot;, 4711), 4711).x
 
 	assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;, id, 42)).x
 	assertThrows(&quot;compose&quot;, Array(Nothing, 		  id, 42)).x
