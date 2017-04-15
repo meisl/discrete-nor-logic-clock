@@ -12,6 +12,7 @@ Type TFn
 	ite		As Object
 	asc		As Object
 	add		As Object
+	inRange	As Object
 End Type
 
 
@@ -31,6 +32,7 @@ Function Fn
 		result.ite 		= lookupFn(&quot;ite&quot;)
 		result.asc 		= lookupFn(&quot;asc&quot;)
 		result.add 		= lookupFn(&quot;add&quot;)
+		result.inRange	= lookupFn(&quot;inRange&quot;)
 	End If
 	Fn = result
 End Function
@@ -268,7 +270,7 @@ Function applyLast(fn As Object, arg As Variant)
 			End if
 		Case &quot;asc&quot;:		result = Asc(arg)
 		Case &quot;add&quot;:		result = CLng(car(reverseArgs) + arg)
-		
+		Case &quot;inRange&quot;:	result = CBool( (cadr(reverseArgs) &lt;= arg) And (arg &lt;= car(reverseArgs)) )
 		Case Else
 			reverseArgs = cons(arg, reverseArgs)
 			result = applyBuiltinRev(fn, reverseArgs)
@@ -291,7 +293,7 @@ Function applyBuiltinRev(fn As Object, ByVal reverseArgs As Object)
 		a(i) = car(reverseArgs)
 		reverseArgs = cdr(reverseArgs)
 	Next i
-	Select Case car(fn)
+	Select Case getFnName(fn)
 		Case &quot;arityF&quot;:			result = arityF(		a(0)				)
 		Case &quot;existsF&quot;:			result = existsF(		a(0)				)
 		Case &quot;applyToList&quot;:		result = applyToList(	a(0), a(1)			)
@@ -303,7 +305,8 @@ Function applyBuiltinRev(fn As Object, ByVal reverseArgs As Object)
 		Case &quot;ite&quot;:				result = ite(			a(0), a(1), a(2), a(3)	)
 		Case &quot;add&quot;:				result = add(			a(0), a(1)			)
 		Case &quot;mul&quot;:				result = mul(			a(0), a(1)			)
-		Case &quot;inRange&quot;:			result = inRange(		a(0), a(1), a(2)	)
+		Case &quot;inRange&quot;:			
+			result = _inRange(		a(0), a(1), a(2)	)
 		Case &quot;equ&quot;:				result = equ(			a(0), a(1)			)
 		Case &quot;concat&quot;:			result = concat(		a(0), a(1)			)
 		Case &quot;asc&quot;:				result = asc(			a(0)				)

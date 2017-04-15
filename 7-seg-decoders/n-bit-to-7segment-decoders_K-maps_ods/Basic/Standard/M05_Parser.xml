@@ -70,7 +70,15 @@ End Function
 
 &apos; always succeeds by returning the provided value; without increasing pos
 Function pReturn(Optional v As Variant)
-	pReturn = mkParser(&quot;return&quot;, v)
+	Static oFn As Object
+	If isMissing(v) Then
+		If isNull(oFn) Then
+			oFn = mkParser(&quot;return&quot;)
+		End If
+		pReturn = oFn
+	Else
+		pReturn = mkParser(&quot;return&quot;, v)
+	End If
 End Function
 
 Function pBind(p As Parser, ByVal f As Variant)
@@ -204,7 +212,7 @@ Function pBinDigit()
 			pBind(pStr(&quot;1&quot;), fstArg(pReturn(1)))_
 		)
 		&apos;&apos;not paying off (yet):
-		&apos;result = pBind(pItem, compose(ite(apply(&quot;inRange&quot;, Asc(&quot;0&quot;), Asc(&quot;1&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), &quot;asc&quot;)
+		result = pBind(pItem, compose(ite(inRange(Asc(&quot;0&quot;), Asc(&quot;1&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), &quot;asc&quot;)
 	End If
 	pBinDigit = result
 End Function
@@ -227,7 +235,7 @@ Function pDecDigit()
 		Dim f as Object
 		&apos;Set f = compose(add(-Asc(&quot;0&quot;)), Fn.asc)
 		&apos;MsgBox(TFn_toString(f))
-		Set f = compose(ite(apply(&quot;inRange&quot;, Asc(&quot;0&quot;), Asc(&quot;9&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), &quot;asc&quot;)
+		Set f = compose(ite(inRange(Asc(&quot;0&quot;), Asc(&quot;9&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), &quot;asc&quot;)
 		result = pBind(pItem, f)
 	End If
 	pDecDigit = result
@@ -252,11 +260,11 @@ Function pHexDigit()
 		Set retLowerA = compose(pReturn, add(10-Asc(&quot;a&quot;)))
 		Set Kfail = fstArg(pFail)
 		result = pBind(pItem, compose( _
-			ite( apply(&quot;inRange&quot;, Asc(&quot;0&quot;), Asc(&quot;9&quot;)), _
+			ite( inRange(Asc(&quot;0&quot;), Asc(&quot;9&quot;)), _
 				retZero, _
-				ite(apply(&quot;inRange&quot;, Asc(&quot;A&quot;), Asc(&quot;F&quot;)), _
+				ite(inRange(Asc(&quot;A&quot;), Asc(&quot;F&quot;)), _
 					retUpperA, _
-					ite(apply(&quot;inRange&quot;, Asc(&quot;a&quot;), Asc(&quot;f&quot;)), _
+					ite(inRange(Asc(&quot;a&quot;), Asc(&quot;f&quot;)), _
 						retLowerA, _
 						fstArg(pFail) _
 					) _
@@ -442,16 +450,13 @@ End Function
 Global refute_parses_pass As Object
 
 Function test_Parser()
-	Dim tm As Date, tmSecs As Long, aPerSec As Integer
-	tm = TimeValue(Time)
-	
-	&apos;Dim lTick As Long
-	&apos;lTick = GetSystemTicks()
-	&apos;wait 2000
-	&apos;lTick = (GetSystemTicks() - lTick)
-	&apos;MsgBox &quot;&quot; &amp; lTick &amp; &quot; Ticks&quot; ,0,&quot;Die Pause dauerte&quot;
+	Dim ticksPerSec As Long
+	ticksPerSec = GetSystemTicks()
+	Wait(100) &apos; wait a hundred milliseconds
+	ticksPerSec = 10 * (GetSystemTicks() - ticksPerSec)
 
-	Dim aCount As Integer
+	Dim tm As Double, aCount As Integer, aPerSec As Double
+	tm = GetSystemTicks
 	aCount = assertionCount
 	
 	Dim failure As String
@@ -486,16 +491,12 @@ Goto end_of_Parser_tests
 &apos; 12 sec for 781 ~&gt; 65 aPerSec
 	test_Parser_hexLit()
 &apos; 16 sec for 883 ~&gt; 55 aPerSec
+
 end_of_Parser_tests:	
 	aCount = assertionCount - aCount
-	tm = TimeValue(Time) - tm
-	tmSecs = Second(tm) + 60 * (Minute(tm) + 60 * Hour(tm))
-	If (tmSecs = 0) Then
-		aPerSec = aCount
-	Else
-		aPerSec = aCount/tmSecs
-	End If
-	MsgBox(TimeSerial(Hour(tm), Minute(tm), Second(tm)) &amp; &quot; for &quot; &amp; aCount &amp; &quot; assertions&quot;_
+	tm = CLng(10 * (GetSystemTicks() - tm) / ticksPerSec) / 10
+	aPerSec =  CLng(10 * aCount / tm) / 10
+	MsgBox(tm &amp; &quot; sec for &quot; &amp; aCount &amp; &quot; assertions&quot;_
 		&amp; chr(13) &amp; &quot;that&apos;s ~&quot; &amp; aPerSec &amp; &quot; assertions/sec&quot;_
 	)
 End Function

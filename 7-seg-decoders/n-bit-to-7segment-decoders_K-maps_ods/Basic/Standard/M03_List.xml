@@ -310,6 +310,8 @@ Function test_List_List()
 	assertEqual(toString(List(0, 1, 2, 3, 4, 5, 6, 7)), &quot;[0, 1, 2, 3, 4, 5, 6, 7]&quot;).x
 	assertEqual(toString(List(0, 1, 2, 3, 4, 5, 6, 7, 8)), &quot;[0, 1, 2, 3, 4, 5, 6, 7, 8]&quot;).x
 	assertEqual(toString(List(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)), &quot;[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]&quot;).x
+
+	&apos;&apos; assertThrows requires the function to be recognized by module &quot;List&quot;
 	&apos;assertThrows(&quot;List&quot;, Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)).x
 	
 	assertEqual(toString(test_List_foo(5)), &quot;[5]&quot;).x

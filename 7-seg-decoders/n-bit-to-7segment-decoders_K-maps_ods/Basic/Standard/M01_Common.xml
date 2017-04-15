@@ -199,8 +199,12 @@ Function mul(Optional a As Long, Optional b As Long)
 	mul = result
 End Function
 
+Function _inRange(lo As Long, hi As Long, x As Long) As Boolean
+	_inRange = (lo &lt;= x) And (x &lt;= hi)
+End Function
+
 Function inRange(Optional lo As Long, Optional hi As Long, Optional x As Long)
-	inRange = CBool( (lo &lt;= x) And (x &lt;= hi) )
+	inRange = _apply(Fn.inRange, lo, hi, x)
 End Function
 
 Function equ(a As Variant, b As Variant) As Boolean
@@ -632,6 +636,7 @@ Function test_mul()
 End Function
 
 Function test_inRange()
+	dim actual as Boolean
 	assertEqual(inRange(48, 57, 47), False).x
 	assertEqual(inRange(48, 57, 48), True).x
 	assertEqual(inRange(48, 57, 55), True).x
