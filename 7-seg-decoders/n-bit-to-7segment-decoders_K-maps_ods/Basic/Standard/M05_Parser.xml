@@ -471,27 +471,27 @@ Function test_Parser()
 	test_Parser_str()
 	test_Parser_choice()
 	test_Parser_zeroOrOne()
-&apos; 1 sec for 273 ~&gt; &gt;273 aPerSec
+&apos; 0.4 sec for 273 ~&gt; 682.5 aPerSec
 	test_Parser_white()
 	test_Parser_binDigit()
-&apos; 1 sec for 322 ~&gt; 322 aPerSec
+&apos; 0.6 sec for 322 ~&gt; 536.7 aPerSec
 	test_Parser_decDigit()
-&apos; 2 sec for 359 ~&gt; 180 aPerSec
+&apos; 0.8 sec for 359 ~&gt; 448.8 aPerSec
 	test_Parser_hexDigit()
-&apos; 3 sec for 408 ~&gt; 136 aPerSec
+&apos; 1.1 sec for 408 ~&gt; 370.9 aPerSec
 	test_Parser_manyRev()
 	test_Parser_many()
-&apos; 5 sec for 540 ~&gt; 108 aPerSec
+&apos; 2.2 sec for 540 ~&gt; 245.5 aPerSec
 	test_Parser_many1Rev()
 	test_Parser_many1()
-&apos; 7 sec for 632 ~&gt; 90 aPerSec
+&apos; 2.9 sec for 632 ~&gt; 217.9 aPerSec
 	test_Parser_seq()
-&apos; 8 sec for 702 ~&gt; 88 aPerSec
+&apos; 3.4 sec for 702 ~&gt; 206.5 aPerSec
 	test_Parser_hexNum()
 Goto end_of_Parser_tests
-&apos; 12 sec for 781 ~&gt; 65 aPerSec
+&apos; 4.3 sec for 781 ~&gt; 181.6 aPerSec
 	test_Parser_hexLit()
-&apos; 16 sec for 883 ~&gt; 55 aPerSec
+&apos; 5.3 sec for 883 ~&gt; 166.6 aPerSec
 
 end_of_Parser_tests:	
 	aCount = assertionCount - aCount
@@ -590,7 +590,7 @@ Function test_Parser_return()
 	Dim expected As Variant
 	
 	p = pReturn
-	assertEqual(typeOf(p), typeOf(nil)).x
+	assertEqual(isFn(p), True).x
 	assertEqual(arity(p),  1).x
 
 	p = pReturn(&quot;bar&quot;)

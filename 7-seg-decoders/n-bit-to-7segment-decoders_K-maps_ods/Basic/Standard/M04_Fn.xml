@@ -4,6 +4,12 @@
 Option Explicit
 
 Type TFn
+	which		As Variant
+	arity 		As Integer
+	partialArgs As Variant
+End Type
+
+Type TFnObjs
 	id 		As Object
 	fstArg 	As Object
 	sndArg 	As Object
@@ -20,10 +26,30 @@ Sub Main
 	test_Fn()
 End Sub
 
+Function newFn(name As String, arity As Integer)
+	Dim result As New TFn
+	result.which = name
+	result.arity = arity
+	newFn = result
+End Function
+
+Function mkPartialApp(fn As Object, arg As Variant)
+	Dim result As New TFn
+	If isPartialApp(fn) Then
+		result.which = fn.which
+		result.partialArgs = cons(arg, partialArgs(fn))
+	Else
+		result.which = fn
+		result.partialArgs = cons(arg, nil)
+	End If
+	result.arity = arity(fn) - 1
+	mkPartialApp = result
+End Function
+
 Function Fn
 	Static result As Object
 	If isNull(result) Then
-		Set result = New TFn
+		Set result = New TFnObjs
 		result.id      	= lookupFn(&quot;id&quot;)
 		result.fstArg  	= lookupFn(&quot;fstArg&quot;)
 		result.sndArg  	= lookupFn(&quot;sndArg&quot;)
@@ -77,46 +103,46 @@ Function fnObjs()
 	Static result As Object
 	If IsNull(result) Then
 		result = toList(Array(_
-			List(&quot;isString&quot;,		True, 1), _
-			List(&quot;toString&quot;,		True, 1), _
-			List(&quot;id&quot;,				True, 1), _
-			List(&quot;fstArg&quot;,			True, 2), _
-			List(&quot;sndArg&quot;,			True, 2), _
-			List(&quot;swap&quot;,			True, 3), _
-			List(&quot;compose&quot;,			True, 3), _
-			List(&quot;ite&quot;,				True, 4), _
-			List(&quot;add&quot;,				True, 2), _
-			List(&quot;mul&quot;,				True, 2), _
-			List(&quot;inRange&quot;,			True, 3), _
-			List(&quot;equ&quot;,				True, 2), _
-			List(&quot;concat&quot;,			True, 2), _
-			List(&quot;asc&quot;,				True, 1), _
-			List(&quot;chr&quot;,				True, 1), _
-			List(&quot;readHex&quot;,			True, 1), _
+			newFn(&quot;isString&quot;,		1), _
+			newFn(&quot;toString&quot;,		1), _
+			newFn(&quot;id&quot;,				1), _
+			newFn(&quot;fstArg&quot;,			2), _
+			newFn(&quot;sndArg&quot;,			2), _
+			newFn(&quot;swap&quot;,			3), _
+			newFn(&quot;compose&quot;,			3), _
+			newFn(&quot;ite&quot;,				4), _
+			newFn(&quot;add&quot;,				2), _
+			newFn(&quot;mul&quot;,				2), _
+			newFn(&quot;inRange&quot;,			3), _
+			newFn(&quot;equ&quot;,				2), _
+			newFn(&quot;concat&quot;,			2), _
+			newFn(&quot;asc&quot;,				1), _
+			newFn(&quot;chr&quot;,				1), _
+			newFn(&quot;readHex&quot;,			1), _
 			_
-			List(&quot;existsF&quot;,			True, 1), _
-			List(&quot;arityF&quot;, 			True, 1), _
-			List(&quot;applyToList&quot;,		True, 2), _
+			newFn(&quot;existsF&quot;,			1), _
+			newFn(&quot;arityF&quot;, 			1), _
+			newFn(&quot;applyToList&quot;,		2), _
 			_
-			List(&quot;TList_toString&quot;,	True, 1), _
-			List(&quot;TList_equ&quot;,		True, 2), _
-			List(&quot;isNil&quot;,			True, 1), _
-			List(&quot;cons&quot;,			True, 2), _
-			List(&quot;car&quot;,				True, 1), _
-			List(&quot;cdr&quot;,				True, 1), _
-			List(&quot;cadr&quot;,			True, 1), _
-			List(&quot;caddr&quot;,			True, 1), _
-			List(&quot;foldl&quot;,			True, 3), _
-			List(&quot;foldr&quot;,			True, 3), _
-			List(&quot;foldl1&quot;,			True, 2), _
-			List(&quot;foldr1&quot;,			True, 2), _
-			List(&quot;map&quot;,				True, 2), _
-			List(&quot;filter&quot;,			True, 2), _
-			List(&quot;adjoin&quot;,			True, 2), _
-			List(&quot;flatten&quot;,			True, 1), _
-			List(&quot;reverse&quot;,			True, 1), _
+			newFn(&quot;TList_toString&quot;,	1), _
+			newFn(&quot;TList_equ&quot;,		2), _
+			newFn(&quot;isNil&quot;,			1), _
+			newFn(&quot;cons&quot;,			2), _
+			newFn(&quot;car&quot;,				1), _
+			newFn(&quot;cdr&quot;,				1), _
+			newFn(&quot;cadr&quot;,			1), _
+			newFn(&quot;caddr&quot;,			1), _
+			newFn(&quot;foldl&quot;,			3), _
+			newFn(&quot;foldr&quot;,			3), _
+			newFn(&quot;foldl1&quot;,			2), _
+			newFn(&quot;foldr1&quot;,			2), _
+			newFn(&quot;map&quot;,				2), _
+			newFn(&quot;filter&quot;,			2), _
+			newFn(&quot;adjoin&quot;,			2), _
+			newFn(&quot;flatten&quot;,			1), _
+			newFn(&quot;reverse&quot;,			1), _
 			_
-			List(&quot;mkParser&quot;,		True, 2)_
+			newFn(&quot;mkParser&quot;,		2)_
 		))
 	End If
 	fnObjs = result
@@ -127,7 +153,7 @@ Function lookupFn(name As String) As Variant
 	Dim fs As Object
 	fs = fnObjs
 	While Not(isNil(fs))
-		If (car(car(fs)) = name) Then
+		If (getFnName(car(fs)) = name) Then
 			result = car(fs)
 			fs = nil
 		Else
@@ -149,20 +175,20 @@ Function arityF(fName As String) As Integer
 	End If
 End Function
 
+Function arity(fn As Object) As Integer
+	arity = fn.arity
+End Function
+
 Function isFn(ByVal fn As Variant) As Boolean
-	If (typeOf(fn) = typeOf(nil)) Then
-		Dim k As Integer
-		k = length(fn)
-		Select Case k
-			Case 2
-				isFn = True	&apos;(typeOf(car(fn)) = typeOf(nil))	&apos; isFn(car(fn))
-				&apos;TODO: check if partialArgs is proper list
-				Exit Function
-			Case 3
-				isFn = (isString(car(fn)) And (typeOf(cadr(fn)) = &quot;Boolean&quot;) And (typeOf(caddr(fn)) = &quot;Integer&quot;))
-				Exit Function
-		End Select
+	If isObject(fn) Then
+		On Local Error Goto isFn_returnsFalse
+		fn.which
+		fn.arity
+		fn.partialArgs
+		isFn = True
+		Exit Function
 	End If
+isFn_returnsFalse:
 	isFn = False
 End Function
 
@@ -185,34 +211,24 @@ Function asFn(fn As Variant, Optional ByVal msg As String)
 End Function
 
 Function isPartialApp(fn As Object) As Boolean
-	isPartialApp = Not(isString(car(fn)))
+	isPartialApp = Not(isEmpty(fn.partialArgs))
 End Function
 
 Function partialArgs(fn As Object)	&apos; ATTENTION: stored in reverse order!
 	Dim result As Object
 	If isPartialApp(fn) Then
-		result = cadr(fn)
+		result = fn.partialArgs
 	Else
 		result = nil
 	End If
 	partialArgs = result
 End Function
 
-Function arity(fn As Object) As Integer
-	Dim result As Integer
-	If isPartialApp(fn) Then
-		result = arity(car(fn)) - length(partialArgs(fn))
-	Else
-		result = caddr(fn)
-	End If
-	arity = result
-End Function
-
 Function getFnName(f As Object)
 	If isPartialApp(f) Then
-		getFnName = car(car(f))
+		getFnName = getFnName(f.which)
 	Else
-		getFnName = car(f)
+		getFnName = f.which
 	End If
 End Function
 
@@ -225,11 +241,7 @@ Function apply1(ByVal fn As Variant, ByVal arg As Variant)
 	ElseIf r = 1 Then
 		result = applyLast(fn, arg)
 	Else
-		If isPartialApp(fn) Then
-			result = List(car(fn), cons(arg, partialArgs(fn)))
-		Else
-			result = cons( fn, cons(cons(arg, nil), nil) ) &apos; List(fn, List(arg))
-		End If
+		result = mkPartialApp(fn, arg)
 	End If
 	apply1 = result
 End Function
@@ -239,7 +251,7 @@ Function applyLast(fn As Object, arg As Variant)
 	Dim reverseArgs As Object
 	If isPartialApp(fn) Then
 		reverseArgs = partialArgs(fn)
-		fn = car(fn)
+		fn = fn.which
 	Else
 		reverseArgs = nil
 	End If
