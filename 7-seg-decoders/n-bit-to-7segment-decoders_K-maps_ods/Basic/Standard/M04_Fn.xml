@@ -17,8 +17,20 @@ Type TFnObjs
 	compose As Object
 	ite		As Object
 	asc		As Object
+	chr		As Object
 	add		As Object
+	readHex As Object
+	mul		As Object
+	equ		As Object
 	inRange	As Object
+	
+	isNil	As Object
+	cons	As Object
+	length	As Object
+	car		As Object
+	cdr		As Object
+	
+	mkParser As Object
 End Type
 
 
@@ -33,19 +45,6 @@ Function newFn(name As String, arity As Integer)
 	newFn = result
 End Function
 
-Function mkPartialApp(fn As Object, arg As Variant)
-	Dim result As New TFn
-	If isPartialApp(fn) Then
-		result.which = fn.which
-		result.partialArgs = cons(arg, partialArgs(fn))
-	Else
-		result.which = fn
-		result.partialArgs = cons(arg, nil)
-	End If
-	result.arity = arity(fn) - 1
-	mkPartialApp = result
-End Function
-
 Function Fn
 	Static result As Object
 	If isNull(result) Then
@@ -57,10 +56,35 @@ Function Fn
 		result.compose 	= lookupFn(&quot;compose&quot;)
 		result.ite 		= lookupFn(&quot;ite&quot;)
 		result.asc 		= lookupFn(&quot;asc&quot;)
+		result.chr 		= lookupFn(&quot;chr&quot;)
 		result.add 		= lookupFn(&quot;add&quot;)
+		result.mul 		= lookupFn(&quot;mul&quot;)
+		result.readHex	= lookupFn(&quot;readHex&quot;)
+		result.equ		= lookupFn(&quot;equ&quot;)
 		result.inRange	= lookupFn(&quot;inRange&quot;)
+
+		result.isNil	= lookupFn(&quot;isNil&quot;)
+		result.cons		= lookupFn(&quot;cons&quot;)
+		result.length	= lookupFn(&quot;length&quot;)
+		result.car 		= lookupFn(&quot;car&quot;)
+		result.cdr 		= lookupFn(&quot;cdr&quot;)
+
+		result.mkParser	= lookupFn(&quot;mkParser&quot;)
 	End If
 	Fn = result
+End Function
+
+Function mkPartialApp(fn As Object, arg As Variant)
+	Dim result As New TFn
+	If isPartialApp(fn) Then
+		result.which = fn.which
+		result.partialArgs = cons(arg, partialArgs(fn))
+	Else
+		result.which = fn
+		result.partialArgs = cons(arg, nil)
+	End If
+	result.arity = arity(fn) - 1
+	mkPartialApp = result
 End Function
 
 Function TFn_toString(ByVal f)
@@ -128,19 +152,20 @@ Function fnObjs()
 			newFn(&quot;TList_equ&quot;,		2), _
 			newFn(&quot;isNil&quot;,			1), _
 			newFn(&quot;cons&quot;,			2), _
-			newFn(&quot;car&quot;,				1), _
-			newFn(&quot;cdr&quot;,				1), _
+			newFn(&quot;length&quot;,			1), _
+			newFn(&quot;car&quot;,			1), _
+			newFn(&quot;cdr&quot;,			1), _
 			newFn(&quot;cadr&quot;,			1), _
 			newFn(&quot;caddr&quot;,			1), _
 			newFn(&quot;foldl&quot;,			3), _
 			newFn(&quot;foldr&quot;,			3), _
 			newFn(&quot;foldl1&quot;,			2), _
 			newFn(&quot;foldr1&quot;,			2), _
-			newFn(&quot;map&quot;,				2), _
+			newFn(&quot;map&quot;,			2), _
 			newFn(&quot;filter&quot;,			2), _
 			newFn(&quot;adjoin&quot;,			2), _
-			newFn(&quot;flatten&quot;,			1), _
-			newFn(&quot;reverse&quot;,			1), _
+			newFn(&quot;flatten&quot;,		1), _
+			newFn(&quot;reverse&quot;,		1), _
 			_
 			newFn(&quot;mkParser&quot;,		2)_
 		))
@@ -320,6 +345,8 @@ Function applyBuiltinRev(fn As Object, ByVal reverseArgs As Object)
 		Case &quot;TList_equ&quot;:		result = TList_equ(		a(0), a(1)			)
 		Case &quot;isNil&quot;:			result = isNil(			a(0)				)
 		Case &quot;cons&quot;:			result = cons(			a(0), a(1)			)
+		Case &quot;length&quot;
+			result = length(			a(0)			)
 		Case &quot;snoc&quot;:			result = snoc(			a(0), a(1)			)
 		Case &quot;car&quot;:				result = car(			a(0)				)
 		Case &quot;cdr&quot;:				result = cdr(			a(0)				)
@@ -407,13 +434,13 @@ Function test_Fn()
 	assertEqual(lookupFn(&quot;non-existent&quot;), Empty).x
 		
 	Dim fId As Variant
-	fId = lookupFn(&quot;id&quot;)
+	fId = Fn.id
 	assertEqual(isPartialApp(fId), False).x
 	assertEqual(arity(fId), 1).x
 	assertEqual(apply(fId, 0), id(0)).x
 
 	Dim fCar As Variant
-	fCar = lookupFn(&quot;car&quot;)
+	fCar = Fn.car
 	assertEqual(isPartialApp(fCar), False).x
 	assertEqual(isNil(partialArgs(fCar)), True).x
 	assertEqual(arity(fCar), 1).x
@@ -422,7 +449,7 @@ Function test_Fn()
 	assertEqual( apply1(fCar, List(&quot;a&quot;)), &quot;a&quot; ).x
 		
 	Dim fEqu As Variant
-	fEqu = lookupFn(&quot;equ&quot;)
+	fEqu = Fn.equ
 	assertEqual(isPartialApp(fEqu), False).x
 	assertEqual(isNil(partialArgs(fEqu)), True).x
 	assertEqual(arity(fEqu), 2).x
@@ -446,7 +473,7 @@ Function test_Fn()
 	assertEqual(eq5_5, True).x
 
 	Dim konst5 As Variant
-	konst5 = apply1(lookupFn(&quot;fstArg&quot;), 5)
+	konst5 = apply1(Fn.fstArg, 5)
 	assertEqual(isPartialApp(konst5), True).x
 	assertEqual(arity(konst5), 1).x
 	assertEqual(apply1(konst5, 7), 	5).x
@@ -458,7 +485,7 @@ Function test_Fn()
 	assertEqual(fstArg(5, 7), 		5).x
 		
 	Dim sndArg5 As Variant
-	sndArg5 = apply1(lookupFn(&quot;sndArg&quot;), 5)
+	sndArg5 = apply1(Fn.sndArg, 5)
 	assertEqual(isPartialApp(sndArg5), True).x
 	assertEqual(arity(sndArg5), 1).x
 	assertEqual(apply1(sndArg5, 7), 7).x
@@ -470,7 +497,7 @@ Function test_Fn()
 	assertEqual(sndArg(5, 7), 		7).x
 		
 	Dim fIte As Variant
-	fIte = lookupFn(&quot;ite&quot;)
+	fIte = Fn.ite
 	assertEqual(isPartialApp(fIte), False).x
 	assertEqual(arity(fIte), 4).x
 
@@ -496,7 +523,7 @@ Function test_Fn()
 &apos;	MsgBox( toString(iteFalse42Seven) )
 
 	Dim fAsc As Variant
-	fAsc = lookupFn(&quot;asc&quot;)
+	fAsc = Fn.asc
 	assertEqual(arity(fAsc), 1).x
 	assertEqual(apply(fAsc, &quot; &quot;), 		Asc(&quot; &quot;)).x
 	assertEqual(apply(fAsc, Chr( 9)), 	       9).x
@@ -508,7 +535,7 @@ Function test_Fn()
 	assertEqual(apply(fAsc, &quot;Z&quot;), 		Asc(&quot;Z&quot;)).x
 
 	Dim fChr As Variant
-	fChr = lookupFn(&quot;chr&quot;)
+	fChr = Fn.chr
 	assertEqual(arity(fChr), 1).x
 	assertEqual(apply(fChr,  9), 	Chr( 9)).x
 	assertEqual(apply(fChr, 13), 	Chr(13)).x
@@ -520,7 +547,7 @@ Function test_Fn()
 
 
 	Dim fAdd As Variant
-	fAdd = lookupFn(&quot;add&quot;)
+	fAdd = Fn.add
 	assertEqual(arity(fAdd), 2).x
 	assertEqual(apply(fAdd,  0,  0), 	add(0, 0)).x
 	assertEqual(apply(fAdd,  0,  1), 	add(0, 1)).x
@@ -530,7 +557,7 @@ Function test_Fn()
 	assertEqual(apply(fAdd, 65535), add(65535, 65535)).x
 
 	Dim fMul As Variant
-	fMul = lookupFn(&quot;mul&quot;)
+	fMul = Fn.mul
 	assertEqual(arity(fMul), 2).x
 	assertEqual(apply(fMul,  0,  0), 	mul(0, 0)).x
 	assertEqual(apply(fMul,  0,  1), 	mul(0, 1)).x
@@ -540,7 +567,7 @@ Function test_Fn()
 	assertEqual(apply(fMul, 32767), mul(65535, 32767)).x
 
 	Dim fReadhex As Variant
-	fReadHex = lookupFn(&quot;readHex&quot;)
+	fReadHex = Fn.readHex
 	assertEqual(arity(fReadHex), 1).x
 	assertEqual(apply(fReadHex,  &quot;0&quot;),  readHex(&quot;0&quot;)).x
 	assertEqual(apply(fReadHex,  &quot;1&quot;),  readHex(&quot;1&quot;)).x

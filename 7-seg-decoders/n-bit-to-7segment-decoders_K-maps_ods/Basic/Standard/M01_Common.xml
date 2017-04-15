@@ -71,7 +71,7 @@ End Function
 
 &apos; :: (b -&gt; a) -&gt; a -&gt; b = (b -&gt; a) -&gt; (a -&gt; b)
 Function _swap(Optional ByVal f, Optional x, Optional y)
-	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;swap&quot;) : End If
+	Static oFn As Object : If isNull(oFn) Then : Set oFn = Fn.swap : End If
 	Dim result As Variant
 	If isMissing(f) Then
 		result = oFn
@@ -97,7 +97,7 @@ End Function
 &apos; B = \f g x.f (g x)
 &apos;   :: (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c  =  (b -&gt; c) -&gt; (a -&gt; b) -&gt; (a -&gt; c)
 Function _compose(Optional ByVal f, Optional ByVal g, Optional x)
-	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;compose&quot;) : End If
+	Static oFn As Object : If isNull(oFn) Then : Set oFn = Fn.compose : End If
 	Dim result As Variant
 	If isMissing(f) Then
 		result = oFn
@@ -166,7 +166,7 @@ Function startsWith(s As String, prefix As String)
 End Function
 
 Function _add(Optional a As Long, Optional b As Long)
-	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;add&quot;) : End If
+	Static oFn As Object : If isNull(oFn) Then : Set oFn = Fn.add : End If
 	Dim result As Variant
 	If isMissing(a) Then
 		result = oFn
@@ -185,7 +185,7 @@ Function add(Optional a As Long, Optional b As Long)
 End Function
 
 Function mul(Optional a As Long, Optional b As Long)
-	Static oFn As Object : If isNull(oFn) Then : Set oFn = lookupFn(&quot;mul&quot;) : End If
+	Static oFn As Object : If isNull(oFn) Then : Set oFn = Fn.mul : End If
 	Dim result As Variant
 	If isMissing(a) Then
 		result = oFn
@@ -466,7 +466,7 @@ Function test_toString()
 End Function
 
 Function test_id()
-	assertEqual(arityF(&quot;id&quot;), 1).x
+	assertEqual(arity(Fn.id), 1).x
 	assertEqual(arity(id), 1).x
 
 	assertEqual(id(Empty), Empty).x
@@ -480,7 +480,7 @@ Function test_id()
 End Function
 
 Function test_fstArg()
-	assertEqual(arityF(&quot;fstArg&quot;), 2).x
+	assertEqual(arity(Fn.fstArg), 2).x
 
 	assertEqual(fstArg(1, 2), 1).x
 	assertEqual(fstArg(2, 1), 2).x
@@ -489,7 +489,7 @@ Function test_fstArg()
 End Function
 
 Function test_sndArg()
-	assertEqual(arityF(&quot;sndArg&quot;), 2).x
+	assertEqual(arity(Fn.sndArg), 2).x
 
 	assertEqual(sndArg(1, 2), 2).x
 	assertEqual(sndArg(2, 1), 1).x
@@ -498,78 +498,58 @@ Function test_sndArg()
 End Function
 
 Function test_swap()
-	assertEqual(arityF(&quot;swap&quot;), 3).x
+	assertEqual(arity(Fn.swap), 3).x
 
-	assertEqual(swap(lookupFn(&quot;fstArg&quot;), 1, 2), 2).x
-	assertEqual(swap(lookupFn(&quot;sndArg&quot;), 1, 2), 1).x
+	assertEqual(swap(Fn.fstArg, 1, 2), 2).x
+	assertEqual(swap(Fn.sndArg, 1, 2), 1).x
 
-	assertEqual(swap(&quot;fstArg&quot;, 1, 2), 2).x
-	assertEqual(swap(&quot;sndArg&quot;, 1, 2), 1).x
+	assertEqual(swap(Fn.fstArg, 1, 2), 2).x
+	assertEqual(swap(Fn.sndArg, 1, 2), 1).x
 
 	Dim f As Variant &apos; test partial application
 	
 	f = swap
 	assertEqual(arity(f), 3).x
-	assertEqual(apply(f, lookupFn(&quot;fstArg&quot;), 1, 2), 2).x
-	assertEqual(apply(f, lookupFn(&quot;sndArg&quot;), 1, 2), 1).x
+	assertEqual(apply(f, Fn.fstArg, 1, 2), 2).x
+	assertEqual(apply(f, Fn.sndArg, 1, 2), 1).x
 
-	assertEqual(apply(f, &quot;fstArg&quot;, 1, 2), 2).x
-	assertEqual(apply(f, &quot;sndArg&quot;, 1, 2), 1).x
+	assertEqual(apply(f, Fn.fstArg, 1, 2), 2).x
+	assertEqual(apply(f, Fn.sndArg, 1, 2), 1).x
 	
 	&apos; partially applied to 1 arg:
-	f = swap(lookupFn(&quot;fstArg&quot;))
+	f = swap(Fn.fstArg)
 	assertEqual(arity(f), 2).x
 	assertEqual(apply(f, 1, 2), 2).x
 	
-	f = swap(&quot;fstArg&quot;)
-	assertEqual(arity(f), 2).x
-	assertEqual(apply(f, 1, 2), 2).x
-	
-	f = swap(lookupFn(&quot;sndArg&quot;))
-	assertEqual(arity(f), 2).x
-	assertEqual(apply(f, 1, 2), 1).x
-	
-	f = swap(&quot;sndArg&quot;)
+	f = swap(Fn.sndArg)
 	assertEqual(arity(f), 2).x
 	assertEqual(apply(f, 1, 2), 1).x
 	
 	&apos; partially applied to 2 args:
-	f = swap(lookupFn(&quot;fstArg&quot;), 1)
+	f = swap(Fn.fstArg, 1)
 	assertEqual(arity(f), 1).x
 	assertEqual(apply(f, 2), 2).x
-	
-	f = swap(&quot;fstArg&quot;, 1)
-	assertEqual(arity(f), 1).x
-	assertEqual(apply(f, 2), 2).x
-	
-	f = swap(lookupFn(&quot;sndArg&quot;), 1)
-	assertEqual(arity(f), 1).x
-	assertEqual(apply(f, 2), 1).x
-	
-	f = swap(&quot;sndArg&quot;, 1)
+		
+	f = swap(Fn.sndArg, 1)
 	assertEqual(arity(f), 1).x
 	assertEqual(apply(f, 2), 1).x
 End Function
 
 Function test_compose()
-	assertEqual(arityF(&quot;compose&quot;), 3).x
+	assertEqual(arity(Fn.compose), 3).x
 
 	Dim f As Variant
 	
 	f = compose
-	assertEqual(typeOf(f), typeOf(nil)).x
+	assertEqual(isFn(f), True).x
 	assertEqual(arity(f), 3).x
 	
-	f = compose(compose)
-	assertEqual(typeOf(f), typeOf(nil)).x
-	assertEqual(arity(f), 2).x
-
 	f = compose(compose, compose)
-	assertEqual(typeOf(f), typeOf(nil)).x
+	assertEqual(isFn(f), True).x
 	assertEqual(arity(f), 1).x
 
 	f = compose(fstArg(5), fstArg(7))
-	assertEqual(typeOf(f), typeOf(nil)).x
+	assertEqual(isFn(f), True).x
 	assertEqual(arity(f), 1).x
 	assertEqual(apply(f, 42), 5).x
 	

@@ -34,7 +34,7 @@ Function mkParser(Optional tp As String, Optional st As Variant)
 	Static oFn As Object
 	Dim result As Object
 	If isMissing(st) Then
-		If isNull(oFn) Then : Set oFn = lookupFn(&quot;mkParser&quot;) : End If
+		If isNull(oFn) Then : Set oFn = Fn.mkParser : End If
 		If isMissing(tp) Then
 			result = oFn
 		Else

@@ -42,26 +42,35 @@ IncompatibleCars:
 End Function
 
 Function nil()
-	Static result As New TList	&apos; uninitialized instance at first
-	result.tyname = &quot;TList&quot;
+	Static result As Object
+	If isNull(result) Then
+		Set result = New TList
+		result.tyname = &quot;TList&quot;
+	End If
 	nil = result
 End Function
 
-Function isNil(xs As TList)
-	isNil = (xs.len = 0)
+Function isNil(Optional xs As TList)
+	If isMissing(xs) Then : isNil = Fn.isNil : Else
+		isNil = (xs.len = 0)
+	End If
 End Function
 
-Function length(xs As TList)
-	length = xs.len
+Function length(Optional xs As TList)
+	If isMissing(xs) Then : length = Fn.length : Else
+		length = xs.len
+	End If
 End Function
 
-Function cons(x As Variant, xs As TList)
-	Dim result As New TList
-	result.tyname = xs.tyname
-	result.head = x
-	result.tail = xs
-	result.len = xs.len + 1
-	cons = result
+Function cons(Optional x As Variant, Optional xs As TList)
+	If isMissing(xs) Then : cons = _apply(Fn.cons, x) : Else
+		Dim result As New TList
+		result.tyname = xs.tyname
+		result.head = x
+		result.tail = xs
+		result.len = xs.len + 1
+		cons = result
+	End If
 End Function
 
 Function car(xs As TList) As Variant
@@ -166,8 +175,7 @@ Function reverse(xs As TList)
 	If xs.len &lt;= 1 Then
 		result = xs
 	Else
-		result = foldl(apply(&quot;swap&quot;, lookupFn(&quot;cons&quot;)), nil, xs)
-&apos;		result = foldl(swap(cons), nil, xs)
+		result = foldl(swap(cons), nil, xs)
 	End If
 	reverse = result
 End Function
@@ -229,6 +237,7 @@ End Function
 
 Function test_List()
 	test_List_isNil_and_cons()
+	test_List_length()
 	test_List_fnApp()
 	test_List_typeOfAndToString()
 	test_List_List()
@@ -251,15 +260,29 @@ Function test_List_isNil_and_cons()
 	assertEqual(isNil(cons(0, nil)), False).x
 	assertEqual(isNil(cons(&quot;&quot;, nil)), False).x
 	
-	assertEqual(apply(&quot;isNil&quot;, nil), True).x
+	assertEqual(apply(isNil, nil), True).x
 		
 	&apos;assertEqual(toString(isNil(Empty)), &quot;[&apos;isNil&apos;, True, 1]&quot;).x
 	&apos;assertEqual(apply(isNil, Nothing), True).x
 End Function
 
+Function test_List_length()
+	assertEqual(length(					nil), 	0).x
+	assertEqual(length(			cons(0, nil)), 	1).x
+	assertEqual(length(cons(0, 	cons(0, nil))), 2).x
+
+	assertEqual(isFn(Fn.length), 	True).x
+	assertEqual(isFn(length), 		True).x
+	assertEqual(arity(length), 		   1).x
+	
+	assertEqual(apply(length,						nil), 	0).x
+	assertEqual(apply(length,				cons(0, nil)), 	1).x
+	assertEqual(apply(length,	cons(0, 	cons(0, nil))), 2).x
+End Function
+
 Function test_List_fnApp()
 	assertEqual(arityF(&quot;TList_toString&quot;), 1).x
-	assertEqual(arityF(&quot;cons&quot;), 2).x
+	assertEqual(arity(cons), 2).x
 	assertEqual(arityF(&quot;reverse&quot;), 1).x
 End Function
 
