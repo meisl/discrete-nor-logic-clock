@@ -103,11 +103,18 @@ End Function
 
 &apos; succeeds on strings with the given prefix t by returning t,
 &apos; and advancing pos by the length of t
-Function pStr(t As String)
-	If (Len(t) = 0) Then
-		croak(&quot;pStr: cannot match &apos;exactly&apos; the empty string t=&apos;&apos;&quot;)
+Function pStr(Optional t As String)
+	Static oFn As Object
+	If isMissing(t) Then
+		If isNull(oFn) Then : oFn = mkParser(&quot;str&quot;) : End If
+		pStr = oFn
+		Exit Function
 	Else
-		pStr = mkParser(&quot;str&quot;, t)
+		If (Len(t) = 0) Then
+			croak(&quot;pStr: cannot match &apos;exactly&apos; the empty string t=&apos;&apos;&quot;)
+		Else
+			pStr = mkParser(&quot;str&quot;, t)
+		End If	
 	End If
 End Function
 
@@ -118,26 +125,47 @@ End Function
 &apos; succeeds if either p1 succeeds (then returning p1&apos;s result and pos)
 &apos; or (and only if p1 fails) if p2 succeeds, returns p2&apos;s result and pos.
 &apos; fails if both, p1 and p2 fail
-Function pChoice(p1 As Parser, p2 As Parser)
-	&apos; TODO: @pChoice: strip out always failing parsers
-	&apos; TODO: @pChoice: if p1 always succeeds strip out p2
-&apos;	pChoice = mkParser(&quot;choice&quot;, List(p1, p2))
-&apos;	Exit Function
-	Dim choices As Variant
-	If p2.tp = &quot;choice&quot; Then
-		If p1.tp = &quot;choice&quot; Then
-			choices = adjoin(p1.st, p2.st)
-		Else
-			choices = cons(p1,  p2.st)
-		End If
-	Else
-		If p1.tp = &quot;choice&quot; Then
-			choices = adjoin(p1.st, List(p2))
-		Else
-			choices = List(p1, p2)
-		End If
+Function pChoice(Optional p1 As Parser, Optional p2 As Parser)
+	Dim oFn As Object
+	If isNull(oFn) Then
+		&apos;list1 = swap(cons, nil)
+		&apos;      = \y.(swap cons) nil y
+		&apos;      = \y.cons y nil
+		&apos;      :: a -&gt; [a]
+		&apos;list2 = (swap cons) ° list1 
+		&apos;      =   \y.(swap cons) list1 y
+		&apos;      =   \y.(swap cons) (\y.cons y nil) y
+		&apos;      =   \y.(swap cons) (cons y nil)
+		&apos;      = \x y.(swap cons) (cons y nil) x 
+		&apos;      = \x y.cons x (cons y nil)
+		&apos;      :: a -&gt; a -&gt; [a]
+		Set oFn = Fn.pChoice
 	End If
-	pChoice = mkParser(&quot;choice&quot;, choices)
+	If isMissing(p1) Then
+		pChoice = oFn
+	ElseIf isMissing(p2) Then
+		pChoice = apply(oFn, p1)
+	Else
+		&apos; TODO: @pChoice: strip out always failing parsers
+		&apos; TODO: @pChoice: if p1 always succeeds strip out p2
+	&apos;	pChoice = mkParser(&quot;choice&quot;, List(p1, p2))
+	&apos;	Exit Function
+		Dim choices As Variant
+		If p2.tp = &quot;choice&quot; Then
+			If p1.tp = &quot;choice&quot; Then
+				choices = adjoin(p1.st, p2.st)
+			Else
+				choices = cons(p1,  p2.st)
+			End If
+		Else
+			If p1.tp = &quot;choice&quot; Then
+				choices = adjoin(p1.st, List(p2))
+			Else
+				choices = List(p1, p2)
+			End If
+		End If
+		pChoice = mkParser(&quot;choice&quot;, choices)
+	End If
 End Function
 
 &apos; never fails: if p fails than pZeroOrOne(p) returns nil + same pos as result,
@@ -288,9 +316,19 @@ End Function
 Function pHexLit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pSeq(Array(pStr(&quot;0x&quot;), pHexNum), Fn.sndArg)
+		result = pSeq(Array(pStr(&quot;0x&quot;), pHexNum), sndArg)
 	End If
 	pHexLit = result
+End Function
+
+Function pBaseType()
+	Static result As Object
+	If isNull(result) Then
+		Dim baseTypes as Object
+		Set baseTypes = List(&quot;Bool&quot;, &quot;Str&quot;, &quot;Int&quot;, &quot;Long&quot;)
+		result = foldl1(pChoice, map(pStr, baseTypes))
+	End If
+	pBaseType = result
 End Function
 
 
@@ -473,6 +511,7 @@ Function test_Parser()
 	test_Parser_zeroOrOne()
 &apos; 0.4 sec for 273 ~&gt; 682.5 aPerSec
 	test_Parser_white()
+	test_Parser_baseType()
 	test_Parser_binDigit()
 &apos; 0.6 sec for 322 ~&gt; 536.7 aPerSec
 	test_Parser_decDigit()
@@ -488,9 +527,9 @@ Function test_Parser()
 	test_Parser_seq()
 &apos; 3.4 sec for 702 ~&gt; 206.5 aPerSec
 	test_Parser_hexNum()
+Goto end_of_Parser_tests
 &apos; 4.3 sec for 781 ~&gt; 181.6 aPerSec
 	test_Parser_hexLit()
-Goto end_of_Parser_tests
 &apos; 5.3 sec for 883 ~&gt; 166.6 aPerSec
 
 end_of_Parser_tests:	
@@ -615,6 +654,7 @@ End Function
 Function test_Parser_item()
 	Dim p As Parser
 	Set p = pItem
+
 	refute_parses(p, &quot;&quot;).x
 	assert_parses(p, &quot; &quot;,		&quot; &quot;, 2).x
 	assert_parses(p, &quot;a&quot;,		&quot;a&quot;, 2).x
@@ -641,7 +681,11 @@ End Function
 
 
 Function test_Parser_str()
-	Dim p As Parser
+	Dim p As Object
+	
+	p = pStr
+	assertEqual(isFn(p), True).x
+	assertEqual(arity(p),  1).x
 	
 &apos;	assertThrows(pStr, Array(&quot;&quot;)).x
 
@@ -677,9 +721,17 @@ Function test_Parser_str()
 End Function
 
 Function test_Parser_choice()
-	Dim p As Parser
+	Dim p As Object
 	Dim data As Variant
-	
+
+	p = pChoice
+	assertEqual(isFn(p), True).x
+	assertEqual(arity(p),  2).x
+	p = apply(p, pItem)
+	assertEqual(isFn(p), True).x
+	assertEqual(arity(p),  1).x
+	p = apply(p, pReturn(7))
+		
 	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
 		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
 		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
@@ -753,6 +805,30 @@ Function test_Parser_white()
 	refute_parses(p, chr(13) &amp; chr(9) &amp; &quot;asdf&quot;).x
 	assert_parses(p, chr(9) &amp; chr(13) &amp; &quot;asdf&quot;, 	&quot;\t&quot;, 2).x
 	refute_parses(p, chr(13) &amp; chr(13) &amp; &quot;asdf&quot;).x
+End Function
+
+Function test_Parser_baseType()
+	Dim p As Parser
+	p = pBaseType
+
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot;asdf&quot;).x
+	refute_parses(p, &quot;a&quot;).x
+	refute_parses(p, &quot;b&quot;).x
+	refute_parses(p, &quot;c&quot;).x
+	
+	assert_parses(p, &quot;Bool -&gt; Bool&quot;, &quot;Bool&quot;, 5).x
+	assert_parses(p, &quot;Bool&quot;, &quot;Bool&quot;, 5).x
+	refute_parses(p, &quot;bool&quot;).x
+
+	assert_parses(p, &quot;Str&quot;, &quot;Str&quot;, 4).x
+	refute_parses(p, &quot;str&quot;).x
+
+	assert_parses(p, &quot;Int&quot;, &quot;Int&quot;, 4).x
+	refute_parses(p, &quot;int&quot;).x
+
+	assert_parses(p, &quot;Long&quot;, &quot;Long&quot;, 5).x
+	refute_parses(p, &quot;long&quot;).x
 End Function
 
 Function test_Parser_binDigit()

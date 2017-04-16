@@ -4,6 +4,7 @@
 Option Explicit
 
 Type TFn
+	str			As Variant
 	which		As Variant
 	arity 		As Integer
 	partialArgs As Variant
@@ -42,6 +43,7 @@ Type TFnObjs
 	reverse 	As Object
 	
 	mkParser 	As Object
+	pChoice		As Object
 End Type
 
 
@@ -49,10 +51,15 @@ Sub Main
 	test_Fn()
 End Sub
 
-Function newFn(name As String, arity As Integer)
+Function newFn(name As String, arity As Integer, Optional typ)
 	Dim result As New TFn
 	result.which = name
 	result.arity = arity
+	If Not(isMissing(typ)) Then
+		result.str = name &amp; &quot; :: &quot; &amp; toString(typ)
+	Else
+		result.str = name
+	End If
 	newFn = result
 End Function
 
@@ -91,6 +98,7 @@ Function Fn
 		result.reverse	= lookupFn(&quot;reverse&quot;)
 
 		result.mkParser	= lookupFn(&quot;mkParser&quot;)
+		result.pChoice	= lookupFn(&quot;pChoice&quot;)
 	End If
 	Fn = result
 End Function
@@ -143,7 +151,7 @@ Function TFn_toString(ByVal f)
 				
 				k = k + 1
 			Else &apos; r = 2
-			
+				croak(&quot;TFn_toString: compose partially applied to just 1 arg&quot;)
 			End If
 		Else
 			result = &quot;(&quot; &amp; n &amp; &quot;_&quot; &amp; r
@@ -159,7 +167,6 @@ Function TFn_toString(ByVal f)
 			result = result &amp; &quot;)&quot;
 		End If
 	Else
-		n = car(f)
 		result = n &amp; &quot;_&quot; &amp; r
 	End If
 	TFn_toString = result
@@ -169,22 +176,22 @@ Function fnObjs()
 	Static result As Object
 	If IsNull(result) Then
 		result = toList(Array(_
-			newFn(&quot;isString&quot;,		1), _
-			newFn(&quot;toString&quot;,		1), _
-			newFn(&quot;id&quot;,				1), _
-			newFn(&quot;fstArg&quot;,			2), _
-			newFn(&quot;sndArg&quot;,			2), _
-			newFn(&quot;swap&quot;,			3), _
-			newFn(&quot;compose&quot;,		3), _
-			newFn(&quot;ite&quot;,			4), _
-			newFn(&quot;add&quot;,			2), _
-			newFn(&quot;mul&quot;,			2), _
-			newFn(&quot;inRange&quot;,		3), _
-			newFn(&quot;equ&quot;,			2), _
-			newFn(&quot;concat&quot;,			2), _
-			newFn(&quot;asc&quot;,			1), _
-			newFn(&quot;chr&quot;,			1), _
-			newFn(&quot;readHex&quot;,		1), _
+			newFn(&quot;isString&quot;,		1, &quot;a -&gt; Bool&quot;), _
+			newFn(&quot;toString&quot;,		1, &quot;a -&gt; Str&quot;), _
+			newFn(&quot;id&quot;,				1, &quot;a -&gt; a&quot;), _
+			newFn(&quot;fstArg&quot;,			2, &quot;a -&gt; b -&gt; a&quot;), _
+			newFn(&quot;sndArg&quot;,			2, &quot;a -&gt; b -&gt; b&quot;), _
+			newFn(&quot;swap&quot;,			3, &quot;(b -&gt; a -&gt; c) -&gt; a -&gt; b -&gt; c&quot;), _
+			newFn(&quot;compose&quot;,		3, &quot;(b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c&quot;), _
+			newFn(&quot;ite&quot;,			4, &quot;(a -&gt; Bool) -&gt; (a -&gt; b) -&gt; (a -&gt; b) -&gt; a -&gt; b&quot;), _
+			newFn(&quot;add&quot;,			2, &quot;Long -&gt; Long -&gt; Long&quot;), _
+			newFn(&quot;mul&quot;,			2, &quot;Long -&gt; Long -&gt; Long&quot;), _
+			newFn(&quot;inRange&quot;,		3, &quot;Long -&gt; Long -&gt; Long -&gt; Bool&quot;), _
+			newFn(&quot;equ&quot;,			2, &quot;a -&gt; a -&gt; Bool&quot;), _
+			newFn(&quot;concat&quot;,			2, &quot;Str -&gt; Str -&gt; Str&quot;), _
+			newFn(&quot;asc&quot;,			1, &quot;Char -&gt; Int&quot;), _
+			newFn(&quot;chr&quot;,			1, &quot;Int -&gt; Char&quot;), _
+			newFn(&quot;readHex&quot;,		1, &quot;Str -&gt; Long&quot;), _
 			_
 			newFn(&quot;existsF&quot;,		1), _
 			newFn(&quot;arityF&quot;, 		1), _
@@ -206,10 +213,11 @@ Function fnObjs()
 			newFn(&quot;map&quot;,			2), _
 			newFn(&quot;filter&quot;,			2), _
 			newFn(&quot;adjoin&quot;,			2), _
-			newFn(&quot;flatten&quot;,		1), _
-			newFn(&quot;reverse&quot;,		1), _
+			newFn(&quot;flatten&quot;,		1, &quot;List List a -&gt; List a&quot;), _
+			newFn(&quot;reverse&quot;,		1, &quot;List a -&gt; List a&quot;), _
 			_
-			newFn(&quot;mkParser&quot;,		2)_
+			newFn(&quot;mkParser&quot;,		2, &quot;Str -&gt; Any -&gt; Parser a&quot;), _
+			newFn(&quot;pChoice&quot;,		2, &quot;Parser a -&gt; Parser a -&gt; Parser a&quot;)_
 		))
 	End If
 	fnObjs = result
@@ -305,9 +313,7 @@ Function apply1(ByVal fn As Variant, ByVal arg As Variant)
 	Dim result As Variant, r As Integer
 	fn = asFn(fn)	&apos; makes sure it really is a function
 	r = arity(fn)
-	If r &lt; 1 Then
-		croak(&quot;apply1: cannot apply &quot; &amp; chr(13) &amp; &quot;  &quot; &amp; toString(fn) &amp; chr(13) &amp; &quot;arity=&quot; &amp; r)
-	ElseIf r = 1 Then
+	If r = 1 Then
 		result = applyLast(fn, arg)
 	Else
 		result = mkPartialApp(fn, arg)
@@ -372,6 +378,7 @@ applyLast_of_two:
 		Case &quot;foldr1&quot;:		result = foldr1(	a0, a1)
 		Case &quot;adjoin&quot;:		result = adjoin(	a0, a1)
 		Case &quot;mkParser&quot;:	result = mkParser(	a0, a1)
+		Case &quot;pChoice&quot;:		result = pChoice(	a0, a1)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select
@@ -431,7 +438,6 @@ Function applyBuiltinRev(fn As Object, ByVal reverseArgs As Object)
 		Case &quot;arityF&quot;:			result = arityF(		a(0)				)
 		Case &quot;existsF&quot;:			result = existsF(		a(0)				)
 		Case &quot;applyToList&quot;:		result = applyToList(	a(0), a(1)			)
-		Case &quot;isString&quot;:		result = isString(		a(0)				)
 		Case &quot;toString&quot;:		result = toString(		a(0)				)
 		Case &quot;TList_toString&quot;:	result = TList_toString(a(0)				)
 		Case &quot;TList_equ&quot;:		result = TList_equ(		a(0), a(1)			)
@@ -481,7 +487,11 @@ Function apply(ByVal fn As Variant, a0, Optional a1, Optional a2, Optional a3, O
 	End If
 	fn = asFn(fn, &quot;apply: invalid 1st arg&quot;)
 	If isMissing(a1) Then
-		apply = apply1(fn, a0)
+		If arity(fn) = 1 Then
+			apply = applyLast(fn, a0)
+		Else
+			apply = apply1(fn, a0)
+		End If
 	ElseIf isMissing(a2) Then
 		apply = apply1(apply1(fn, a0), a1)
 	ElseIf isMissing(a3) Then
@@ -663,10 +673,7 @@ Function test_Fn()
 	assertEqual(arityF(&quot;arityF&quot;), 1).x
 	assertEqual(arityF(&quot;applyToList&quot;), 2).x
 
-	assertEqual(apply(&quot;existsF&quot;, &quot;foo&quot;),         False).x
-	assertEqual(apply(&quot;existsF&quot;, &quot;existsF&quot;),      True).x
 	assertEqual(apply(&quot;arityF&quot;,  &quot;foo&quot;),            -1).x
-	assertEqual(apply(&quot;arityF&quot;,  &quot;existsF&quot;),         1).x
 	assertEqual(apply(&quot;arityF&quot;,  &quot;arityF&quot;),          1).x
 	assertEqual(apply(&quot;arityF&quot;,  &quot;applyToList&quot;),     2).x
 
