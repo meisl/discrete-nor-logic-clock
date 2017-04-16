@@ -1180,6 +1180,12 @@ Function test_Parser_toString()
 	assertEqual(TParser_toString(pReturn(7)), 		&quot;(return 7)&quot;).x
 	assertEqual(TParser_toString(pReturn(&quot;seven&quot;)),	&quot;(return &apos;seven&apos;)&quot;).x
 	assertEqual(TParser_toString(pStr(&quot;a&quot;)),		&quot;(str &apos;a&apos;)&quot;).x
+
+	&apos; polymorphic toString:	
+	assertEqual(toString(pFail), 			&quot;fail&quot;).x
+	assertEqual(toString(pReturn(7)), 		&quot;(return 7)&quot;).x
+	assertEqual(toString(pReturn(&quot;seven&quot;)),	&quot;(return &apos;seven&apos;)&quot;).x
+	assertEqual(toString(pStr(&quot;a&quot;)),		&quot;(str &apos;a&apos;)&quot;).x
 End Function
 
 Function test_Parser_hexNum()

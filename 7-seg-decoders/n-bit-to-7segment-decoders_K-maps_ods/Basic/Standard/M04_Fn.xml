@@ -438,14 +438,15 @@ Function applyBuiltinRev(fn As Object, ByVal reverseArgs As Object)
 		reverseArgs = cdr(reverseArgs)
 	Next i
 	Select Case getFnName(fn)
-		Case &quot;arityF&quot;:			result = arityF(		a(0)				)
-		Case &quot;existsF&quot;:			result = existsF(		a(0)				)
-		Case &quot;applyToList&quot;:		result = applyToList(	a(0), a(1)			)
-		Case &quot;toString&quot;:		result = toString(		a(0)				)
-		Case &quot;TList_toString&quot;:	result = TList_toString(a(0)				)
-		Case &quot;TList_equ&quot;:		result = TList_equ(		a(0), a(1)			)
+		Case &quot;arityF&quot;:				result = arityF(			a(0)				)
+		Case &quot;existsF&quot;:				result = existsF(			a(0)				)
+		Case &quot;applyToList&quot;:			result = applyToList(		a(0), a(1)			)
+		Case &quot;toString&quot;:			result = toString(			a(0)				)
+		Case &quot;TList_toString&quot;:		result = TList_toString(	a(0)				)
+		Case &quot;TParser_toString&quot;:	result = TParser_toString(	a(0)				)
+		Case &quot;TList_equ&quot;:			result = TList_equ(			a(0), a(1)			)
 		Case Else
-			croak(&quot;applyBuiltinRev: unknown function &apos;&quot; &amp; car(fn) &amp; &quot;&apos;&quot;)
+			croak(&quot;applyBuiltinRev: unknown function &apos;&quot; &amp; getFnName(fn) &amp; &quot;&apos;&quot;)
 	End Select	
 	applyBuiltinRev = result
 End Function
