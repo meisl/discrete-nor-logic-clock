@@ -30,6 +30,23 @@ End Sub
 
 &apos;==================================================================
 
+Function TParser_toString(Optional p As Object)
+	If isMissing(p) Then
+		TParser_toString = Fn.TParser_toString
+	Else
+		Dim result As String
+		Select Case p.tp
+			Case &quot;fail&quot;:	result = &quot;fail&quot;
+			Case &quot;item&quot;: 	result = &quot;item&quot;
+			Case &quot;return&quot;:	result = &quot;(return &quot; &amp; toString(p.st) &amp; &quot;)&quot;
+			Case &quot;str&quot;:		result = &quot;(str &quot; &amp; toString(p.st) &amp; &quot;)&quot;
+			Case Else
+				croak(&quot;TParser_toString/NYI: .tp = &quot; &amp; toString(p.tp))
+		End Select
+		TParser_toString = result
+	End If
+End Function
+
 Function mkParser(Optional tp As String, Optional st As Variant)
 	Static oFn As Object
 	Dim result As Object
@@ -525,6 +542,7 @@ Function test_Parser()
 	test_Parser_many1()
 &apos; 2.9 sec for 632 ~&gt; 217.9 aPerSec
 	test_Parser_seq()
+	test_Parser_toString()
 &apos; 3.4 sec for 702 ~&gt; 206.5 aPerSec
 	test_Parser_hexNum()
 Goto end_of_Parser_tests
@@ -1150,6 +1168,18 @@ Function test_Parser_seq()
 	assert_parses(p, &quot;1&quot;, 			List(49), 2).x
 	assert_parses(p, &quot;123456789&quot;,	List(49, 50, 51, 52, 53, 54, 55, 56, 57), 10).x
 	assert_parses(p, &quot;123456789 0&quot;,	List(49, 50, 51, 52, 53, 54, 55, 56, 57), 10).x
+End Function
+
+Function test_Parser_toString()
+	Dim f As Object
+	f = TParser_toString
+	assertEqual(isFn(f), True).x
+	assertEqual(arity(f),   1).x
+	
+	assertEqual(TParser_toString(pFail), 			&quot;fail&quot;).x
+	assertEqual(TParser_toString(pReturn(7)), 		&quot;(return 7)&quot;).x
+	assertEqual(TParser_toString(pReturn(&quot;seven&quot;)),	&quot;(return &apos;seven&apos;)&quot;).x
+	assertEqual(TParser_toString(pStr(&quot;a&quot;)),		&quot;(str &apos;a&apos;)&quot;).x
 End Function
 
 Function test_Parser_hexNum()

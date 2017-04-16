@@ -42,8 +42,9 @@ Type TFnObjs
 	flatten 	As Object
 	reverse 	As Object
 	
-	mkParser 	As Object
-	pChoice		As Object
+	TParser_toString	As Object
+	mkParser 			As Object
+	pChoice				As Object
 End Type
 
 
@@ -97,6 +98,7 @@ Function Fn
 		result.flatten	= lookupFn(&quot;flatten&quot;)
 		result.reverse	= lookupFn(&quot;reverse&quot;)
 
+		result.TParser_toString = lookupFn(&quot;TParser_toString&quot;)
 		result.mkParser	= lookupFn(&quot;mkParser&quot;)
 		result.pChoice	= lookupFn(&quot;pChoice&quot;)
 	End If
@@ -216,8 +218,9 @@ Function fnObjs()
 			newFn(&quot;flatten&quot;,		1, &quot;List List a -&gt; List a&quot;), _
 			newFn(&quot;reverse&quot;,		1, &quot;List a -&gt; List a&quot;), _
 			_
-			newFn(&quot;mkParser&quot;,		2, &quot;Str -&gt; Any -&gt; Parser a&quot;), _
-			newFn(&quot;pChoice&quot;,		2, &quot;Parser a -&gt; Parser a -&gt; Parser a&quot;)_
+			newFn(&quot;TParser_toString&quot;,	1, &quot;Parser a -&gt; Str&quot;), _
+			newFn(&quot;mkParser&quot;,			2, &quot;Str -&gt; Any -&gt; Parser a&quot;), _
+			newFn(&quot;pChoice&quot;,			2, &quot;Parser a -&gt; Parser a -&gt; Parser a&quot;)_
 		))
 	End If
 	fnObjs = result
