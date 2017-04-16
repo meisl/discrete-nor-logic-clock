@@ -42,7 +42,6 @@ Function TParser_toString(Optional p As Object)
 			Case &quot;str&quot;:			result = &quot;(str &quot; &amp; toString(p.st) &amp; &quot;)&quot;
 			Case &quot;zeroOrOne&quot;:	result = TParser_toString(p.st(0)) &amp; &quot;?&quot;
 			Case &quot;choice&quot;
-				
 				Dim ts As Object
 				ts = p.st
 				result = &quot;(&quot; &amp; TParser_toString(car(ts))
@@ -51,6 +50,17 @@ Function TParser_toString(Optional p As Object)
 					result = result &amp; &quot; +++ &quot; + TParser_toString(car(ts))
 					ts = cdr(ts)
 				Wend
+				result = result &amp; &quot;)&quot;
+			Case &quot;seq&quot;
+				Dim ps As Variant, f As Object, i As Integer, args As String
+				ps = p.st(0)
+				f  = p.st(1)
+				result = &quot;(&quot;
+				For i = LBound(ps) To UBound(ps)
+					result = result &amp; &quot;a&quot; &amp; i &amp; &quot; &lt;- &quot; &amp; toString(ps(i)) &amp; chr(13) &amp; &quot; &quot;
+					args = args &amp; &quot; a&quot; &amp; i
+				Next i
+				result = result &amp; &quot;return someFn&quot; &amp; args
 				result = result &amp; &quot;)&quot;
 			Case Else
 				croak(&quot;TParser_toString/NYI: .tp = &quot; &amp; toString(p.tp))
@@ -358,6 +368,44 @@ Function pBaseType()
 	pBaseType = result
 End Function
 
+Function pTypeExpr()
+	Static result As Object
+	If isNull(result) Then
+		result = pBaseType
+		Dim pArrowOut As Object, recursionDummy As Object
+		pArrowOut = pSeq(Array(pStr(&quot;-&gt;&quot;), recursionDummy), sndArg)
+		result = pSeq(Array(result, pZeroOrOne(pArrowOut)), _
+			maybeMakeArrowType _
+		)&apos;\i o.if (isNil o) then i else (mkArrowType i (car o))
+		msgbox(toString(pArrowOut))
+		pArrowOut.st(0)(1) = result &apos; recursion!
+	&apos;	msgbox(toString(pArrowOut))
+	End If
+	pTypeExpr = result
+End Function
+
+Function mkArrowType(tIn, tOut)
+	mkArrowType = &quot;(-&gt; &quot; &amp; tIn &amp; &quot; &quot; &amp; tOut &amp; &quot;)&quot;
+End Function
+
+Function maybeMakeArrowType(Optional i, Optional o)
+	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.maybeMakeArrowType : End If
+	Dim result As Variant
+	If isMissing(o) Then
+		If isMissing(i) Then
+			result = oFn
+		Else
+			result = apply(oFn, o)
+		End If
+	Else
+		If isNil(o) Then
+			result = i
+		Else
+			result = mkArrowType(i, car(o))
+		End If
+	End If
+	maybeMakeArrowType = result
+End Function
 
 &apos; =============================================================================
 
@@ -515,6 +563,9 @@ End Function
 
 Global refute_parses_pass As Object
 
+Function [-----------------------------]()
+End Function
+
 Function test_Parser()
 	Dim ticksPerSec As Long
 	ticksPerSec = GetSystemTicks()
@@ -539,6 +590,7 @@ Function test_Parser()
 &apos; 0.5 sec for 279 ~&gt; 558.0 aPerSec
 	test_Parser_white()
 	test_Parser_baseType()
+	test_Parser_TypeExpr()
 	test_Parser_binDigit()
 &apos; 0.6 sec for 347 ~&gt; 578.3 aPerSec
 	test_Parser_decDigit()
@@ -857,6 +909,18 @@ Function test_Parser_baseType()
 
 	assert_parses(p, &quot;Long&quot;, &quot;Long&quot;, 5).x
 	refute_parses(p, &quot;long&quot;).x
+End Function
+
+Function test_Parser_TypeExpr()
+	Dim p As Parser
+	p = pTypeExpr
+	
+	assert_parses(p, &quot;Bool&quot;, &quot;Bool&quot;, 5).x
+	assert_parses(p, &quot;Int&quot;,	 &quot;Int&quot;, 4).x
+	assert_parses(p, &quot;Int-&gt;Int&quot;,	 &quot;(-&gt; Int Int)&quot;, 9).x
+	assert_parses(p, &quot;Int-&gt;Int&quot;,	 &quot;[Int, Int]&quot;, 9).x
+	assert_parses(p, &quot;Int-&gt;Str-&gt;Bool&quot;,	 &quot;(-&gt; Int (-&gt; Str Bool))&quot;, 15).x
+	assert_parses(p, &quot;Int-&gt;Str-&gt;Bool&quot;,	 &quot;[Int, [Str, Bool]]&quot;, 15).x
 End Function
 
 Function test_Parser_binDigit()
