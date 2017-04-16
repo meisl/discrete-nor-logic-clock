@@ -58,7 +58,7 @@ Function mkPass()
 	mkPass = result
 End Function
 
-Function assertThrows(fName As String, args As Array, Optional errNo As Integer)
+Function assertThrows(vF As Variant, args As Array, Optional errNo As Integer)
 	assertionCount = assertionCount + 1
 	Dim result As Object, a As String, x As String
 	Dim fResult As Variant
@@ -68,15 +68,26 @@ Function assertThrows(fName As String, args As Array, Optional errNo As Integer)
 	End If
 	k = LBound(args)
 	n = UBound(args) - k + 1
-	Select Case fName
-		Case &quot;assertEqual&quot;:	
-		Case &quot;assertThrows&quot;
-		Case &quot;i_will_throw0&quot;
-		Case Else
-			If Not(existsF(fName)) Then
-				croak(&quot;assertThrows: unknown fn &quot; &amp; toString(fName))
-			End If
-	End Select
+	Dim fName As String, f As Object
+	If isString(vF) Then
+		fName = vF
+		Select Case fName
+			Case &quot;assertEqual&quot;:	
+			Case &quot;assertThrows&quot;
+			Case &quot;i_will_throw0&quot;
+			Case Else
+				f = lookupFn(fName)
+				If isEmpty(f) Then
+					croak(&quot;assertThrows: unknown fn &quot; &amp; toString(fName))
+				End If
+		End Select
+	ElseIf isFn(vF) Then
+		fName = getFnName(vF)
+		f = vF
+	Else
+		croak(&quot;assertThrows: invalid 1st arg - expected fn, got &quot; &amp; toString(vF))
+	End If	
+
 	Select Case fName
 		Case &quot;assertEqual&quot;:
 			testLevel = testLevel + 1
@@ -106,7 +117,7 @@ On Local Error Goto Boom
 			Else 
 				testLevel = testLevel + 1
 On Local Error Goto Boom
-				fResult = applyToList(fName, argsList)
+				fResult = applyToList(f, argsList)
 			End If
 	End Select
 	testLevel = testLevel - 1

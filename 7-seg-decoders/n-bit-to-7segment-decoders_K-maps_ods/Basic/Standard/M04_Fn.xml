@@ -38,7 +38,8 @@ Type TFnObjs
 	foldl		As Object
 	foldr		As Object
 	foldl1		As Object
-	foldr1		As Object
+&apos;	foldr1		As Object
+	adjoin		As Object
 	flatten 	As Object
 	reverse 	As Object
 	
@@ -94,7 +95,8 @@ Function Fn
 		result.foldl	= lookupFn(&quot;foldl&quot;)
 		result.foldr	= lookupFn(&quot;foldr&quot;)
 		result.foldl1	= lookupFn(&quot;foldl1&quot;)
-		result.foldr1	= lookupFn(&quot;foldr1&quot;)
+&apos;		result.foldr1	= lookupFn(&quot;foldr1&quot;)
+		result.adjoin	= lookupFn(&quot;adjoin&quot;)
 		result.flatten	= lookupFn(&quot;flatten&quot;)
 		result.reverse	= lookupFn(&quot;reverse&quot;)
 
@@ -378,7 +380,7 @@ applyLast_of_two:
 		Case &quot;map&quot;:			result = map(		a0, a1)
 		Case &quot;filter&quot;:		result = filter(	a0, a1)
 		Case &quot;foldl1&quot;:		result = foldl1(	a0, a1)
-		Case &quot;foldr1&quot;:		result = foldr1(	a0, a1)
+&apos;		Case &quot;foldr1&quot;:		result = foldr1(	a0, a1)
 		Case &quot;adjoin&quot;:		result = adjoin(	a0, a1)
 		Case &quot;mkParser&quot;:	result = mkParser(	a0, a1)
 		Case &quot;pChoice&quot;:		result = pChoice(	a0, a1)
@@ -395,8 +397,8 @@ applyLast_of_three:
 		Case &quot;swap&quot;:	result = apply(a0, a2, a1)
 		Case &quot;compose&quot;:	result = apply(a0, apply(a1, a2))
 		Case &quot;inRange&quot;:	result = CBool( (a0 &lt;= a2) And (a2 &lt;= a1) )
-		Case &quot;foldl&quot;:	result = foldl(a0, a2, a1)
-		Case &quot;foldr&quot;:	result = foldl(a0, a2, a1)
+		Case &quot;foldl&quot;:	result = foldl(a0, a1, a2)
+		Case &quot;foldr&quot;:	result = foldl(a0, a1, a2)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select

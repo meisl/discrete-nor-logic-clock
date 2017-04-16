@@ -36,10 +36,22 @@ Function TParser_toString(Optional p As Object)
 	Else
 		Dim result As String
 		Select Case p.tp
-			Case &quot;fail&quot;:	result = &quot;fail&quot;
-			Case &quot;item&quot;: 	result = &quot;item&quot;
-			Case &quot;return&quot;:	result = &quot;(return &quot; &amp; toString(p.st) &amp; &quot;)&quot;
-			Case &quot;str&quot;:		result = &quot;(str &quot; &amp; toString(p.st) &amp; &quot;)&quot;
+			Case &quot;fail&quot;:		result = &quot;fail&quot;
+			Case &quot;item&quot;: 		result = &quot;item&quot;
+			Case &quot;return&quot;:		result = &quot;(return &quot; &amp; toString(p.st) &amp; &quot;)&quot;
+			Case &quot;str&quot;:			result = &quot;(str &quot; &amp; toString(p.st) &amp; &quot;)&quot;
+			Case &quot;zeroOrOne&quot;:	result = TParser_toString(p.st(0)) &amp; &quot;?&quot;
+			Case &quot;choice&quot;
+				
+				Dim ts As Object
+				ts = p.st
+				result = &quot;(&quot; &amp; TParser_toString(car(ts))
+				ts = cdr(ts)
+				While Not(isNil(ts))
+					result = result &amp; &quot; +++ &quot; + TParser_toString(car(ts))
+					ts = cdr(ts)
+				Wend
+				result = result &amp; &quot;)&quot;
 			Case Else
 				croak(&quot;TParser_toString/NYI: .tp = &quot; &amp; toString(p.tp))
 		End Select
@@ -188,14 +200,12 @@ End Function
 &apos; never fails: if p fails than pZeroOrOne(p) returns nil + same pos as result,
 &apos; otherwise returns a singleton list of p&apos;s result + pos
 &apos; matches at most once
-Function pZeroOrOne(p As Parser)
+Function pZeroOrOne(Optional p As Parser)
 	pZeroOrOne = mkParser(&quot;zeroOrOne&quot;, p)
-	Exit Function
-	
-&apos;	Dim singletonList As Object
-&apos;	Set singletonList = swap(&quot;cons&quot;, nil)
-&apos;	pZeroOrOne = pChoice( pSeq(Array(p), singletonList), pReturn(nil))
-&apos;	pZeroOrOne = pChoice( pBind(p, compose(pReturn, singletonList)), pReturn(nil))
+	&apos;Dim singletonList As Object
+	&apos;Set singletonList = swap(cons, nil)
+	&apos;pZeroOrOne = pChoice( pSeq(Array(p), singletonList), pReturn(nil))
+	&apos;pZeroOrOne = pChoice( pBind(p, compose(pReturn, singletonList)), pReturn(nil))
 End Function
 
 &apos; never fails: if p fails than pMany(p) returns nil + same pos as result,
@@ -208,7 +218,7 @@ End Function
 &apos; same as pManyRev but with the list in the order as in the parsed string
 Function pMany(p As Parser)
 	&apos; Note: direct impl might give a little more perf
-	pMany = pSeq(Array(pManyRev(p)), &quot;reverse&quot;)
+	pMany = pSeq(Array(pManyRev(p)), Fn.reverse)
 End Function
 
 &apos; same as pManyRev but fails if there is no match at all
@@ -220,7 +230,7 @@ End Function
 &apos; same as pMany but fails if there is no match at all
 &apos; matches as many as possible
 Function pMany1(p As Parser)
-	pMany1 = pSeq(Array(pMany1Rev(p)), &quot;reverse&quot;)
+	pMany1 = pSeq(Array(pMany1Rev(p)), Fn.reverse)
 End Function
 
 &apos; pSeq - make a sequence of parsers, collect their results in a list 
@@ -526,29 +536,29 @@ Function test_Parser()
 	test_Parser_str()
 	test_Parser_choice()
 	test_Parser_zeroOrOne()
-&apos; 0.4 sec for 273 ~&gt; 682.5 aPerSec
+&apos; 0.5 sec for 279 ~&gt; 558.0 aPerSec
 	test_Parser_white()
 	test_Parser_baseType()
 	test_Parser_binDigit()
-&apos; 0.6 sec for 322 ~&gt; 536.7 aPerSec
+&apos; 0.6 sec for 347 ~&gt; 578.3 aPerSec
 	test_Parser_decDigit()
-&apos; 0.8 sec for 359 ~&gt; 448.8 aPerSec
+&apos; 0.8 sec for 384 ~&gt; 480.0 aPerSec
 	test_Parser_hexDigit()
-&apos; 1.1 sec for 408 ~&gt; 370.9 aPerSec
+&apos; 1.0 sec for 433 ~&gt; 433.0 aPerSec
 	test_Parser_manyRev()
 	test_Parser_many()
-&apos; 2.2 sec for 540 ~&gt; 245.5 aPerSec
+&apos; 1.9 sec for 565 ~&gt; 297.4 aPerSec
 	test_Parser_many1Rev()
 	test_Parser_many1()
-&apos; 2.9 sec for 632 ~&gt; 217.9 aPerSec
+&apos; 2.5 sec for 657 ~&gt; 252.7 aPerSec
 	test_Parser_seq()
 	test_Parser_toString()
-&apos; 3.4 sec for 702 ~&gt; 206.5 aPerSec
-	test_Parser_hexNum()
 Goto end_of_Parser_tests
-&apos; 4.3 sec for 781 ~&gt; 181.6 aPerSec
+&apos; 3.0 sec for 737 ~&gt; 245.7 aPerSec
+	test_Parser_hexNum()
+&apos; 4.0 sec for 816 ~&gt; 204.0 aPerSec
 	test_Parser_hexLit()
-&apos; 5.3 sec for 883 ~&gt; 166.6 aPerSec
+&apos; 4.8 sec for 918 ~&gt; 191.3 aPerSec
 
 end_of_Parser_tests:	
 	aCount = assertionCount - aCount
@@ -1176,16 +1186,22 @@ Function test_Parser_toString()
 	assertEqual(isFn(f), True).x
 	assertEqual(arity(f),   1).x
 	
-	assertEqual(TParser_toString(pFail), 			&quot;fail&quot;).x
-	assertEqual(TParser_toString(pReturn(7)), 		&quot;(return 7)&quot;).x
-	assertEqual(TParser_toString(pReturn(&quot;seven&quot;)),	&quot;(return &apos;seven&apos;)&quot;).x
-	assertEqual(TParser_toString(pStr(&quot;a&quot;)),		&quot;(str &apos;a&apos;)&quot;).x
+	assertEqual(TParser_toString(pFail), 							&quot;fail&quot;).x
+	assertEqual(TParser_toString(pReturn(7)), 						&quot;(return 7)&quot;).x
+	assertEqual(TParser_toString(pReturn(&quot;seven&quot;)),					&quot;(return &apos;seven&apos;)&quot;).x
+	assertEqual(TParser_toString(pStr(&quot;a&quot;)),						&quot;(str &apos;a&apos;)&quot;).x
+	assertEqual(TParser_toString(pZeroOrOne(pStr(&quot;a&quot;))),			&quot;(str &apos;a&apos;)?&quot;).x
+	assertEqual(TParser_toString(pChoice(pStr(&quot;a&quot;), pStr(&quot;b&quot;))),	&quot;((str &apos;a&apos;) +++ (str &apos;b&apos;))&quot;).x
+	assertEqual(TParser_toString(pChoice(pStr(&quot;b&quot;), pStr(&quot;a&quot;))),	&quot;((str &apos;b&apos;) +++ (str &apos;a&apos;))&quot;).x
 
 	&apos; polymorphic toString:	
-	assertEqual(toString(pFail), 			&quot;fail&quot;).x
-	assertEqual(toString(pReturn(7)), 		&quot;(return 7)&quot;).x
-	assertEqual(toString(pReturn(&quot;seven&quot;)),	&quot;(return &apos;seven&apos;)&quot;).x
-	assertEqual(toString(pStr(&quot;a&quot;)),		&quot;(str &apos;a&apos;)&quot;).x
+	assertEqual(toString(pFail), 							&quot;fail&quot;).x
+	assertEqual(toString(pReturn(7)), 						&quot;(return 7)&quot;).x
+	assertEqual(toString(pReturn(&quot;seven&quot;)),					&quot;(return &apos;seven&apos;)&quot;).x
+	assertEqual(toString(pStr(&quot;a&quot;)),						&quot;(str &apos;a&apos;)&quot;).x
+	assertEqual(toString(pZeroOrOne(pStr(&quot;a&quot;))),			&quot;(str &apos;a&apos;)?&quot;).x
+	assertEqual(toString(pChoice(pStr(&quot;a&quot;), pStr(&quot;b&quot;))),	&quot;((str &apos;a&apos;) +++ (str &apos;b&apos;))&quot;).x
+	assertEqual(toString(pChoice(pStr(&quot;b&quot;), pStr(&quot;a&quot;))),	&quot;((str &apos;b&apos;) +++ (str &apos;a&apos;))&quot;).x
 End Function
 
 Function test_Parser_hexNum()

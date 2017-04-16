@@ -41,7 +41,7 @@ IncompatibleCars:
 	TList_equ = result
 End Function
 
-Function nil()
+Function nil() As TList
 	Static result As Object
 	If isNull(result) Then
 		Set result = New TList
@@ -62,13 +62,13 @@ Function length(Optional xs As TList)
 	End If
 End Function
 
-Function cons(Optional x As Variant, Optional xs As TList)
+Function cons(Optional x, Optional xs As TList)
 	If isMissing(xs) Then : cons = _apply(Fn.cons, x) : Else
 		Dim result As New TList
-		result.tyname = xs.tyname
+		result.tyname = nil.tyname
 		result.head = x
 		result.tail = xs
-		result.len = xs.len + 1
+		result.len = xs.len + 1&apos; do not dot-access xs directly!
 		cons = result
 	End If
 End Function
@@ -111,7 +111,7 @@ Function map(fn As Variant, xs As Variant)
 	map = result
 End Function
 
-Function filter(fn As Variant, ByVal xs As Variant)
+Function filter(fn As Variant, ByVal xs As TList)
 	Dim result As TList
 	If IsArray(xs) Then
 		result = filter(fn, toList(xs))
@@ -129,47 +129,89 @@ Function filter(fn As Variant, ByVal xs As Variant)
 	filter = result
 End Function
 
-Function foldl(fn As Variant, acc As Variant, ByVal xs As Variant)
-	Dim result As Variant
-	If IsArray(xs) Then
-		result = foldl(fn, acc, toList(xs))
+Function foldl(Optional f As Object, Optional acc, Optional ByVal xs As TList)
+	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.foldl : End If
+	If isMissing(xs) Then
+		If isMissing(acc) Then
+			If isMissing(f) Then
+				foldl = oFn
+			Else
+				foldl = apply(oFn, f)
+			End If
+		Else
+			foldl = apply(oFn, f, acc)
+		End If
 	Else
-		result = acc
-		While Not(isNil(xs))
-			result = apply(fn, result, car(xs))
-			xs = cdr(xs)
-		Wend
+		If IsArray(xs) Then
+			foldl = foldl(f, acc, toList(xs))
+		Else
+			Dim result As Variant
+			result = acc
+			While Not(isNil(xs))
+				result = apply(f, result, car(xs))
+				xs = cdr(xs)
+			Wend
+			foldl = result
+		End If
 	End If
-	foldl = result
 End Function
 
-Function foldl1(fn As Variant, ByVal xs As Variant)
-	If isNil(xs) Then
-		croak(&quot;foldl1 on nil&quot;)
+Function foldl1(Optional f As Object, Optional xs As TList)
+	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.foldl1 : End If
+	If isMissing(f) Then
+		foldl1 = oFn
+	ElseIf isMissing(xs) Then
+		foldl1 = apply(oFn, f)
+	Else
+		If isNil(xs) Then
+			croak(&quot;foldl1 on nil&quot;)
+		End If
+		foldl1 = foldl(f, car(xs), cdr(xs))
 	End If
-	foldl1 = foldl(fn, car(xs), cdr(xs))
 End Function
 
-Function foldr(fn As Variant, ByVal acc As Variant, xs As Variant)
-	Dim result As Variant
-	If IsNil(xs) Then
-		result = acc
-	ElseIf IsArray(xs) Then
-		result = foldr(fn, acc, toList(xs))
+Function foldr(Optional f As Object, Optional acc As Variant, Optional xs As TList)
+	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.foldr : End If
+	If isMissing(xs) Then
+		If isMissing(acc) Then
+			If isMissing(f) Then
+				foldr = oFn
+			Else
+				foldr = apply(oFn, f)
+			End If
+		Else
+			foldr = apply(oFn, f, acc)
+		End If
 	Else
-		result = apply(fn, xs.head, foldr(fn, acc, xs.tail))
+		Dim result As Variant
+		If IsNil(xs) Then
+			result = acc
+		ElseIf IsArray(xs) Then
+			result = foldr(f, acc, toList(xs))
+		Else
+			result = apply(f, car(xs), foldr(f, acc, cdr(xs)))
+		End If
+		foldr = result
 	End If
-	foldr = result
 End Function
 
 &apos; Cannot name this function &quot;append&quot;, seems to be a BASIC keyword(?)
-Function adjoin(xs As TList, ys As TList)
-	adjoin = foldr(cons, ys, xs)
+Function adjoin(Optional xs As TList, Optional ys As TList)
+	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.adjoin : End If
+	If isMissing(ys) Then 
+		If isMissing(xs) Then
+			adjoin = oFn
+		Else
+			adjoin = apply(oFn, xs)
+		End If
+	Else
+		adjoin = foldr(cons, ys, xs)
+	End If
 End Function
 
 &apos; Normally this is called &quot;concat&quot; but we already have that for Strings
-Function flatten(xs As TList)
-	flatten = foldl(&quot;adjoin&quot;, nil, xs)
+Function flatten(Optional xs As TList)
+	flatten = foldl(adjoin, nil, xs)
 End Function
 
 Function reverse(Optional xs As TList)
@@ -248,6 +290,9 @@ Function test_List()
 	test_List_cdr()
 	test_List_map()
 	test_List_filter()
+	test_List_foldl()
+	test_List_foldl1()
+	test_List_foldr()
 	test_List_adjoin()
 	test_List_flatten()
 	test_List_reverse()
@@ -256,9 +301,10 @@ End Function
 
 Function test_List_isNil_and_cons()
 	assertEqual(isNil(nil), True).x
-&apos;	assertThrows(&quot;isNil&quot;, Array()).x		&apos; assertThrows can&apos;t test call with 0 args
-	assertThrows(&quot;isNil&quot;, Array(Empty)).x
-	assertThrows(&quot;isNil&quot;, Array(Nothing)).x
+&apos;	assertThrows(isNil, Array()).x		&apos; assertThrows can&apos;t test call with 0 args
+	assertThrows(isNil, Array(Empty)).x
+	assertThrows(isNil, Array(Nothing)).x
+
 	assertEqual(isNil(cons(nil, nil)), False).x
 	assertEqual(isNil(cons(0, nil)), False).x
 	assertEqual(isNil(cons(&quot;&quot;, nil)), False).x
@@ -414,6 +460,70 @@ Function test_List_filter()
 	assertEqual(toString(apply(&quot;filter&quot;,  &quot;isNil&quot;, List(nil, List(1), nil, List(1, 0), List(nil))  )), &quot;[[], []]&quot;).x
 
 	assertEqual(toString(apply(&quot;filter&quot;,  equ1, List(0, 1, 1, 0, 1, 0)  )), &quot;[1, 1, 1]&quot;).x
+End Function
+
+Function test_List_foldl() &apos;TODO: check order of args as they come in
+	Dim f As Object
+	f = Fn.foldl
+	assertEqual(isFn(f), True).x
+	assertEqual(arity(f),   3).x
+	
+	f = foldl(concat)
+	assertEqual(isFn(f), True).x
+	assertEqual(arity(f),   2).x
+	
+	f = foldl(concat, &quot;xxx&quot;)
+	assertEqual(isFn(f), True).x
+	assertEqual(arity(f),   1).x
+	
+	assertEqual(apply(f, nil),                      &quot;xxx&quot;).x
+	assertEqual(apply(f, List(&quot;a&quot;)),			 	&quot;xxxa&quot;).x
+	assertEqual(apply(f, List(&quot;a&quot;, &quot;b&quot;)),		 	&quot;xxxab&quot;).x
+	assertEqual(apply(f, List(&quot;a&quot;, &quot;b&quot;, &quot;c&quot;)),	 	&quot;xxxabc&quot;).x
+	assertEqual(apply(f, List(&quot;d&quot;, &quot;a&quot;, &quot;c&quot;, &quot;b&quot;)),	&quot;xxxdacb&quot;).x
+
+	assertEqual(apply(foldl, add, 1, List(4, 1, 3, 2)), 11).x
+End Function
+
+Function test_List_foldl1() &apos;TODO: check order of args as they come in
+	Dim f As Object
+	f = Fn.foldl1
+	assertEqual(isFn(f), True).x
+	assertEqual(arity(f),   2).x
+	
+	f = foldl1(concat)
+	assertEqual(isFn(f), True).x
+	assertEqual(arity(f),   1).x
+	assertThrows(f, Array(nil)).x
+	assertEqual(apply(f, List(&quot;a&quot;)),			 	&quot;a&quot;).x
+	assertEqual(apply(f, List(&quot;a&quot;, &quot;b&quot;)),		 	&quot;ab&quot;).x
+	assertEqual(apply(f, List(&quot;a&quot;, &quot;b&quot;, &quot;c&quot;)),	 	&quot;abc&quot;).x
+	assertEqual(apply(f, List(&quot;d&quot;, &quot;a&quot;, &quot;c&quot;, &quot;b&quot;)),	&quot;dacb&quot;).x
+
+	assertEqual(apply(foldl1, add, List(4, 1, 3, 2)), 10).x
+End Function
+
+Function test_List_foldr() &apos;TODO: check order of args as they come in
+	Dim f As Object
+	f = Fn.foldr
+	assertEqual(isFn(f), True).x
+	assertEqual(arity(f),   3).x
+	
+	f = foldr(concat)
+	assertEqual(isFn(f), True).x
+	assertEqual(arity(f),   2).x
+	
+	f = foldr(concat, &quot;xxx&quot;)
+	assertEqual(isFn(f), True).x
+	assertEqual(arity(f),   1).x
+	
+	assertEqual(apply(f, nil),                      &quot;xxx&quot;).x
+	assertEqual(apply(f, List(&quot;a&quot;)),			 	&quot;xxxa&quot;).x
+	assertEqual(apply(f, List(&quot;a&quot;, &quot;b&quot;)),		 	&quot;xxxab&quot;).x
+	assertEqual(apply(f, List(&quot;a&quot;, &quot;b&quot;, &quot;c&quot;)),	 	&quot;xxxabc&quot;).x
+	assertEqual(apply(f, List(&quot;d&quot;, &quot;a&quot;, &quot;c&quot;, &quot;b&quot;)),	&quot;xxxdacb&quot;).x
+
+	assertEqual(apply(foldr, add, 1, List(4, 1, 3, 2)), 11).x
 End Function
 
 Function test_List_adjoin()
