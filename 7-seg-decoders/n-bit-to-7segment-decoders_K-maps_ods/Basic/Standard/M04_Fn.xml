@@ -46,6 +46,7 @@ Type TFnObjs
 	
 	TParser_toString	As Object
 	mkParser 			As Object
+	pBind				As Object
 	pChoice				As Object
 	maybeMakeArrowType	As Object
 End Type
@@ -105,6 +106,7 @@ Function Fn
 
 		result.TParser_toString = lookupFn(&quot;TParser_toString&quot;)
 		result.mkParser	= lookupFn(&quot;mkParser&quot;)
+		result.pBind	= lookupFn(&quot;pBind&quot;)
 		result.pChoice	= lookupFn(&quot;pChoice&quot;)
 		result.maybeMakeArrowType = lookupFn(&quot;maybeMakeArrowType&quot;)
 	End If
@@ -226,6 +228,7 @@ Function fnObjs()
 			_
 			newFn(&quot;TParser_toString&quot;,	1, &quot;Parser a -&gt; Str&quot;), _
 			newFn(&quot;mkParser&quot;,			2, &quot;Str -&gt; Any -&gt; Parser a&quot;), _
+			newFn(&quot;pBind&quot;,				2, &quot;Parser a -&gt; (a -&gt; Parser b) -&gt; Parser b&quot;), _
 			newFn(&quot;pChoice&quot;,			2, &quot;Parser a -&gt; Parser a -&gt; Parser a&quot;), _
 			newFn(&quot;maybeMakeArrowType&quot;,	2_
 	))
@@ -389,6 +392,7 @@ applyLast_of_two:
 &apos;		Case &quot;foldr1&quot;:		result = foldr1(	a0, a1)
 		Case &quot;adjoin&quot;:		result = adjoin(	a0, a1)
 		Case &quot;mkParser&quot;:	result = mkParser(	a0, a1)
+		Case &quot;pBind&quot;:		result = pBind(		a0, a1)
 		Case &quot;pChoice&quot;:		result = pChoice(	a0, a1)
 		Case &quot;maybeMakeArrowType&quot;: result = maybeMakeArrowType(a0, a1)
 		Case Else

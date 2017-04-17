@@ -37,8 +37,8 @@ Function TParser_toString(Optional p As Object)
 		Dim result As String
 		Select Case p.tp
 			Case &quot;fail&quot;:		result = &quot;fail&quot;
-			Case &quot;item&quot;: 		result = &quot;item&quot;
 			Case &quot;return&quot;:		result = &quot;(return &quot; &amp; toString(p.st) &amp; &quot;)&quot;
+			Case &quot;item&quot;: 		result = &quot;item&quot;
 			Case &quot;str&quot;:			result = &quot;(str &quot; &amp; toString(p.st) &amp; &quot;)&quot;
 			Case &quot;choice&quot;
 				Dim alts As Object
@@ -114,21 +114,50 @@ End Function
 
 &apos; always succeeds by returning the provided value; without increasing pos
 Function pReturn(Optional v As Variant)
-	Static oFn As Object
+	Static oFn As Object : If isNull(oFn) Then : oFn = mkParser(&quot;return&quot;) : End If
 	If isMissing(v) Then
-		If isNull(oFn) Then
-			Set oFn = mkParser(&quot;return&quot;)
-		End If
 		pReturn = oFn
 	Else
 		pReturn = mkParser(&quot;return&quot;, v)
 	End If
 End Function
 
-Function pBind(p As Parser, ByVal f As Variant)
-	&apos; TODO: pBind: check if p is proper Parser
-	f = asFn(f, &quot;pBind: invalid 2nd arg&quot;)
-	pBind = mkParser(&quot;bind&quot;, Array(p, f))
+&apos; monadic bind, aka &quot;&gt;&gt;=&quot;
+&apos; for the Parser type that is the fn of type Parser a -&gt; (a -&gt; Parser b) -&gt; Parser b
+&apos; which applies the Parser p and if that succeeds feeds its result to the fn f
+&apos; to give the overall result Parser b that f returns
+Function pBind(Optional p As Parser, Optional f As Object)
+	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.pBind : End If
+	If isMissing(f) Then
+		If isMissing(p) Then
+			pBind = oFn
+		Else
+			&apos; TODO: pBind: check if p is proper Parser
+			pBind = apply(oFn, p)
+		End If
+	Else
+		&apos; TODO: pBind: check if f is proper function
+		pBind = mkParser(&quot;bind&quot;, Array(p, f))
+	End If
+End Function
+
+&apos; requires both, p and q to succeed in sequence, but throws away q&apos;s result value
+&apos; and instead returns p&apos;s value together with q&apos;s pos
+&apos; ---
+&apos; pThen = p &gt;&gt;= (\v.q &gt;&gt;= \_.return v)
+&apos;       = p &gt;&gt;= (\v.q &gt;&gt;= (K ° return) v
+&apos;		= p &gt;&gt;= (\r f v.let x = applyP r
+&apos;						in if (fail? x)
+&apos;						   then fail
+&apos;						   else f v
+&apos;				) q (K ° return)
+&apos;		= p &gt;&gt;= (\v.let x = applyP q
+&apos;					in if (fail? x)
+&apos;					   then fail
+&apos;					   else (K ° return) v
+&apos;		= p &gt;&gt;= (((&gt;&gt;=) q ) ° (K ° return)))
+Function pThen(p As Parser, q As Parser)
+	pThen = pBind(p, compose(pBind(q), compose(fstArg, pReturn)))
 End Function
 
 &apos; fails on empty string but succeeds on all others
@@ -148,11 +177,9 @@ End Function
 &apos; succeeds on strings with the given prefix t by returning t,
 &apos; and advancing pos by the length of t
 Function pStr(Optional t As String)
-	Static oFn As Object
+	Static oFn As Object : If isNull(oFn) Then : oFn = mkParser(&quot;str&quot;) : End If
 	If isMissing(t) Then
-		If isNull(oFn) Then : oFn = mkParser(&quot;str&quot;) : End If
 		pStr = oFn
-		Exit Function
 	Else
 		If (Len(t) = 0) Then
 			croak(&quot;pStr: cannot match &apos;exactly&apos; the empty string t=&apos;&apos;&quot;)
@@ -212,6 +239,7 @@ Function pChoice(Optional p1 As Parser, Optional p2 As Parser)
 	End If
 End Function
 
+&apos; pattern-matches p against &quot;q +++ return Empty&quot; where q any parser
 Function isPZeroOrOne(p As Parser)
 	Dim result As Boolean : result = False
 	If p.tp = &quot;choice&quot; Then
@@ -583,6 +611,8 @@ Function test_Parser(Optional rng)
 	
 	test_Parser_fail()
 	test_Parser_return()
+	test_Parser_bind()	
+	test_Parser_then()	
 	test_Parser_item()
 	test_Parser_nextAsc()
 	test_Parser_str()
@@ -735,6 +765,54 @@ Function test_Parser_return()
 	assert_parses(p, &quot;[]&quot;,		4711, 1).x
 	assert_parses(p, &quot;abcd&quot;,	4711, 1).x
 	assert_parses(p, chr(13),	4711, 1).x
+End Function
+
+Function test_Parser_bind()
+	Dim p As Object
+	p = pBind
+	assertEqual(isFn(p), True).x
+	assertEqual(arity(p),   2).x
+	
+	p = pBind(pItem)
+	assertEqual(isFn(p), True).x
+	assertEqual(arity(p),   1).x
+	
+	p = apply(p, fstArg(pStr(&quot;y&quot;)))
+	assert_parses(p, &quot;xy&quot;, &quot;y&quot;, 3).x
+	refute_parses(p, &quot;xx&quot;).x
+	refute_parses(p, &quot;yx&quot;).x
+	assert_parses(p, &quot; yabcd&quot;, &quot;y&quot;, 3).x
+	
+&apos;	p = pBind(pItem, \a.return (concat &quot;FOO&quot; a))
+	p = pBind(pItem, compose(pReturn, concat(&quot;FOO&quot;)))
+	assert_parses(p, &quot;xy&quot;,		&quot;FOOx&quot;, 2).x
+	assert_parses(p, &quot;xx&quot;,		&quot;FOOx&quot;, 2).x
+	assert_parses(p, &quot;yx&quot;,		&quot;FOOy&quot;, 2).x
+	assert_parses(p, &quot; yabcd&quot;,	&quot;FOO &quot;, 2).x
+End Function
+
+Function test_Parser_then()
+	Dim p As Object
+	&apos;TODO: make pThen (partially) applicable
+&apos;	p = pThen
+&apos;	assertEqual(isFn(p), True).x
+&apos;	assertEqual(arity(p),   2).x
+	
+	p = pThen(pStr(&quot;x&quot;), pStr(&quot; &quot;))
+	refute_parses(p, &quot;xabcd&quot;).x
+	refute_parses(p, &quot;yabcd&quot;).x
+	refute_parses(p, &quot;y abcd&quot;).x
+	assert_parses(p, &quot;x abcd&quot;,		&quot;x&quot;, 3).x
+	assert_parses(p, &quot;x  abcd&quot;,		&quot;x&quot;, 3).x
+	assert_parses(p, &quot;x   abcd&quot;,	&quot;x&quot;, 3).x
+
+	p = pThen(pStr(&quot;x&quot;), pMany(pStr(&quot; &quot;)))
+	assert_parses(p, &quot;xabcd&quot;,		&quot;x&quot;, 2).x
+	refute_parses(p, &quot;yabcd&quot;).x
+	refute_parses(p, &quot;y abcd&quot;).x
+	assert_parses(p, &quot;x abcd&quot;,		&quot;x&quot;, 3).x
+	assert_parses(p, &quot;x  abcd&quot;,		&quot;x&quot;, 4).x
+	assert_parses(p, &quot;x   abcd&quot;,	&quot;x&quot;, 5).x
 End Function
 
 Function test_Parser_item()
