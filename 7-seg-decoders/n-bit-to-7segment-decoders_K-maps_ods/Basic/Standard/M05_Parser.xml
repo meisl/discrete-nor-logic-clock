@@ -40,17 +40,22 @@ Function TParser_toString(Optional p As Object)
 			Case &quot;item&quot;: 		result = &quot;item&quot;
 			Case &quot;return&quot;:		result = &quot;(return &quot; &amp; toString(p.st) &amp; &quot;)&quot;
 			Case &quot;str&quot;:			result = &quot;(str &quot; &amp; toString(p.st) &amp; &quot;)&quot;
-			Case &quot;zeroOrOne&quot;:	result = TParser_toString(p.st(0)) &amp; &quot;?&quot;
 			Case &quot;choice&quot;
-				Dim ts As Object
-				ts = p.st
-				result = &quot;(&quot; &amp; TParser_toString(car(ts))
-				ts = cdr(ts)
-				While Not(isNil(ts))
-					result = result &amp; &quot; +++ &quot; + TParser_toString(car(ts))
-					ts = cdr(ts)
-				Wend
-				result = result &amp; &quot;)&quot;
+				Dim alts As Object
+				alts = p.st
+				If isPZeroOrOne(p) Then
+					&apos; it has shape p +++ return Empty
+					&apos; so it&apos;s effectively &quot;zero-or-one&quot; p, which can be written as &quot;p?&quot;
+					result = TParser_toString(car(alts)) &amp; &quot;?&quot;
+				Else
+					result = &quot;(&quot; &amp; TParser_toString(car(alts))
+					alts = cdr(alts)
+					While Not(isNil(alts))
+						result = result &amp; &quot; +++ &quot; + TParser_toString(car(alts))
+						alts = cdr(alts)
+					Wend
+					result = result &amp; &quot;)&quot;
+				End If
 			Case &quot;seq&quot;
 				Dim ps As Variant, f As Object, i As Integer, args As String
 				ps = p.st(0)
@@ -207,15 +212,28 @@ Function pChoice(Optional p1 As Parser, Optional p2 As Parser)
 	End If
 End Function
 
-&apos; never fails: if p fails than pZeroOrOne(p) returns nil + same pos as result,
-&apos; otherwise returns a singleton list of p&apos;s result + pos
+Function isPZeroOrOne(p As Parser)
+	Dim result As Boolean : result = False
+	If p.tp = &quot;choice&quot; Then
+		If length(p.st) = 2 Then
+			Dim sndAlt As Parser &apos; 2nd alternative
+			sndAlt = cadr(p.st)
+			&apos; check if it has shape p +++ return Empty (which is effectively &quot;zero-or-one&quot; p)
+			result = ((sndAlt.tp = &quot;return&quot;) And isEmpty(sndAlt.st))
+		End If
+	End If
+	isPZeroOrOne = result
+End Function
+
+&apos; never fails: if p fails than pZeroOrOne(p) returns Empty + same pos as result,
+&apos; otherwise returns whatever p returns as result (+ pos)
 &apos; matches at most once
-Function pZeroOrOne(Optional p As Parser)
-	pZeroOrOne = mkParser(&quot;zeroOrOne&quot;, p)
-	&apos;Dim singletonList As Object
-	&apos;Set singletonList = swap(cons, nil)
-	&apos;pZeroOrOne = pChoice( pSeq(Array(p), singletonList), pReturn(nil))
-	&apos;pZeroOrOne = pChoice( pBind(p, compose(pReturn, singletonList)), pReturn(nil))
+Function pZeroOrOne(p As Parser)
+	If isPZeroOrOne(p) Then
+		pZeroOrOne = p
+	Else
+		pZeroOrOne = pChoice(p, pReturn(Empty))
+	End If
 End Function
 
 &apos; never fails: if p fails than pMany(p) returns nil + same pos as result,
@@ -375,9 +393,9 @@ Function pTypeExpr()
 		Dim pArrowOut As Object, recursionDummy As Object
 		pArrowOut = pSeq(Array(pStr(&quot;-&gt;&quot;), recursionDummy), sndArg)
 		result = pSeq(Array(result, pZeroOrOne(pArrowOut)), _
-			maybeMakeArrowType _
+			Fn.maybeMakeArrowType _
 		)&apos;\i o.if (isNil o) then i else (mkArrowType i (car o))
-		msgbox(toString(pArrowOut))
+	&apos;	msgbox(toString(pArrowOut))
 		pArrowOut.st(0)(1) = result &apos; recursion!
 	&apos;	msgbox(toString(pArrowOut))
 	End If
@@ -388,23 +406,12 @@ Function mkArrowType(tIn, tOut)
 	mkArrowType = &quot;(-&gt; &quot; &amp; tIn &amp; &quot; &quot; &amp; tOut &amp; &quot;)&quot;
 End Function
 
-Function maybeMakeArrowType(Optional i, Optional o)
-	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.maybeMakeArrowType : End If
-	Dim result As Variant
-	If isMissing(o) Then
-		If isMissing(i) Then
-			result = oFn
-		Else
-			result = apply(oFn, o)
-		End If
+Function maybeMakeArrowType(i, o)
+	If isEmpty(o) Then
+		maybeMakeArrowType = i
 	Else
-		If isNil(o) Then
-			result = i
-		Else
-			result = mkArrowType(i, car(o))
-		End If
+		maybeMakeArrowType = mkArrowType(i, o)
 	End If
-	maybeMakeArrowType = result
 End Function
 
 &apos; =============================================================================
@@ -492,13 +499,6 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		Else
 			croak(&quot;applying pChoice: invalid list of alternatives &quot; &amp; chr(13) &amp; toString(innerParsers))
 		End If
-	ElseIf p.tp = &quot;zeroOrOne&quot; Then
-		result = applyP(p.st, s, pos)
-		If isParseFailure(result) Then
-			result = Array(nil, pos)
-		Else
-			result = Array(List(result(0)), result(1))
-		End If
 	ElseIf (p.tp = &quot;many1Rev&quot;) Then
 		Dim lstLen As Integer
 		nxtPos = pos
@@ -566,7 +566,8 @@ Global refute_parses_pass As Object
 Function [-----------------------------]()
 End Function
 
-Function test_Parser()
+Function test_Parser(Optional rng)
+	Dim result As Variant
 	Dim ticksPerSec As Long
 	ticksPerSec = GetSystemTicks()
 	Wait(100) &apos; wait a hundred milliseconds
@@ -605,20 +606,25 @@ Function test_Parser()
 &apos; 2.5 sec for 657 ~&gt; 252.7 aPerSec
 	test_Parser_seq()
 	test_Parser_toString()
-Goto end_of_Parser_tests
-&apos; 3.0 sec for 737 ~&gt; 245.7 aPerSec
+&apos; 2.8 sec for 751 ~&gt; 245.7 aPerSec
 	test_Parser_hexNum()
-&apos; 4.0 sec for 816 ~&gt; 204.0 aPerSec
+&apos; 3.7 sec for 830 ~&gt; 204.0 aPerSec
 	test_Parser_hexLit()
-&apos; 4.8 sec for 918 ~&gt; 191.3 aPerSec
+Goto end_of_Parser_tests
+&apos; 4.6 sec for 932 ~&gt; 191.3 aPerSec
 
 end_of_Parser_tests:	
 	aCount = assertionCount - aCount
 	tm = CLng(10 * (GetSystemTicks() - tm) / ticksPerSec) / 10
 	aPerSec =  CLng(10 * aCount / tm) / 10
-	MsgBox(tm &amp; &quot; sec for &quot; &amp; aCount &amp; &quot; assertions&quot;_
-		&amp; chr(13) &amp; &quot;that&apos;s ~&quot; &amp; aPerSec &amp; &quot; assertions/sec&quot;_
-	)
+	Dim summary As String
+	summary = tm &amp; &quot; sec for &quot; &amp; aCount &amp; &quot; assertions, &quot;_
+		&amp; chr(13) &amp; &quot;that&apos;s ~&quot; &amp; aPerSec &amp; &quot; assertions/sec&quot;
+	If isMissing(rng) Then
+		MsgBox(summary)
+	End If
+	result = summary
+	test_Parser = result
 End Function
 
 &apos;= test helpers ===============================================================
@@ -849,8 +855,8 @@ Function test_Parser_zeroOrOne()
 	Dim p As Parser
 	Dim data As Variant
 	Dim zeroMatches As Variant, oneMatch As Variant
-	zeroMatches = nil
-	oneMatch    = List(&quot;x&quot;)
+	zeroMatches = Empty
+	oneMatch    = &quot;x&quot;
 		
 	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
 		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
@@ -859,6 +865,16 @@ Function test_Parser_zeroOrOne()
 
 	p = pZeroOrOne(pStr(&quot;x&quot;))
 
+	assert_parses(p, data,	zeroMatches, 1).x
+	assert_parses(p, &quot;x&quot;, 	oneMatch, 2).x
+	assert_parses(p, &quot;xx&quot;, 	oneMatch, 2).x
+	assert_parses(p, &quot;xxx&quot;, oneMatch, 2).x
+	assert_parses(p, &quot; x&quot;, 	zeroMatches, 1).x
+	assert_parses(p, &quot; xx&quot;, zeroMatches, 1).x
+	assert_parses(p, &quot; xxx&quot;,zeroMatches, 1).x
+	
+	&apos; double p?? is the same as p?:
+	p = pZeroOrOne(pZeroOrOne(pStr(&quot;x&quot;)))
 	assert_parses(p, data,	zeroMatches, 1).x
 	assert_parses(p, &quot;x&quot;, 	oneMatch, 2).x
 	assert_parses(p, &quot;xx&quot;, 	oneMatch, 2).x
@@ -918,9 +934,9 @@ Function test_Parser_TypeExpr()
 	assert_parses(p, &quot;Bool&quot;, &quot;Bool&quot;, 5).x
 	assert_parses(p, &quot;Int&quot;,	 &quot;Int&quot;, 4).x
 	assert_parses(p, &quot;Int-&gt;Int&quot;,	 &quot;(-&gt; Int Int)&quot;, 9).x
-	assert_parses(p, &quot;Int-&gt;Int&quot;,	 &quot;[Int, Int]&quot;, 9).x
+&apos;	assert_parses(p, &quot;Int-&gt;Int&quot;,	 &quot;[Int, Int]&quot;, 9).x
 	assert_parses(p, &quot;Int-&gt;Str-&gt;Bool&quot;,	 &quot;(-&gt; Int (-&gt; Str Bool))&quot;, 15).x
-	assert_parses(p, &quot;Int-&gt;Str-&gt;Bool&quot;,	 &quot;[Int, [Str, Bool]]&quot;, 15).x
+&apos;	assert_parses(p, &quot;Int-&gt;Str-&gt;Bool&quot;,	 &quot;[Int, [Str, Bool]]&quot;, 15).x
 End Function
 
 Function test_Parser_binDigit()
@@ -1244,28 +1260,33 @@ Function test_Parser_seq()
 	assert_parses(p, &quot;123456789 0&quot;,	List(49, 50, 51, 52, 53, 54, 55, 56, 57), 10).x
 End Function
 
+Function assert_toStr(p As Object, expected As String)
+	Dim testResult As Variant
+	testResult = assertEqual(TParser_toString(p), expected)
+	If testResult.isFail Then
+		assert_toStr = testResult
+		Exit Function
+	End If
+	&apos; try polymorphic dispatch:
+	testResult = assertEqual(toString(p), expected)
+	assert_toStr = testResult
+End Function
+
 Function test_Parser_toString()
 	Dim f As Object
 	f = TParser_toString
 	assertEqual(isFn(f), True).x
 	assertEqual(arity(f),   1).x
 	
-	assertEqual(TParser_toString(pFail), 							&quot;fail&quot;).x
-	assertEqual(TParser_toString(pReturn(7)), 						&quot;(return 7)&quot;).x
-	assertEqual(TParser_toString(pReturn(&quot;seven&quot;)),					&quot;(return &apos;seven&apos;)&quot;).x
-	assertEqual(TParser_toString(pStr(&quot;a&quot;)),						&quot;(str &apos;a&apos;)&quot;).x
-	assertEqual(TParser_toString(pZeroOrOne(pStr(&quot;a&quot;))),			&quot;(str &apos;a&apos;)?&quot;).x
-	assertEqual(TParser_toString(pChoice(pStr(&quot;a&quot;), pStr(&quot;b&quot;))),	&quot;((str &apos;a&apos;) +++ (str &apos;b&apos;))&quot;).x
-	assertEqual(TParser_toString(pChoice(pStr(&quot;b&quot;), pStr(&quot;a&quot;))),	&quot;((str &apos;b&apos;) +++ (str &apos;a&apos;))&quot;).x
-
-	&apos; polymorphic toString:	
-	assertEqual(toString(pFail), 							&quot;fail&quot;).x
-	assertEqual(toString(pReturn(7)), 						&quot;(return 7)&quot;).x
-	assertEqual(toString(pReturn(&quot;seven&quot;)),					&quot;(return &apos;seven&apos;)&quot;).x
-	assertEqual(toString(pStr(&quot;a&quot;)),						&quot;(str &apos;a&apos;)&quot;).x
-	assertEqual(toString(pZeroOrOne(pStr(&quot;a&quot;))),			&quot;(str &apos;a&apos;)?&quot;).x
-	assertEqual(toString(pChoice(pStr(&quot;a&quot;), pStr(&quot;b&quot;))),	&quot;((str &apos;a&apos;) +++ (str &apos;b&apos;))&quot;).x
-	assertEqual(toString(pChoice(pStr(&quot;b&quot;), pStr(&quot;a&quot;))),	&quot;((str &apos;b&apos;) +++ (str &apos;a&apos;))&quot;).x
+	assert_toStr(pFail, 							&quot;fail&quot;).x
+	assert_toStr(pReturn(7), 						&quot;(return 7)&quot;).x
+	assert_toStr(pReturn(&quot;seven&quot;),					&quot;(return &apos;seven&apos;)&quot;).x
+	assert_toStr(pStr(&quot;a&quot;),							&quot;(str &apos;a&apos;)&quot;).x
+	assert_toStr(pChoice(pStr(&quot;a&quot;), pStr(&quot;b&quot;)),		&quot;((str &apos;a&apos;) +++ (str &apos;b&apos;))&quot;).x
+	assert_toStr(pChoice(pStr(&quot;b&quot;), pStr(&quot;a&quot;)),		&quot;((str &apos;b&apos;) +++ (str &apos;a&apos;))&quot;).x
+	assert_toStr(pZeroOrOne(pStr(&quot;a&quot;)),				&quot;(str &apos;a&apos;)?&quot;).x
+	&apos; double p?? is the same as p?:
+	assert_toStr(pZeroOrOne(pZeroOrOne(pStr(&quot;a&quot;))),	&quot;(str &apos;a&apos;)?&quot;).x
 End Function
 
 Function test_Parser_hexNum()
