@@ -413,7 +413,7 @@ applyLast_of_three:
 		Case &quot;compose&quot;:	result = apply(a0, apply(a1, a2))
 		Case &quot;inRange&quot;:	result = CBool( (a0 &lt;= a2) And (a2 &lt;= a1) )
 		Case &quot;foldl&quot;:	result = foldl(a0, a1, a2)
-		Case &quot;foldr&quot;:	result = foldl(a0, a1, a2)
+		Case &quot;foldr&quot;:	result = foldr(a0, a1, a2)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select
