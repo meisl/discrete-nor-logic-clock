@@ -245,6 +245,20 @@ Function assertFails(assertionName As String, args As Array)
 	assertFails = result
 End Function
 
+Function testStat(which As String, statsStr As String)
+	Dim stats As Variant
+	stats = Split(statsStr, &quot; &quot;)
+	Select Case which
+		Case &quot;name&quot;:	testStat = stats(0)
+		Case &quot;time&quot;:	testStat = CDbl(stats(1))
+		Case &quot;count&quot;:	testStat = CLng(stats(2))
+		Case Else
+			croak(&quot;no such stat: &quot; &amp; which)
+	End Select
+End Function
+
+&apos; ==================================================================
+
 Function i_will_throw0()
 	Dim foo As Object
 	i_will_throw0 = foo.provoke.an.error
@@ -253,6 +267,7 @@ End Function
 Function test_Test()
 	test_assertEqual()
 	test_assertThrows()
+	test_testStat()
 End Function
 
 Function test_assertEqual()
@@ -410,6 +425,12 @@ Function test_assertThrows()
 &apos;	assertFails(&quot;assertThrows&quot;, Array(&quot;assertEqual&quot;, Array(2, 3))).x
 
 &apos;	assertPasses(&quot;assertThrows&quot;, Array(&quot;i_will_throw0&quot;, Nothing)).x
+End Function
+
+Function test_testStat()
+	assertEqual(testStat(&quot;name&quot;,  &quot;foobar 5,5 987&quot;), &quot;foobar&quot;).x
+	assertEqual(testStat(&quot;time&quot;,  &quot;foobar 5,5 987&quot;), 5.5).x
+	assertEqual(testStat(&quot;count&quot;, &quot;foobar 5,5 987&quot;), 987).x
 End Function
 
 </script:module>

@@ -671,7 +671,11 @@ Global refute_parses_pass As Object
 Function [-----------------------------]()
 End Function
 
-Function test_Parser(Optional rng)
+Function test_Parser(Optional what)
+	Dim failure As String
+	failure = toString(parseFailure)
+	refute_parses_pass = assertEqual(failure, failure)
+	
 	Dim result As Variant
 	Dim ticksPerSec As Long
 	ticksPerSec = GetSystemTicks()
@@ -679,59 +683,59 @@ Function test_Parser(Optional rng)
 	ticksPerSec = 10 * (GetSystemTicks() - ticksPerSec)
 
 	Dim tm As Double, aCount As Integer, aPerSec As Double
-	tm = GetSystemTicks
 	aCount = assertionCount
+	tm = GetSystemTicks
 	
-	Dim failure As String
-	failure = toString(parseFailure)
-	refute_parses_pass = assertEqual(failure, failure)
-	
-	test_Parser_fail()
-	test_Parser_return()
-	test_Parser_bind()	
-	test_Parser_then()	
-	test_Parser_item()
-	test_Parser_nextAsc()
-	test_Parser_str()
-	test_Parser_choice()
-	test_Parser_zeroOrOne()
-&apos; 0.5 sec for 279 ~&gt; 558.0 aPerSec
-	test_Parser_white()
-	test_Parser_baseType()
-	test_Parser_TypeCtor()
-	test_Parser_TypeExpr()
-	test_Parser_binDigit()
-&apos; 0.6 sec for 347 ~&gt; 578.3 aPerSec
-	test_Parser_decDigit()
-&apos; 0.8 sec for 384 ~&gt; 480.0 aPerSec
-	test_Parser_hexDigit()
-&apos; 1.0 sec for 433 ~&gt; 433.0 aPerSec
-	test_Parser_manyRev()
-	test_Parser_many()
-&apos; 1.9 sec for 565 ~&gt; 297.4 aPerSec
-	test_Parser_many1Rev()
-	test_Parser_many1()
-&apos; 2.5 sec for 657 ~&gt; 252.7 aPerSec
-	test_Parser_seq()
-	test_Parser_toString()
-&apos; 2.8 sec for 751 ~&gt; 245.7 aPerSec
-	test_Parser_hexNum()
-&apos; 3.7 sec for 830 ~&gt; 204.0 aPerSec
-	test_Parser_hexLit()
-Goto end_of_Parser_tests
-&apos; 4.6 sec for 932 ~&gt; 191.3 aPerSec
+	If isEmpty(what) Or (what = &quot;all&quot;) Or (what = &quot;primitives&quot;) Then
+		test_Parser_fail()
+		test_Parser_return()
+		test_Parser_bind()	
+		test_Parser_then()	
+		test_Parser_item()
+		test_Parser_nextAsc()
+		test_Parser_choice()
+	End If
+	If isEmpty(what) Or (what = &quot;all&quot;) Or (what = &quot;multiplicity&quot;) Then
+		test_Parser_zeroOrOne()
+		test_Parser_manyRev()
+		test_Parser_many()
+		test_Parser_many1Rev()
+		test_Parser_many1()	
+	End If	
+	If isEmpty(what) Or (what = &quot;all&quot;) Or (what = &quot;basic&quot;) Then
+		test_Parser_str()
+		test_Parser_white()
+		test_Parser_seq()
+		test_Parser_toString()
+	End If
+	If isEmpty(what) Or (what = &quot;all&quot;) Or (what = &quot;numbers&quot;) Then
+		test_Parser_binDigit()
+		test_Parser_decDigit()
+		test_Parser_hexDigit()
+		test_Parser_hexNum()
+		test_Parser_hexLit()
+	End If	
+	If isEmpty(what) Or (what = &quot;all&quot;) Or (what = &quot;types&quot;) Then
+		test_Parser_baseType()
+		test_Parser_TypeCtor()
+		test_Parser_TypeExpr()
+	End If
 
 end_of_Parser_tests:	
 	aCount = assertionCount - aCount
 	tm = CLng(10 * (GetSystemTicks() - tm) / ticksPerSec) / 10
-	aPerSec =  CLng(10 * aCount / tm) / 10
-	Dim summary As String
-	summary = tm &amp; &quot; sec for &quot; &amp; aCount &amp; &quot; assertions, &quot;_
+	if tm = 0 Then : tm = 1 : End If
+	
+	If isMissing(what) Then
+		aPerSec =  CLng(10 * aCount / tm) / 10
+		Dim summary As String
+		summary = tm &amp; &quot; sec for &quot; &amp; aCount &amp; &quot; assertions, &quot;_
 		&amp; chr(13) &amp; &quot;that&apos;s ~&quot; &amp; aPerSec &amp; &quot; assertions/sec&quot;
-	If isMissing(rng) Then
 		MsgBox(summary)
+		result = summary
+	Else
+		result = Join(Array(&quot;test_Parser(&quot; &amp; what &amp; &quot;):&quot;, tm, aCount), &quot; &quot;)
 	End If
-	result = summary
 	test_Parser = result
 End Function
 
