@@ -141,8 +141,9 @@ Function pBind(Optional p As Parser, Optional f As Object)
 	End If
 End Function
 
-&apos; requires both, p and q to succeed in sequence, but throws away q&apos;s result value
-&apos; and instead returns p&apos;s value together with q&apos;s pos
+&apos; Requires both, p and q to succeed in sequence, but throws away q&apos;s result value
+&apos; and instead returns p&apos;s value together with q&apos;s pos.
+&apos; This is useful to eat up trailing whitespace, for example.
 &apos; ---
 &apos; pThen = p &gt;&gt;= (\v.q &gt;&gt;= \_.return v)
 &apos;       = p &gt;&gt;= (\v.q &gt;&gt;= (K ° return) v
@@ -404,30 +405,101 @@ Function pHexLit()
 	pHexLit = result
 End Function
 
+&apos; Type expressions: base types (atomic/built-in types), arrow types (fns), and n-ary Type constructors
+&apos; Grammar for type expressions:
+&apos;   TypeExpr ::= ws* N ws* (&quot;-&gt;&quot; TypeExpr)?		; &quot;ws&quot; means whitespace, &quot;*&quot; means many and &quot;?&quot; zeroOrOne
+&apos;          N ::= BaseType			; need extra rule &quot;N&quot; for &quot;-&gt;&quot; to bind most strongly
+&apos;              | TypeVar
+&apos;              | TypeCtor (ws+ N)*	; &quot;+&quot; means many1
+&apos;              | &quot;(&quot; TypeExpr &quot;)&quot;
+&apos;   BaseType ::= &quot;Bool&quot; | &quot;Str&quot; | &quot;Int&quot; | &quot;Long&quot; | ...
+&apos;    TypeVar ::= [a-z]
+&apos;   TypeCtor ::= &quot;List&quot; | &quot;Maybe&quot; | ...
+&apos; This makes the binary (infix) type constructor &quot;-&gt;&quot; right-associative
+&apos; and also make it bind more weakly than any other type constructor 
+&apos; &quot;TypeCtor&quot;.
+&apos; For example: &quot;Parser a -&gt; b&quot; = &quot;(Parser a) -&gt; b&quot;; NOT &quot;Parser (a -&gt; b)&quot;
+&apos; Now, this grammar is tricky to implement because it contains both,
+&apos; - simple recursion (TypeExpr in TypeExpr and N in N)
+&apos; - mutual recursion (N in TypeExpr and TypeExpr in N)
+Function pTypeExpr()
+	Static result As Object
+	If isNull(result) Then
+		Dim pLeft As Object
+		Dim pRight As Object
+		Dim pS As Object
+		Dim pParenS As Object
+		Dim pTypeArg As Object
+		Dim pCtor As Object
+		Dim pN
+		Dim recDummy As Object
+		
+		&apos; Left ::= ws* N
+		pLeft = pSeq(Array(pMany(pWhite), recDummy), sndArg)
+		
+		&apos; Right ::= &quot;-&gt;&quot; S
+		pRight = pSeq(Array(pStr(&quot;-&gt;&quot;), recDummy), sndArg)
+		
+		&apos; S ::= Left ws* Right?
+		pS = pSeq(Array(pLeft,_
+						pSeq(Array(pMany(pWhite), pZeroOrOne(pRight)),_
+						sndArg),_
+				  ), Fn.maybeMakeArrowType)
+		
+		pRight.st(0)(1) = pS &apos; fix up recursive call to S in Right
+		
+		&apos; ParenS ::= &quot;(&quot; S &quot;)&quot;
+		pParenS = pSeq(Array(pSeq(Array(pStr(&quot;(&quot;), pS), sndArg),_
+						     pStr(&quot;)&quot;)_
+					   ), fstArg)
+		
+		&apos; TypeArg ::= ws+ N
+		pTypeArg = pSeq(Array(pMany1(pWhite), recDummy), sndArg)
+		
+		&apos; Ctor ::= TypeCtor TypeArg*
+		pCtor = pSeq(Array(pTypeCtor, pMany(pTypeArg)), Fn.mkTypeCtor)
+		
+		&apos; N ::= BaseType | TypeVar | ParenS | Ctor
+		pN = foldl1(pChoice, List(pBaseType, pTypeVar, pParenS, pCtor))
+		
+		pLeft.st(0)(1) = pN &apos; fix up recursive call to N in Left
+		pTypeArg.st(0)(1) = pN &apos; fix up recursive call to N in TypeArg
+			
+		result = pS
+
+		&apos;msgbox(toString(pLeft))
+	End If
+	pTypeExpr = result
+End Function
+
 Function pBaseType()
 	Static result As Object
 	If isNull(result) Then
-		Dim baseTypes as Object
-		Set baseTypes = List(&quot;Bool&quot;, &quot;Str&quot;, &quot;Int&quot;, &quot;Long&quot;)
-		result = foldl1(pChoice, map(pStr, baseTypes))
+		result = foldl1(pChoice, _
+						map(pStr, List(&quot;Bool&quot;, &quot;Str&quot;, &quot;Int&quot;, &quot;Long&quot;))_
+		)
 	End If
 	pBaseType = result
 End Function
 
-Function pTypeExpr()
+Function pTypeVar()
 	Static result As Object
 	If isNull(result) Then
-		result = pBaseType
-		Dim pArrowOut As Object, recursionDummy As Object
-		pArrowOut = pSeq(Array(pStr(&quot;-&gt;&quot;), recursionDummy), sndArg)
-		result = pSeq(Array(result, pZeroOrOne(pArrowOut)), _
-			Fn.maybeMakeArrowType _
-		)&apos;\i o.if (isNil o) then i else (mkArrowType i (car o))
-	&apos;	msgbox(toString(pArrowOut))
-		pArrowOut.st(0)(1) = result &apos; recursion!
-	&apos;	msgbox(toString(pArrowOut))
+		result = foldl1(pChoice, _
+						map(pStr, List(&quot;a&quot;, &quot;b&quot;, &quot;c&quot;, &quot;d&quot;))_
+		)
 	End If
-	pTypeExpr = result
+	pTypeVar = result
+End Function
+
+Function pTypeCtor()
+	Static result As Object
+	If isNull(result) Then
+		result = foldl1(pChoice, _
+						map(pStr, List(&quot;List&quot;, &quot;Maybe&quot;, &quot;Parser&quot;))_
+		)
+	End If
+	pTypeCtor = result
 End Function
 
 Function mkArrowType(tIn, tOut)
@@ -441,6 +513,11 @@ Function maybeMakeArrowType(i, o)
 		maybeMakeArrowType = mkArrowType(i, o)
 	End If
 End Function
+
+Function mkTypeCtor(ctorName As String, typeArgs As Object)
+	mkTypeCtor = &quot;(&quot; &amp; ctorName &amp; &quot; &quot; &amp; toString(typeArgs) &amp; &quot;)&quot;
+End Function
+
 
 &apos; =============================================================================
 
@@ -469,7 +546,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 	Dim p As Parser
 	Dim fResult As Variant
 	If IsNull(parser) Or IsEmpty(parser) Then
-		croak(&quot;applyP: parser p = &quot; &amp; toString(parser))
+		croak(&quot;applyP: invalid arg parser - &quot; &amp; toString(parser))
 	ElseIf TypeName(parser) = &quot;Object&quot; Then
 		Set p = parser
 	Else
@@ -621,6 +698,7 @@ Function test_Parser(Optional rng)
 &apos; 0.5 sec for 279 ~&gt; 558.0 aPerSec
 	test_Parser_white()
 	test_Parser_baseType()
+	test_Parser_TypeCtor()
 	test_Parser_TypeExpr()
 	test_Parser_binDigit()
 &apos; 0.6 sec for 347 ~&gt; 578.3 aPerSec
@@ -1005,16 +1083,66 @@ Function test_Parser_baseType()
 	refute_parses(p, &quot;long&quot;).x
 End Function
 
+Function test_Parser_TypeCtor()
+	Dim p As Parser
+	p = pTypeCtor
+
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot;asdf&quot;).x
+	refute_parses(p, &quot;a&quot;).x
+	refute_parses(p, &quot;b&quot;).x
+	refute_parses(p, &quot;c&quot;).x
+	
+	assert_parses(p, &quot;List&quot;, &quot;List&quot;, 5).x
+	assert_parses(p, &quot;Maybe&quot;, &quot;Maybe&quot;, 6).x
+
+	refute_parses(p, &quot;Bool&quot;).x
+	refute_parses(p, &quot;bool&quot;).x
+
+	refute_parses(p, &quot;Str&quot;).x
+	refute_parses(p, &quot;str&quot;).x
+
+	refute_parses(p, &quot;Int&quot;).x
+	refute_parses(p, &quot;int&quot;).x
+
+	refute_parses(p, &quot;Long&quot;).x
+	refute_parses(p, &quot;long&quot;).x
+End Function
+
 Function test_Parser_TypeExpr()
 	Dim p As Parser
 	p = pTypeExpr
 	
-	assert_parses(p, &quot;Bool&quot;, &quot;Bool&quot;, 5).x
-	assert_parses(p, &quot;Int&quot;,	 &quot;Int&quot;, 4).x
-	assert_parses(p, &quot;Int-&gt;Int&quot;,	 &quot;(-&gt; Int Int)&quot;, 9).x
-&apos;	assert_parses(p, &quot;Int-&gt;Int&quot;,	 &quot;[Int, Int]&quot;, 9).x
-	assert_parses(p, &quot;Int-&gt;Str-&gt;Bool&quot;,	 &quot;(-&gt; Int (-&gt; Str Bool))&quot;, 15).x
-&apos;	assert_parses(p, &quot;Int-&gt;Str-&gt;Bool&quot;,	 &quot;[Int, [Str, Bool]]&quot;, 15).x
+	assert_parses(p, &quot;Bool&quot;, 			&quot;Bool&quot;, 5).x
+	assert_parses(p, &quot;Int&quot;,	 			&quot;Int&quot;, 4).x
+	assert_parses(p, &quot;Int-&gt;Int&quot;,	 	&quot;(-&gt; Int Int)&quot;, 9).x
+	assert_parses(p, &quot;Int-&gt;Str-&gt;Bool&quot;,	&quot;(-&gt; Int (-&gt; Str Bool))&quot;, 15).x
+	assert_parses(p, &quot;a-&gt;b-&gt;c&quot;,	 		&quot;(-&gt; a (-&gt; b c))&quot;, 8).x
+	assert_parses(p, &quot;(a-&gt;b)-&gt;c&quot;,	 	&quot;(-&gt; (-&gt; a b) c)&quot;, 10).x
+	assert_parses(p, &quot;(a-&gt;b)-&gt;(c)&quot;,	 	&quot;(-&gt; (-&gt; a b) c)&quot;, 12).x
+	assert_parses(p, &quot;List&quot;,	 		&quot;(List [])&quot;, 5).x
+	assert_parses(p, &quot;List a&quot;,	 		&quot;(List [&apos;a&apos;])&quot;, 7).x
+	assert_parses(p, &quot;List a b&quot;,	 	&quot;(List [&apos;a&apos;, &apos;b&apos;])&quot;, 9).x
+	assert_parses(p, &quot;List a-&gt;b&quot;,	 	&quot;(-&gt; (List [&apos;a&apos;]) b)&quot;, 10).x
+	assert_parses(p, &quot;List (a-&gt;b)&quot;,	 	&quot;(List [&apos;(-&gt; a b)&apos;])&quot;, 12).x
+	assert_parses(p, &quot;List Maybe a&quot;,	&quot;(List [&apos;(Maybe [&apos;a&apos;])&apos;])&quot;, 13).x
+	assert_parses(p, &quot;List Maybe a b&quot;,	&quot;(List [&apos;(Maybe [&apos;a&apos;, &apos;b&apos;])&apos;])&quot;, 15).x
+	assert_parses(p, &quot;List (Maybe a) b&quot;,&quot;(List [&apos;(Maybe [&apos;a&apos;])&apos;, &apos;b&apos;])&quot;, 17).x
+	
+	refute_parses(p, &quot;-&gt;a&quot;).x
+	&apos;refute_parses(p, &quot;a-&gt;&quot;).x
+
+	&apos; skips over trailing whitespace:
+	assert_parses(p, &quot;Bool   &quot;, 				&quot;Bool&quot;, 8).x
+	assert_parses(p, &quot;Int    &quot;,	 				&quot;Int&quot;,  8).x
+	assert_parses(p, &quot;Int -&gt; Int            &quot;,	&quot;(-&gt; Int Int)&quot;, 23).x
+	assert_parses(p, &quot;Int  -&gt; Str -&gt;   Bool &quot;,	&quot;(-&gt; Int (-&gt; Str Bool))&quot;, 23).x
+
+	&apos; skips over leading whitespace:
+	assert_parses(p, &quot; Bool  &quot;, 				&quot;Bool&quot;, 8).x
+	assert_parses(p, &quot; Int   &quot;,	 				&quot;Int&quot;,  8).x
+	assert_parses(p, &quot; Int -&gt; Int           &quot;,	&quot;(-&gt; Int Int)&quot;, 23).x
+	assert_parses(p, &quot; Int  -&gt; Str -&gt;  Bool &quot;,	&quot;(-&gt; Int (-&gt; Str Bool))&quot;, 23).x
 End Function
 
 Function test_Parser_binDigit()

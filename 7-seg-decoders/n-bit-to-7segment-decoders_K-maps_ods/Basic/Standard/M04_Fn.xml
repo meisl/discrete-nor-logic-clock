@@ -49,6 +49,7 @@ Type TFnObjs
 	pBind				As Object
 	pChoice				As Object
 	maybeMakeArrowType	As Object
+	mkTypeCtor			As Object
 End Type
 
 
@@ -109,6 +110,7 @@ Function Fn
 		result.pBind	= lookupFn(&quot;pBind&quot;)
 		result.pChoice	= lookupFn(&quot;pChoice&quot;)
 		result.maybeMakeArrowType = lookupFn(&quot;maybeMakeArrowType&quot;)
+		result.mkTypeCtor		  = lookupFn(&quot;mkTypeCtor&quot;)
 	End If
 	Fn = result
 End Function
@@ -230,7 +232,8 @@ Function fnObjs()
 			newFn(&quot;mkParser&quot;,			2, &quot;Str -&gt; Any -&gt; Parser a&quot;), _
 			newFn(&quot;pBind&quot;,				2, &quot;Parser a -&gt; (a -&gt; Parser b) -&gt; Parser b&quot;), _
 			newFn(&quot;pChoice&quot;,			2, &quot;Parser a -&gt; Parser a -&gt; Parser a&quot;), _
-			newFn(&quot;maybeMakeArrowType&quot;,	2_
+			newFn(&quot;maybeMakeArrowType&quot;,	2, &quot;Typ -&gt; Maybe Typ -&gt; Typ&quot;), _
+			newFn(&quot;mkTypeCtor&quot;,			2, &quot;Str -&gt; List Typ -&gt; Typ&quot;)_
 	))
 	End If
 	fnObjs = result
@@ -395,6 +398,7 @@ applyLast_of_two:
 		Case &quot;pBind&quot;:		result = pBind(		a0, a1)
 		Case &quot;pChoice&quot;:		result = pChoice(	a0, a1)
 		Case &quot;maybeMakeArrowType&quot;: result = maybeMakeArrowType(a0, a1)
+		Case &quot;mkTypeCtor&quot;:	result = mkTypeCtor(a0, a1)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select
