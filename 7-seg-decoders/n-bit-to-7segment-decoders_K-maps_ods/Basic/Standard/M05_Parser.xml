@@ -316,6 +316,30 @@ Function pWhite()
 	pWhite = result
 End Function
 
+Function pAlphaLower()
+	Static result As Parser	&apos; an uninitialized instance of Parser at first
+	If result.tp = &quot;&quot; Then
+		result = pBind(pItem, _
+					ite(compose(inRange(Asc(&quot;a&quot;), Asc(&quot;z&quot;)), Fn.asc), _
+						pReturn, _
+						fstArg(pFail) _
+				 )	)
+	End If
+	pAlphaLower = result
+End Function
+
+Function pAlphaUpper()
+	Static result As Parser	&apos; an uninitialized instance of Parser at first
+	If result.tp = &quot;&quot; Then
+		result = pBind(pItem, _
+					ite(compose(inRange(Asc(&quot;A&quot;), Asc(&quot;Z&quot;)), Fn.asc), _
+						pReturn, _
+						fstArg(pFail) _
+				 )	)
+	End If
+	pAlphaUpper = result
+End Function
+
 Function pBinDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
@@ -459,8 +483,8 @@ Function pTypeExpr()
 		&apos; Ctor ::= TypeCtor TypeArg*
 		pCtor = pSeq(Array(pTypeCtor, pMany(pTypeArg)), Fn.mkTypeCtor)
 		
-		&apos; N ::= BaseType | TypeVar | ParenS | Ctor
-		pN = foldl1(pChoice, List(pBaseType, pTypeVar, pParenS, pCtor))
+		&apos; N ::= ParenS | BaseType | Ctor | TypeVar
+		pN = foldl1(pChoice, List(pParenS, pBaseType, pCtor, pTypeVar))
 		
 		pLeft.st(0)(1) = pN &apos; fix up recursive call to N in Left
 		pTypeArg.st(0)(1) = pN &apos; fix up recursive call to N in TypeArg
@@ -483,13 +507,7 @@ Function pBaseType()
 End Function
 
 Function pTypeVar()
-	Static result As Object
-	If isNull(result) Then
-		result = foldl1(pChoice, _
-						map(pStr, List(&quot;a&quot;, &quot;b&quot;, &quot;c&quot;, &quot;d&quot;))_
-		)
-	End If
-	pTypeVar = result
+	pTypeVar = pAlphaLower
 End Function
 
 Function pTypeCtor()
@@ -686,7 +704,7 @@ Function test_Parser(Optional what)
 	aCount = assertionCount
 	tm = GetSystemTicks
 	
-	If isEmpty(what) Or (what = &quot;all&quot;) Or (what = &quot;primitives&quot;) Then
+	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;primitives&quot;) Then
 		test_Parser_fail()
 		test_Parser_return()
 		test_Parser_bind()	
@@ -695,28 +713,31 @@ Function test_Parser(Optional what)
 		test_Parser_nextAsc()
 		test_Parser_choice()
 	End If
-	If isEmpty(what) Or (what = &quot;all&quot;) Or (what = &quot;multiplicity&quot;) Then
+	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;multiplicity&quot;) Then
 		test_Parser_zeroOrOne()
 		test_Parser_manyRev()
 		test_Parser_many()
 		test_Parser_many1Rev()
 		test_Parser_many1()	
 	End If	
-	If isEmpty(what) Or (what = &quot;all&quot;) Or (what = &quot;basic&quot;) Then
+	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;basic&quot;) Then
 		test_Parser_str()
 		test_Parser_white()
 		test_Parser_seq()
+		test_Parser_alphaLower()
+		test_Parser_alphaUpper()
 		test_Parser_toString()
 	End If
-	If isEmpty(what) Or (what = &quot;all&quot;) Or (what = &quot;numbers&quot;) Then
+	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;numbers&quot;) Then
 		test_Parser_binDigit()
 		test_Parser_decDigit()
 		test_Parser_hexDigit()
 		test_Parser_hexNum()
 		test_Parser_hexLit()
 	End If	
-	If isEmpty(what) Or (what = &quot;all&quot;) Or (what = &quot;types&quot;) Then
+	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;types&quot;) Then
 		test_Parser_baseType()
+		test_Parser_TypeVar()
 		test_Parser_TypeCtor()
 		test_Parser_TypeExpr()
 	End If
@@ -1063,6 +1084,84 @@ Function test_Parser_white()
 	refute_parses(p, chr(13) &amp; chr(13) &amp; &quot;asdf&quot;).x
 End Function
 
+Function test_Parser_alphaLower()
+	Dim p As Parser
+	p = pAlphaLower
+
+	refute_parses(p, Array(&quot; &quot;, chr(9), chr(13), &quot;_&quot;, _
+		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;, _
+		&quot;+&quot;, &quot;-&quot;, &quot;-&gt;&quot;, &quot;*&quot;, &quot;?&quot;, &quot;#&quot;,_
+		&quot;A&quot;, &quot;B&quot;, &quot;C&quot;, &quot;D&quot;, &quot;E&quot;, &quot;F&quot;, &quot;G&quot;, &quot;H&quot;, &quot;I&quot;, &quot;J&quot;, &quot;K&quot;, &quot;L&quot;, &quot;M&quot;, _
+		&quot;N&quot;, &quot;O&quot;, &quot;P&quot;, &quot;Q&quot;, &quot;R&quot;, &quot;S&quot;, &quot;T&quot;, &quot;U&quot;, &quot;V&quot;, &quot;W&quot;, &quot;X&quot;, &quot;Y&quot;, &quot;Z&quot;, _
+		&quot;&quot;)).x
+	assert_parses(p, &quot;asdf&quot;, &quot;a&quot;, 2).x
+	assert_parses(p, &quot;a&quot;, &quot;a&quot;, 2).x
+	assert_parses(p, &quot;b&quot;, &quot;b&quot;, 2).x
+	assert_parses(p, &quot;c&quot;, &quot;c&quot;, 2).x
+	assert_parses(p, &quot;d&quot;, &quot;d&quot;, 2).x
+	assert_parses(p, &quot;e&quot;, &quot;e&quot;, 2).x
+	assert_parses(p, &quot;f&quot;, &quot;f&quot;, 2).x
+	assert_parses(p, &quot;g&quot;, &quot;g&quot;, 2).x
+	assert_parses(p, &quot;h&quot;, &quot;h&quot;, 2).x
+	assert_parses(p, &quot;i&quot;, &quot;i&quot;, 2).x
+	assert_parses(p, &quot;j&quot;, &quot;j&quot;, 2).x
+	assert_parses(p, &quot;k&quot;, &quot;k&quot;, 2).x
+	assert_parses(p, &quot;l&quot;, &quot;l&quot;, 2).x
+	assert_parses(p, &quot;m&quot;, &quot;m&quot;, 2).x
+	assert_parses(p, &quot;n&quot;, &quot;n&quot;, 2).x
+	assert_parses(p, &quot;o&quot;, &quot;o&quot;, 2).x
+	assert_parses(p, &quot;p&quot;, &quot;p&quot;, 2).x
+	assert_parses(p, &quot;q&quot;, &quot;q&quot;, 2).x
+	assert_parses(p, &quot;r&quot;, &quot;r&quot;, 2).x
+	assert_parses(p, &quot;s&quot;, &quot;s&quot;, 2).x
+	assert_parses(p, &quot;t&quot;, &quot;t&quot;, 2).x
+	assert_parses(p, &quot;u&quot;, &quot;u&quot;, 2).x
+	assert_parses(p, &quot;v&quot;, &quot;v&quot;, 2).x
+	assert_parses(p, &quot;w&quot;, &quot;w&quot;, 2).x
+	assert_parses(p, &quot;x&quot;, &quot;x&quot;, 2).x
+	assert_parses(p, &quot;y&quot;, &quot;y&quot;, 2).x
+	assert_parses(p, &quot;z&quot;, &quot;z&quot;, 2).x
+End Function
+
+Function test_Parser_alphaUpper()
+	Dim p As Parser
+	p = pAlphaUpper
+
+	refute_parses(p, Array(&quot; &quot;, chr(9), chr(13), &quot;_&quot;, _
+		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;, _
+		&quot;+&quot;, &quot;-&quot;, &quot;-&gt;&quot;, &quot;*&quot;, &quot;?&quot;, &quot;#&quot;,_
+		&quot;a&quot;, &quot;b&quot;, &quot;c&quot;, &quot;d&quot;, &quot;e&quot;, &quot;f&quot;, &quot;g&quot;, &quot;h&quot;, &quot;i&quot;, &quot;j&quot;, &quot;k&quot;, &quot;l&quot;, &quot;m&quot;, _
+		&quot;n&quot;, &quot;o&quot;, &quot;p&quot;, &quot;q&quot;, &quot;r&quot;, &quot;s&quot;, &quot;t&quot;, &quot;u&quot;, &quot;v&quot;, &quot;w&quot;, &quot;x&quot;, &quot;y&quot;, &quot;z&quot;, _
+		&quot;&quot;)).x
+	assert_parses(p, &quot;ASDF&quot;, &quot;A&quot;, 2).x
+	assert_parses(p, &quot;A&quot;, &quot;A&quot;, 2).x
+	assert_parses(p, &quot;B&quot;, &quot;B&quot;, 2).x
+	assert_parses(p, &quot;C&quot;, &quot;C&quot;, 2).x
+	assert_parses(p, &quot;D&quot;, &quot;D&quot;, 2).x
+	assert_parses(p, &quot;E&quot;, &quot;E&quot;, 2).x
+	assert_parses(p, &quot;F&quot;, &quot;F&quot;, 2).x
+	assert_parses(p, &quot;G&quot;, &quot;G&quot;, 2).x
+	assert_parses(p, &quot;H&quot;, &quot;H&quot;, 2).x
+	assert_parses(p, &quot;I&quot;, &quot;I&quot;, 2).x
+	assert_parses(p, &quot;J&quot;, &quot;J&quot;, 2).x
+	assert_parses(p, &quot;K&quot;, &quot;K&quot;, 2).x
+	assert_parses(p, &quot;L&quot;, &quot;L&quot;, 2).x
+	assert_parses(p, &quot;M&quot;, &quot;M&quot;, 2).x
+	assert_parses(p, &quot;N&quot;, &quot;N&quot;, 2).x
+	assert_parses(p, &quot;O&quot;, &quot;O&quot;, 2).x
+	assert_parses(p, &quot;P&quot;, &quot;P&quot;, 2).x
+	assert_parses(p, &quot;Q&quot;, &quot;Q&quot;, 2).x
+	assert_parses(p, &quot;R&quot;, &quot;R&quot;, 2).x
+	assert_parses(p, &quot;S&quot;, &quot;S&quot;, 2).x
+	assert_parses(p, &quot;T&quot;, &quot;T&quot;, 2).x
+	assert_parses(p, &quot;U&quot;, &quot;U&quot;, 2).x
+	assert_parses(p, &quot;V&quot;, &quot;V&quot;, 2).x
+	assert_parses(p, &quot;W&quot;, &quot;W&quot;, 2).x
+	assert_parses(p, &quot;X&quot;, &quot;X&quot;, 2).x
+	assert_parses(p, &quot;Y&quot;, &quot;Y&quot;, 2).x
+	assert_parses(p, &quot;Z&quot;, &quot;Z&quot;, 2).x
+End Function
+
 Function test_Parser_baseType()
 	Dim p As Parser
 	p = pBaseType
@@ -1085,6 +1184,45 @@ Function test_Parser_baseType()
 
 	assert_parses(p, &quot;Long&quot;, &quot;Long&quot;, 5).x
 	refute_parses(p, &quot;long&quot;).x
+End Function
+
+Function test_Parser_TypeVar()
+	Dim p As Parser
+	p = pTypeVar
+
+	refute_parses(p, Array(&quot; &quot;, chr(9), chr(13), &quot;_&quot;, _
+		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;, _
+		&quot;+&quot;, &quot;-&quot;, &quot;-&gt;&quot;, &quot;*&quot;, &quot;?&quot;, &quot;#&quot;,_
+		&quot;A&quot;, &quot;B&quot;, &quot;C&quot;, &quot;D&quot;, &quot;E&quot;, &quot;F&quot;, &quot;G&quot;, &quot;H&quot;, &quot;I&quot;, &quot;J&quot;, &quot;K&quot;, &quot;L&quot;, &quot;M&quot;, _
+		&quot;N&quot;, &quot;O&quot;, &quot;P&quot;, &quot;Q&quot;, &quot;R&quot;, &quot;S&quot;, &quot;T&quot;, &quot;U&quot;, &quot;V&quot;, &quot;W&quot;, &quot;X&quot;, &quot;Y&quot;, &quot;Z&quot;, _
+		&quot;&quot;)).x
+	assert_parses(p, &quot;asdf&quot;, &quot;a&quot;, 2).x
+	assert_parses(p, &quot;a&quot;, &quot;a&quot;, 2).x
+	assert_parses(p, &quot;b&quot;, &quot;b&quot;, 2).x
+	assert_parses(p, &quot;c&quot;, &quot;c&quot;, 2).x
+	assert_parses(p, &quot;d&quot;, &quot;d&quot;, 2).x
+	assert_parses(p, &quot;e&quot;, &quot;e&quot;, 2).x
+	assert_parses(p, &quot;f&quot;, &quot;f&quot;, 2).x
+	assert_parses(p, &quot;g&quot;, &quot;g&quot;, 2).x
+	assert_parses(p, &quot;h&quot;, &quot;h&quot;, 2).x
+	assert_parses(p, &quot;i&quot;, &quot;i&quot;, 2).x
+	assert_parses(p, &quot;j&quot;, &quot;j&quot;, 2).x
+	assert_parses(p, &quot;k&quot;, &quot;k&quot;, 2).x
+	assert_parses(p, &quot;l&quot;, &quot;l&quot;, 2).x
+	assert_parses(p, &quot;m&quot;, &quot;m&quot;, 2).x
+	assert_parses(p, &quot;n&quot;, &quot;n&quot;, 2).x
+	assert_parses(p, &quot;o&quot;, &quot;o&quot;, 2).x
+	assert_parses(p, &quot;p&quot;, &quot;p&quot;, 2).x
+	assert_parses(p, &quot;q&quot;, &quot;q&quot;, 2).x
+	assert_parses(p, &quot;r&quot;, &quot;r&quot;, 2).x
+	assert_parses(p, &quot;s&quot;, &quot;s&quot;, 2).x
+	assert_parses(p, &quot;t&quot;, &quot;t&quot;, 2).x
+	assert_parses(p, &quot;u&quot;, &quot;u&quot;, 2).x
+	assert_parses(p, &quot;v&quot;, &quot;v&quot;, 2).x
+	assert_parses(p, &quot;w&quot;, &quot;w&quot;, 2).x
+	assert_parses(p, &quot;x&quot;, &quot;x&quot;, 2).x
+	assert_parses(p, &quot;y&quot;, &quot;y&quot;, 2).x
+	assert_parses(p, &quot;z&quot;, &quot;z&quot;, 2).x
 End Function
 
 Function test_Parser_TypeCtor()
