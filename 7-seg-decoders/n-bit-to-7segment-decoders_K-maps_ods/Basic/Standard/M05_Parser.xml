@@ -34,7 +34,7 @@ Function TParser_toString(Optional p As Object)
 	If isMissing(p) Then
 		TParser_toString = Fn.TParser_toString
 	Else
-		Dim result As String
+		Dim result As String, f As Object
 		Select Case p.tp
 			Case &quot;fail&quot;:		result = &quot;fail&quot;
 			Case &quot;return&quot;:		result = &quot;(return &quot; &amp; toString(p.st) &amp; &quot;)&quot;
@@ -56,8 +56,13 @@ Function TParser_toString(Optional p As Object)
 					Wend
 					result = result &amp; &quot;)&quot;
 				End If
+			Case &quot;bind&quot;
+				Dim q As Object
+				q = p.st(0)
+				f = p.st(1)
+				result = toString(q) &amp; &quot; &gt;&gt;= &quot; &amp; TFn_toString(f)
 			Case &quot;seq&quot;
-				Dim ps As Variant, f As Object, i As Integer, args As String
+				Dim ps As Variant, i As Integer, args As String
 				ps = p.st(0)
 				f  = p.st(1)
 				result = &quot;(&quot;
@@ -169,10 +174,34 @@ Function pItem()
 	pItem = result
 End Function
 
-Function pNextAsc()
-	Static result As Object
-	If isNull(result) Then : Set result = pBind(pItem, compose(pReturn, Fn.asc)) : End If
-	pNextAsc = result
+&apos; pattern-matches p against &quot;q &gt;&gt;= K (return Empty)&quot; where q any parser
+Function isPSkip(p As Parser)
+	Dim result As Boolean : result = False
+	If p.tp = &quot;bind&quot; Then
+		Dim f As Object
+		f = p.st(1)
+		If (getFnName(f) = getFnName(Fn.fstArg)) And (arity(f) = 1) Then
+			Dim innerP As Object
+			innerP = car(partialArgs(f))
+			result = (innerP.tp = &quot;return&quot;) And isEmpty(innerP.st)
+		End If
+	End If
+	isPSkip = result
+End Function
+
+Function pSkip(p As Object)
+	Dim result As Variant
+	Select Case p.tp
+		Case &quot;fail&quot;:	result = p
+		Case &quot;return&quot;:	result = pReturn(Empty)
+		Case Else
+			If isPSkip(p) Then
+				result = p
+			Else
+				result = pBind(p, fstArg(pReturn(Empty)))
+			End If
+	End Select
+	pSkip = result
 End Function
 
 &apos; succeeds on strings with the given prefix t by returning t,
@@ -459,26 +488,48 @@ Function pTypeExpr()
 		Dim recDummy As Object
 		
 		&apos; Left ::= ws* N
-		pLeft = pSeq(Array(pMany(pWhite), recDummy), sndArg)
+		&apos; pLeft = do _ &lt;- many white
+		&apos;            n &lt;- N
+		&apos;         return n
+		&apos;pLeft = pSeq(Array(pMany(pWhite), recDummy), sndArg)
+		pLeft = pSeq(Array(pSkip(pMany(pWhite)), recDummy), id)
 		
 		&apos; Right ::= &quot;-&gt;&quot; S
-		pRight = pSeq(Array(pStr(&quot;-&gt;&quot;), recDummy), sndArg)
+		&apos; pRight = do _ &lt;- (str &quot;-&gt;&quot;)
+		&apos;             s &lt;- S
+		&apos;          return s
+		&apos;pRight = pSeq(Array(pStr(&quot;-&gt;&quot;), recDummy), sndArg)
+		pRight = pSeq(Array(pSkip(pStr(&quot;-&gt;&quot;)), recDummy), id)
 		
 		&apos; S ::= Left ws* Right?
+		&apos; pS = do lft &lt;- pLeft
+		&apos;           _ &lt;- many white
+		&apos;         rgt &lt;- zeroOrOne pRight
+		&apos;      return (if (empty? rgt) left else (mkArrowType lft rgt))
+		&apos;pS = pSeq(Array(pLeft,_
+		&apos;				pSeq(Array(pMany(pWhite), pZeroOrOne(pRight)),_
+		&apos;				sndArg),_
+		&apos;		  ), Fn.maybeMakeArrowType)
+		&apos;
 		pS = pSeq(Array(pLeft,_
-						pSeq(Array(pMany(pWhite), pZeroOrOne(pRight)),_
-						sndArg),_
+						pSkip(pMany(pWhite)),_
+						pZeroOrOne(pRight)_
 				  ), Fn.maybeMakeArrowType)
-		
 		pRight.st(0)(1) = pS &apos; fix up recursive call to S in Right
 		
 		&apos; ParenS ::= &quot;(&quot; S &quot;)&quot;
-		pParenS = pSeq(Array(pSeq(Array(pStr(&quot;(&quot;), pS), sndArg),_
-						     pStr(&quot;)&quot;)_
-					   ), fstArg)
+		&apos;pParenS = pSeq(Array(pSeq(Array(pStr(&quot;(&quot;), pS), sndArg),_
+		&apos;				     pStr(&quot;)&quot;)_
+		&apos;			   ), fstArg)
+		
+		pParenS = pSeq(Array(pSkip(pStr(&quot;(&quot;)), _
+							 pS, _
+						     pSkip(pStr(&quot;)&quot;)) _
+					   ), id)
 		
 		&apos; TypeArg ::= ws+ N
-		pTypeArg = pSeq(Array(pMany1(pWhite), recDummy), sndArg)
+		&apos;pTypeArg = pSeq(Array(pMany1(pWhite), recDummy), sndArg)
+		pTypeArg = pSeq(Array(pSkip(pMany1(pWhite)), recDummy), id)
 		
 		&apos; Ctor ::= TypeCtor TypeArg*
 		pCtor = pSeq(Array(pTypeCtor, pMany(pTypeArg)), Fn.mkTypeCtor)
@@ -653,22 +704,23 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		innerParsers = p.st(0)
 		i = LBound(innerParsers)
 		k = UBound(innerParsers)
-		j = 0
 		nxtPos = pos
-		Dim iResults(0 To k-i) As Variant
+		Dim iResults As Object
+		iResults = nil
 		Do
 			t = applyP(innerParsers(i), s, nxtPos)
 			If Not isParseFailure(t) Then
-				iResults(j) = t(0)
 				nxtPos = t(1)
+				If Not(isPSkip(innerParsers(i))) Then
+					iResults = cons(t(0), iResults)
+				End If
 				i = i + 1
-				j = j + 1
 			End If
 		Loop Until (i &gt; k) Or isParseFailure(t)
 		If isParseFailure(t) Then
 			result = t
 		Else
-			fResult = applyToList(p.st(1), toList(iResults))
+			fResult = applyToList(p.st(1), reverse(iResults))
 			&apos; ATTENTION: do not reuse t, type of result value may not match
 			&apos;            and an implicit conversion might happen!
 			result = Array(fResult, nxtPos)
@@ -690,6 +742,7 @@ Function [-----------------------------]()
 End Function
 
 Function test_Parser(Optional what)
+&apos;	what = &quot;primitives&quot;
 	Dim failure As String
 	failure = toString(parseFailure)
 	refute_parses_pass = assertEqual(failure, failure)
@@ -707,11 +760,11 @@ Function test_Parser(Optional what)
 	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;primitives&quot;) Then
 		test_Parser_fail()
 		test_Parser_return()
+		test_Parser_item()
+		test_Parser_choice()
 		test_Parser_bind()	
 		test_Parser_then()	
-		test_Parser_item()
-		test_Parser_nextAsc()
-		test_Parser_choice()
+		test_Parser_skip()
 	End If
 	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;multiplicity&quot;) Then
 		test_Parser_zeroOrOne()
@@ -745,8 +798,7 @@ Function test_Parser(Optional what)
 end_of_Parser_tests:	
 	aCount = assertionCount - aCount
 	tm = CLng(10 * (GetSystemTicks() - tm) / ticksPerSec) / 10
-	if tm = 0 Then : tm = 1 : End If
-	
+	If tm = 0 Then : tm = 1 : End If &apos; avoid divide-by-zero
 	If isMissing(what) Then
 		aPerSec =  CLng(10 * aCount / tm) / 10
 		Dim summary As String
@@ -870,6 +922,64 @@ Function test_Parser_return()
 	assert_parses(p, chr(13),	4711, 1).x
 End Function
 
+Function test_Parser_item()
+	Dim p As Parser
+	Set p = pItem
+
+	refute_parses(p, &quot;&quot;).x
+	assert_parses(p, &quot; &quot;,		&quot; &quot;, 2).x
+	assert_parses(p, &quot;a&quot;,		&quot;a&quot;, 2).x
+	assert_parses(p, &quot;1&quot;,		&quot;1&quot;, 2).x
+	assert_parses(p, &quot;[]&quot;,		&quot;[&quot;, 2).x
+	assert_parses(p, &quot;abcd&quot;,	&quot;a&quot;, 2).x
+	assert_parses(p, chr(13),	chr(13), 2).x
+	assert_parses(p, chr( 9),	chr( 9), 2).x
+End Function
+
+Function test_Parser_choice()
+	Dim p As Object
+	Dim data As Variant
+
+	p = pChoice
+	assertEqual(isFn(p), True).x
+	assertEqual(arity(p),  2).x
+	p = apply(p, pItem)
+	assertEqual(isFn(p), True).x
+	assertEqual(arity(p),  1).x
+	p = apply(p, pReturn(7))
+		
+	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
+		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
+		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
+	)
+	p = pChoice(pFail, pFail)
+	refute_parses(p, data).x
+	
+	p = pChoice(pReturn(7), pFail)
+	assert_parses(p, data, 7, 1).x
+	
+	p = pChoice(pFail, pReturn(7))
+	assert_parses(p, data, 7, 1).x
+	
+	p = pChoice(pReturn(42), pReturn(7))
+	assert_parses(p, data, 42, 1).x
+	
+	assert_parses(pChoice(pItem, pReturn(11)), 	&quot;&quot;, 11, 1	).x
+	refute_parses(pChoice(pItem, pStr(&quot;x&quot;)),	&quot;&quot;).x
+	assert_parses(pChoice(pReturn(11), pItem), 	&quot;&quot;, 11, 1	).x
+	refute_parses(pChoice(pStr(&quot;x&quot;), pItem),	&quot;&quot;).x
+	
+	assert_parses(pChoice(pItem, pReturn(11)), 	&quot; &quot;, &quot; &quot;, 2	).x
+	assert_parses(pChoice(pItem, pStr(&quot;x&quot;)), 	&quot; &quot;, &quot; &quot;, 2	).x
+	assert_parses(pChoice(pReturn(11), pItem), 	&quot; &quot;, 11, 1	).x
+	assert_parses(pChoice(pStr(&quot;x&quot;), pItem), 	&quot; &quot;, &quot; &quot;, 2	).x
+	
+	assert_parses(pChoice(pItem, pReturn(11)), 	&quot;x&quot;, &quot;x&quot;, 2	).x
+	assert_parses(pChoice(pItem, pStr(&quot;x&quot;)), 	&quot;x&quot;, &quot;x&quot;, 2	).x
+	assert_parses(pChoice(pReturn(11), pItem), 	&quot;x&quot;, 11, 1	).x
+	assert_parses(pChoice(pStr(&quot;x&quot;), pItem), 	&quot;x&quot;, &quot;x&quot;, 2	).x
+End Function
+
 Function test_Parser_bind()
 	Dim p As Object
 	p = pBind
@@ -918,32 +1028,136 @@ Function test_Parser_then()
 	assert_parses(p, &quot;x   abcd&quot;,	&quot;x&quot;, 5).x
 End Function
 
-Function test_Parser_item()
-	Dim p As Parser
-	Set p = pItem
-
+Function test_Parser_skip()
+	Dim p As Parser, actual As Variant
+	Set p = pSkip(pItem)
 	refute_parses(p, &quot;&quot;).x
-	assert_parses(p, &quot; &quot;,		&quot; &quot;, 2).x
-	assert_parses(p, &quot;a&quot;,		&quot;a&quot;, 2).x
-	assert_parses(p, &quot;1&quot;,		&quot;1&quot;, 2).x
-	assert_parses(p, &quot;[]&quot;,		&quot;[&quot;, 2).x
-	assert_parses(p, &quot;abcd&quot;,	&quot;a&quot;, 2).x
-	assert_parses(p, chr(13),	chr(13), 2).x
-	assert_parses(p, chr( 9),	chr( 9), 2).x
-End Function
-
-Function test_Parser_nextAsc()
-	Dim p As Parser
-	Set p = pNextAsc
+	assert_parses(p, &quot; &quot;,		Empty, 2).x
+	assert_parses(p, &quot;a&quot;,		Empty, 2).x
+	assert_parses(p, &quot;1&quot;,		Empty, 2).x
+	assert_parses(p, &quot;[]&quot;,		Empty, 2).x
+	assert_parses(p, &quot;abcd&quot;,	Empty, 2).x
+	assert_parses(p, chr(13),   Empty, 2).x
+	assert_parses(p, chr( 9),	Empty, 2).x
 	
+	&apos; skip fail = fail
+	Set p = pSkip(pFail)
 	refute_parses(p, &quot;&quot;).x
-	assert_parses(p, &quot; &quot;,		asc(&quot; &quot;), 2).x
-	assert_parses(p, &quot;a&quot;,		asc(&quot;a&quot;), 2).x
-	assert_parses(p, &quot;1&quot;,		asc(&quot;1&quot;), 2).x
-	assert_parses(p, &quot;[]&quot;,		asc(&quot;[&quot;), 2).x
-	assert_parses(p, &quot;abcd&quot;,	asc(&quot;a&quot;), 2).x
-	assert_parses(p, chr(13),	      13, 2).x
-	assert_parses(p, chr( 9),	       9, 2).x
+	refute_parses(p, &quot; &quot;).x
+	refute_parses(p, &quot;a&quot;).x
+	refute_parses(p, &quot;1&quot;).x
+	refute_parses(p, &quot;[]&quot;).x
+	refute_parses(p, &quot;abcd&quot;).x
+	refute_parses(p, chr(13)).x
+	refute_parses(p, chr( 9)).x
+		
+	Set p = pSkip(pBind(pItem, fstArg(pItem)))
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot; &quot;).x
+	refute_parses(p, &quot;a&quot;).x
+	refute_parses(p, &quot;1&quot;).x
+	assert_parses(p, &quot;[]&quot;,				Empty, 3).x
+	assert_parses(p, &quot;abcd&quot;,			Empty, 3).x
+	refute_parses(p, chr(13)).x
+	refute_parses(p, chr( 9)).x
+	assert_parses(p, chr(13) &amp; chr(13),	Empty, 3).x
+	assert_parses(p, chr( 9) &amp; chr( 9),	Empty, 3).x
+
+	&apos; skip (return x) = return Empty
+	Set p = pSkip(pReturn(&quot;foo&quot;))
+	assert_parses(p, &quot;&quot;,		Empty, 1).x
+	assert_parses(p, &quot; &quot;,		Empty, 1).x
+	assert_parses(p, &quot;a&quot;,		Empty, 1).x
+	assert_parses(p, &quot;1&quot;,		Empty, 1).x
+	assert_parses(p, &quot;[]&quot;,		Empty, 1).x
+	assert_parses(p, &quot;abcd&quot;,	Empty, 1).x
+	assert_parses(p, chr(13),   Empty, 1).x
+	assert_parses(p, chr( 9),	Empty, 1).x
+
+	&apos; skip (skip x) = skip x
+	Set p = pSkip(pSkip(pItem))
+&apos;	msgbox(toString(p))
+	refute_parses(p, &quot;&quot;).x
+	assert_parses(p, &quot; &quot;,		Empty, 2).x
+	assert_parses(p, &quot;a&quot;,		Empty, 2).x
+	assert_parses(p, &quot;1&quot;,		Empty, 2).x
+	assert_parses(p, &quot;[]&quot;,		Empty, 2).x
+	assert_parses(p, &quot;abcd&quot;,	Empty, 2).x
+	assert_parses(p, chr(13),   Empty, 2).x
+	assert_parses(p, chr( 9),	Empty, 2).x
+	
+	Set p = pSkip(pMany(pItem))
+&apos;	msgbox(toString(p))
+	assert_parses(p, &quot;&quot;,		Empty, 1).x
+	assert_parses(p, &quot; &quot;,		Empty, 2).x
+	assert_parses(p, &quot;a&quot;,		Empty, 2).x
+	assert_parses(p, &quot;1&quot;,		Empty, 2).x
+	assert_parses(p, &quot;[]&quot;,		Empty, 3).x
+	assert_parses(p, &quot;abcd&quot;,	Empty, 5).x
+	assert_parses(p, chr(13),   Empty, 2).x
+	assert_parses(p, chr( 9),	Empty, 2).x	
+	
+	Set p = pSkip(pMany1(pItem))
+	refute_parses(p, &quot;&quot;).x
+	assert_parses(p, &quot; &quot;,		Empty, 2).x
+	assert_parses(p, &quot;a&quot;,		Empty, 2).x
+	assert_parses(p, &quot;1&quot;,		Empty, 2).x
+	assert_parses(p, &quot;[]&quot;,		Empty, 3).x
+	assert_parses(p, &quot;abcd&quot;,	Empty, 5).x
+	assert_parses(p, chr(13),   Empty, 2).x
+	assert_parses(p, chr( 9),	Empty, 2).x	
+
+	Set p = pSkip(pMany(pWhite))
+	assert_parses(p, &quot;&quot;,		Empty, 1).x
+	assert_parses(p, &quot; &quot;,		Empty, 2).x
+	assert_parses(p, &quot;  &quot;,		Empty, 3).x
+	assert_parses(p, &quot;a&quot;,		Empty, 1).x
+	assert_parses(p, &quot;1&quot;,		Empty, 1).x
+	assert_parses(p, &quot; a&quot;,		Empty, 2).x
+	assert_parses(p, &quot;  1&quot;,		Empty, 3).x
+	assert_parses(p, &quot;[]&quot;,		Empty, 1).x
+	assert_parses(p, &quot;abcd&quot;,	Empty, 1).x
+	assert_parses(p, &quot;   d&quot;,	Empty, 4).x
+	assert_parses(p, chr(13),   Empty, 1).x
+	assert_parses(p, chr( 9),	Empty, 2).x	
+	
+	Set p = pBind(pSkip(pMany(pWhite)), fstArg(pStr(&quot;xx&quot;))
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot;x&quot;).x
+	assert_parses(p, &quot;xx&quot;,		&quot;xx&quot;,  3).x
+	assert_parses(p, &quot;xxx&quot;,		&quot;xx&quot;,  3).x
+	refute_parses(p, &quot; &quot;).x
+	refute_parses(p, &quot; x&quot;).x
+	assert_parses(p, &quot; xx&quot;,		&quot;xx&quot;,  4).x
+	assert_parses(p, &quot; xxx&quot;,	&quot;xx&quot;,  4).x
+	refute_parses(p, &quot;  &quot;).x
+	refute_parses(p, &quot;  x&quot;).x
+	assert_parses(p, &quot;  xx&quot;,	&quot;xx&quot;,  5).x
+	assert_parses(p, &quot;  xxx&quot;,	&quot;xx&quot;,  5).x
+	refute_parses(p, chr(9) &amp; &quot;  &quot;).x
+	refute_parses(p, chr(9) &amp; &quot;  x&quot;).x
+	assert_parses(p, chr(9) &amp; &quot;  xx&quot;,	&quot;xx&quot;,  6).x
+	assert_parses(p, chr(9) &amp; &quot;  xxx&quot;,	&quot;xx&quot;,  6).x
+	
+	Dim mkList1 As Object, mkList2 As Object, expected As Object
+	Set mkList1 = swap(cons, nil) &apos; \y.cons y nil
+	Set mkList2 = swap(compose(swap(cons), mkList1)) &apos; \x y.cons x (cons y nil))
+	Set expected = apply(mkList2, &quot;foo&quot;, &quot;bar&quot;)
+	assertEqual(toString(expected), &quot;[&apos;foo&apos;, &apos;bar&apos;]&quot;).x
+	Set p = pSeq(Array(pSkip(pMany(pWhite)), _
+					   pStr(&quot;foo&quot;), _
+					   pSkip(pMany(pWhite)), _
+					   pStr(&quot;bar&quot;), _
+					   pSkip(pMany(pWhite)) _
+				 ), mkList2 _
+	)
+	assert_parses(p, &quot;foobar&quot;, 		expected,  7).x
+	assert_parses(p, &quot;   foobar&quot;, 	expected, 10).x
+	assert_parses(p, &quot;foobar   &quot;, 	expected, 10).x
+	assert_parses(p, &quot;foo   bar&quot;, 	expected, 10).x
+	assert_parses(p, &quot; foo  bar&quot;, 	expected, 10).x
+	assert_parses(p, &quot;foo  bar &quot;, 	expected, 10).x
+	assert_parses(p, &quot; foo bar &quot;, 	expected, 10).x
 End Function
 
 
@@ -987,49 +1201,6 @@ Function test_Parser_str()
 	assert_parses(p, chr(13) &amp; chr(13) &amp; &quot;bar&quot;,	&quot;\n&quot;, 2).x
 End Function
 
-Function test_Parser_choice()
-	Dim p As Object
-	Dim data As Variant
-
-	p = pChoice
-	assertEqual(isFn(p), True).x
-	assertEqual(arity(p),  2).x
-	p = apply(p, pItem)
-	assertEqual(isFn(p), True).x
-	assertEqual(arity(p),  1).x
-	p = apply(p, pReturn(7))
-		
-	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
-		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
-		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
-	)
-	p = pChoice(pFail, pFail)
-	refute_parses(p, data).x
-	
-	p = pChoice(pReturn(7), pFail)
-	assert_parses(p, data, 7, 1).x
-	
-	p = pChoice(pFail, pReturn(7))
-	assert_parses(p, data, 7, 1).x
-	
-	p = pChoice(pReturn(42), pReturn(7))
-	assert_parses(p, data, 42, 1).x
-	
-	assert_parses(pChoice(pItem, pReturn(11)), 	&quot;&quot;, 11, 1	).x
-	refute_parses(pChoice(pItem, pStr(&quot;x&quot;)),	&quot;&quot;).x
-	assert_parses(pChoice(pReturn(11), pItem), 	&quot;&quot;, 11, 1	).x
-	refute_parses(pChoice(pStr(&quot;x&quot;), pItem),	&quot;&quot;).x
-	
-	assert_parses(pChoice(pItem, pReturn(11)), 	&quot; &quot;, &quot; &quot;, 2	).x
-	assert_parses(pChoice(pItem, pStr(&quot;x&quot;)), 	&quot; &quot;, &quot; &quot;, 2	).x
-	assert_parses(pChoice(pReturn(11), pItem), 	&quot; &quot;, 11, 1	).x
-	assert_parses(pChoice(pStr(&quot;x&quot;), pItem), 	&quot; &quot;, &quot; &quot;, 2	).x
-	
-	assert_parses(pChoice(pItem, pReturn(11)), 	&quot;x&quot;, &quot;x&quot;, 2	).x
-	assert_parses(pChoice(pItem, pStr(&quot;x&quot;)), 	&quot;x&quot;, &quot;x&quot;, 2	).x
-	assert_parses(pChoice(pReturn(11), pItem), 	&quot;x&quot;, 11, 1	).x
-	assert_parses(pChoice(pStr(&quot;x&quot;), pItem), 	&quot;x&quot;, &quot;x&quot;, 2	).x
-End Function
 
 
 Function test_Parser_zeroOrOne()
