@@ -19,6 +19,7 @@ Public applyP_item As Integer
 Public applyP_bind As Integer
 Public apply_bind_K_return As Integer
 Public applyP_choice As Integer
+Public applyP_many1rev As Integer
 Public applyP_str As Integer
 Public applyP_seq As Integer
 
@@ -721,6 +722,7 @@ Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolea
 			croak(&quot;applying pChoice: invalid list of alternatives &quot; &amp; chr(13) &amp; toString(innerParsers))
 		End If
 	ElseIf (p.tp = &quot;many1Rev&quot;) Then
+		applyP_many1rev = applyP_many1rev + 1
 		Dim lstLen As Integer
 		nxtPos = pos
 		lstLen = 0
@@ -866,11 +868,12 @@ end_of_Parser_tests:
 				&amp; chr(13) &amp; &quot;apply_return: &quot; &amp; applyP_return _
 				&amp; chr(13) &amp; &quot;apply_fail: &quot; &amp; applyP_fail _
 				&amp; chr(13) &amp; &quot;apply_item: &quot; &amp; applyP_item _
-				&amp; chr(13) &amp; &quot;apply_bind: &quot; &amp; applyP_bind _
-				&amp; chr(13) &amp; &quot;apply_bind_K_return: &quot; &amp; apply_bind_K_return _
 				&amp; chr(13) &amp; &quot;apply_choice: &quot; &amp; applyP_choice _
+				&amp; chr(13) &amp; &quot;apply_many1Rev: &quot; &amp; applyP_many1Rev _
 				&amp; chr(13) &amp; &quot;apply_str: &quot; &amp; applyP_str _
 				&amp; chr(13) &amp; &quot;apply_seq: &quot; &amp; applyP_seq _
+				&amp; chr(13) &amp; &quot;apply_bind: &quot; &amp; applyP_bind _
+				&amp; chr(13) &amp; &quot;  (apply_bind_K_return: &quot; &amp; apply_bind_K_return &amp; &quot;)&quot; _
 				&amp; chr(13) &amp; length(bindFns) &amp; &quot; bindFns: &quot; &amp; toString(bindFns))
 	Else
 		result = Join(Array(&quot;test_Parser(&quot; &amp; what &amp; &quot;):&quot;, tm, aCount), &quot; &quot;)
