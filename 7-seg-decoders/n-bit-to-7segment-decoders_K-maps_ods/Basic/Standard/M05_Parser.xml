@@ -219,8 +219,8 @@ Function pSkip(p As Object)
 			If isPSkip(p) Then
 				result = p
 			Else
-				result = pBind(p, fstArg(pReturn(Empty)))
-				&apos;result = mkParser(&quot;skip&quot;, p)
+				&apos;result = pBind(p, fstArg(pReturn(Empty)))
+				result = mkParser(&quot;skip&quot;, p)
 			End If
 	End Select
 	pSkip = result
@@ -705,18 +705,31 @@ Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolea
 		Loop Until (isNil(innerParsers) Or Not(isParseFailure(result)))
 	ElseIf (p.tp = &quot;many1&quot;) Then
 		applyP_many1 = applyP_many1 + 1
-		Set lst = nil
 		innerParser = p.st
-		result = _applyP(innerParser, s, nxtPos, isUnderSkip)
-		While Not(isParseFailure(result))
-			nxtPos = result(1)
-			Set lst = cons(result(0), lst)
+		If isUnderSkip Then
 			result = _applyP(innerParser, s, nxtPos, isUnderSkip)
-		Wend
-		If isNil(lst) Then
-			result = parseFailure
+			If Not(isParseFailure(result)) Then
+				Dim dummyResult As Variant
+				dummyResult = result
+				Do
+					nxtPos = dummyResult(1)
+					dummyResult = _applyP(innerParser, s, nxtPos, isUnderSkip)
+				Loop Until isParseFailure(dummyResult)
+				result(1) = nxtPos
+			End If
 		Else
-			result = Array(reverse(lst), nxtPos)
+			Set lst = nil
+			result = _applyP(innerParser, s, nxtPos, isUnderSkip)
+			While Not(isParseFailure(result))
+				nxtPos = result(1)
+				Set lst = cons(result(0), lst)
+				result = _applyP(innerParser, s, nxtPos, isUnderSkip)
+			Wend
+			If isNil(lst) Then
+				result = parseFailure
+			Else
+				result = Array(reverse(lst), nxtPos)
+			End If
 		End If
 	ElseIf p.tp = &quot;bind&quot; Then
 		applyP_bind = applyP_bind + 1
@@ -724,7 +737,7 @@ Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolea
 			apply_bind_K_return = apply_bind_K_return + 1
 		End If
 		result = _applyP(p.st(0), s, pos, isUnderSkip)
-		If Not isParseFailure(result) Then
+		If Not(isParseFailure(result)) Then
 			nxtPos = result(1)
 			fResult = apply1(p.st(1), result(0))
 			&apos; do NOT access .tp on fResult - it&apos;s effectively as fixing fResult&apos;s type to Object...!
@@ -734,29 +747,41 @@ Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolea
 		applyP_seq = applyP_seq + 1
 		innerParsers = p.st(0)
 		nxtPos = pos
-		Dim iResults As Object
-		iResults = nil
-		For i = LBound(innerParsers) To UBound(innerParsers)
-			result = _applyP(innerParsers(i), s, nxtPos, isUnderSkip)
-			If isParseFailure(result) Then
-				Exit For
+		If isUnderSkip Then
+			For i = LBound(innerParsers) To UBound(innerParsers)
+				result = _applyP(innerParsers(i), s, nxtPos, isUnderSkip)
+				If isParseFailure(result) Then
+					Exit For
+				End If
+				nxtPos = result(1)
+			Next		
+		Else
+			Dim iResults As Object
+			iResults = nil
+			For i = LBound(innerParsers) To UBound(innerParsers)
+				result = _applyP(innerParsers(i), s, nxtPos, isUnderSkip)
+				If isParseFailure(result) Then
+					Exit For
+				End If
+				nxtPos = result(1)
+				If Not(isPSkip(innerParsers(i))) Then
+					iResults = cons(result(0), iResults)
+				End If
+			Next
+			If Not(isParseFailure(result)) Then
+				fResult = applyToList(p.st(1), reverse(iResults))
+				&apos; ATTENTION: do not reuse result, type of result value may not match
+				&apos;            and an implicit conversion might happen!
+				result = Array(fResult, nxtPos)
 			End If
-			nxtPos = result(1)
-			If Not(isPSkip(innerParsers(i))) Then
-				iResults = cons(result(0), iResults)
-			End If
-		Next
-		If Not(isParseFailure(result)) Then
-			fResult = applyToList(p.st(1), reverse(iResults))
-			&apos; ATTENTION: do not reuse t, type of result value may not match
-			&apos;            and an implicit conversion might happen!
-			result = Array(fResult, nxtPos)
 		End If
-		&apos;MsgBox(&quot;seq/&quot; &amp; p.st(1) &amp; &quot;: &quot; &amp; toString(result))
 	Else
 		result = &quot;unknown Parser &apos;&quot; &amp; p.tp &amp; &quot;&apos;&quot;
 		MsgBox(&quot;Error in applyP: &quot; &amp; result)
 	End If
+	&apos;If isUnderSkip And Not(isParseFailure(result)) Then
+	&apos;	assertEqual(result(0), Empty).x
+	&apos;End If
 	_applyP = result
 End Function
 
@@ -790,6 +815,7 @@ Function test_Parser(Optional what)
 		test_Parser_fail()
 		test_Parser_return()
 		test_Parser_item()
+		test_Parser_str()
 		test_Parser_choice()
 		test_Parser_bind()
 		test_Parser_skip()
@@ -801,7 +827,6 @@ Function test_Parser(Optional what)
 		test_Parser_many1()
 	End If
 	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;basic&quot;) Then
-		test_Parser_str()
 		test_Parser_white()
 		test_Parser_seq()
 		test_Parser_alphaLower()
@@ -977,6 +1002,46 @@ Function test_Parser_item()
 	assert_parses(p, chr( 9),	chr( 9), 2).x
 End Function
 
+Function test_Parser_str()
+	Dim p As Object
+	
+	p = pStr
+	assertEqual(isFn(p), True).x
+	assertEqual(arity(p),  1).x
+	
+&apos;	assertThrows(pStr, Array(&quot;&quot;)).x
+
+	p = pStr(&quot;bar&quot;)
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot; &quot;).x
+	refute_parses(p, &quot; &quot; &amp; chr(13)).x
+	refute_parses(p, &quot;asdf&quot;).x
+	refute_parses(p, &quot; bar&quot;).x
+	refute_parses(p, &quot;b&quot;).x
+	refute_parses(p, &quot;ba&quot;).x
+	assert_parses(p, &quot;bar&quot;,		&quot;bar&quot;, 4).x
+	assert_parses(p, &quot;barb&quot;,	&quot;bar&quot;, 4).x
+	assert_parses(p, &quot;barba&quot;,	&quot;bar&quot;, 4).x
+	assert_parses(p, &quot;barbar&quot;,	&quot;bar&quot;, 4).x
+
+	p = pStr(chr(13))
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot; &quot;).x
+	refute_parses(p, &quot; &quot; &amp; chr(13)).x
+	refute_parses(p, &quot;asdf&quot;).x
+	refute_parses(p, &quot; bar&quot;).x
+	refute_parses(p, &quot;b&quot;).x
+	refute_parses(p, &quot;ba&quot;).x
+	refute_parses(p, &quot;bar&quot;).x
+	refute_parses(p, &quot;barb&quot;).x
+	refute_parses(p, &quot;barba&quot;).x
+	refute_parses(p, &quot;barbar&quot;).x
+	assert_parses(p, chr(13),					&quot;\n&quot;, 2).x
+	assert_parses(p, chr(13) &amp; &quot;bar&quot;,			&quot;\n&quot;, 2).x
+	assert_parses(p, chr(13) &amp; chr(13),			&quot;\n&quot;, 2).x
+	assert_parses(p, chr(13) &amp; chr(13) &amp; &quot;bar&quot;,	&quot;\n&quot;, 2).x
+End Function
+
 Function test_Parser_choice()
 	Dim p As Object
 	Dim data As Variant
@@ -1102,6 +1167,44 @@ Function test_Parser_skip()
 	assert_parses(p, &quot;abcd&quot;,	Empty, 2).x
 	assert_parses(p, chr(13),   Empty, 2).x
 	assert_parses(p, chr( 9),	Empty, 2).x
+
+	Set p = pSkip(pStr(&quot;foo&quot;))
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot; &quot;).x
+	refute_parses(p, &quot;a&quot;).x
+	refute_parses(p, &quot;1&quot;).x
+	refute_parses(p, &quot;[]&quot;).x
+	refute_parses(p, &quot;abcd&quot;).x
+	refute_parses(p, chr(13)).x
+	refute_parses(p, chr( 9)).x
+	
+	assert_parses(p, &quot;foo&quot;,				Empty, 4).x
+	assert_parses(p, &quot;foo &quot;,			Empty, 4).x
+	assert_parses(p, &quot;fooa&quot;,			Empty, 4).x
+	assert_parses(p, &quot;foo1&quot;,			Empty, 4).x
+	assert_parses(p, &quot;foo[]&quot;,			Empty, 4).x
+	assert_parses(p, &quot;fooabcd&quot;,			Empty, 4).x
+	assert_parses(p, &quot;foo&quot; &amp; chr(13),   Empty, 4).x
+	assert_parses(p, &quot;foo&quot; &amp; chr( 9),	Empty, 4).x
+	
+	Set p = pSkip(pSeq(Array(pStr(&quot;f&quot;), pStr(&quot;oo&quot;)), concat)
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot; &quot;).x
+	refute_parses(p, &quot;a&quot;).x
+	refute_parses(p, &quot;1&quot;).x
+	refute_parses(p, &quot;[]&quot;).x
+	refute_parses(p, &quot;abcd&quot;).x
+	refute_parses(p, chr(13)).x
+	refute_parses(p, chr( 9)).x
+	
+	assert_parses(p, &quot;foo&quot;,				Empty, 4).x
+	assert_parses(p, &quot;foo &quot;,			Empty, 4).x
+	assert_parses(p, &quot;fooa&quot;,			Empty, 4).x
+	assert_parses(p, &quot;foo1&quot;,			Empty, 4).x
+	assert_parses(p, &quot;foo[]&quot;,			Empty, 4).x
+	assert_parses(p, &quot;fooabcd&quot;,			Empty, 4).x
+	assert_parses(p, &quot;foo&quot; &amp; chr(13),   Empty, 4).x
+	assert_parses(p, &quot;foo&quot; &amp; chr( 9),	Empty, 4).x
 	
 	Set p = pSkip(pMany(pItem))
 &apos;	msgbox(toString(p))
@@ -1176,49 +1279,6 @@ Function test_Parser_skip()
 	assert_parses(p, &quot;foo  bar &quot;, 	expected, 10).x
 	assert_parses(p, &quot; foo bar &quot;, 	expected, 10).x
 End Function
-
-
-Function test_Parser_str()
-	Dim p As Object
-	
-	p = pStr
-	assertEqual(isFn(p), True).x
-	assertEqual(arity(p),  1).x
-	
-&apos;	assertThrows(pStr, Array(&quot;&quot;)).x
-
-	p = pStr(&quot;bar&quot;)
-	refute_parses(p, &quot;&quot;).x
-	refute_parses(p, &quot; &quot;).x
-	refute_parses(p, &quot; &quot; &amp; chr(13)).x
-	refute_parses(p, &quot;asdf&quot;).x
-	refute_parses(p, &quot; bar&quot;).x
-	refute_parses(p, &quot;b&quot;).x
-	refute_parses(p, &quot;ba&quot;).x
-	assert_parses(p, &quot;bar&quot;,		&quot;bar&quot;, 4).x
-	assert_parses(p, &quot;barb&quot;,	&quot;bar&quot;, 4).x
-	assert_parses(p, &quot;barba&quot;,	&quot;bar&quot;, 4).x
-	assert_parses(p, &quot;barbar&quot;,	&quot;bar&quot;, 4).x
-
-	p = pStr(chr(13))
-	refute_parses(p, &quot;&quot;).x
-	refute_parses(p, &quot; &quot;).x
-	refute_parses(p, &quot; &quot; &amp; chr(13)).x
-	refute_parses(p, &quot;asdf&quot;).x
-	refute_parses(p, &quot; bar&quot;).x
-	refute_parses(p, &quot;b&quot;).x
-	refute_parses(p, &quot;ba&quot;).x
-	refute_parses(p, &quot;bar&quot;).x
-	refute_parses(p, &quot;barb&quot;).x
-	refute_parses(p, &quot;barba&quot;).x
-	refute_parses(p, &quot;barbar&quot;).x
-	assert_parses(p, chr(13),					&quot;\n&quot;, 2).x
-	assert_parses(p, chr(13) &amp; &quot;bar&quot;,			&quot;\n&quot;, 2).x
-	assert_parses(p, chr(13) &amp; chr(13),			&quot;\n&quot;, 2).x
-	assert_parses(p, chr(13) &amp; chr(13) &amp; &quot;bar&quot;,	&quot;\n&quot;, 2).x
-End Function
-
-
 
 Function test_Parser_zeroOrOne()
 	Dim p As Parser
