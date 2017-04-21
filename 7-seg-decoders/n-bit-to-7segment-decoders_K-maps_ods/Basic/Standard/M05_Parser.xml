@@ -10,6 +10,17 @@ Type Parser
 	st As Variant
 End Type
 
+Public bindFns As Object
+Public applyP_callCount As Integer
+Public _applyP_callCount As Integer
+Public applyP_return As Integer
+Public applyP_fail As Integer
+Public applyP_item As Integer
+Public applyP_bind As Integer
+Public apply_bind_K_return As Integer
+Public applyP_choice As Integer
+Public applyP_str As Integer
+Public applyP_seq As Integer
 
 Sub Main
 	test_Parser()
@@ -103,11 +114,12 @@ Function parseFailure()
 End Function
 
 Function isParseFailure(parseResult) As Boolean
-	If typeOf(parseResult) &lt;&gt; typeOf(parseFailure) Then
-		isParseFailure = False
-	Else
-		isParseFailure = equ(parseResult, parseFailure)
-	End If
+	isParseFailure = isEmpty(parseResult)
+&apos;	If typeOf(parseResult) &lt;&gt; typeOf(parseFailure) Then
+&apos;		isParseFailure = False
+&apos;	Else
+&apos;		isParseFailure = equ(parseResult, parseFailure)
+&apos;	End If
 End Function
 
 &apos; always fails on any string; failure is indicated by returning parseFailure()
@@ -120,8 +132,11 @@ End Function
 &apos; always succeeds by returning the provided value; without increasing pos
 Function pReturn(Optional v As Variant)
 	Static oFn As Object : If isNull(oFn) Then : oFn = mkParser(&quot;return&quot;) : End If
+	Static returnEmpty As Object : If isNull(returnEmpty) Then : returnEmpty = mkParser(&quot;return&quot;, Empty) : End If
 	If isMissing(v) Then
 		pReturn = oFn
+	ElseIf isEmpty(v) Then
+		pReturn = returnEmpty
 	Else
 		pReturn = mkParser(&quot;return&quot;, v)
 	End If
@@ -141,8 +156,30 @@ Function pBind(Optional p As Parser, Optional f As Object)
 			pBind = apply(oFn, p)
 		End If
 	Else
+		bindStats(p, f)
 		&apos; TODO: pBind: check if f is proper function
 		pBind = mkParser(&quot;bind&quot;, Array(p, f))
+	End If
+End Function
+
+Function isKreturn(f As Object) As Boolean
+	Dim result As Boolean
+	result = False
+	If (getFnName(f) = getFnName(Fn.fstArg)) And (arity(f) = 1) Then
+		Dim v As Parser
+		v = car(partialArgs(f))
+		If v.tp = &quot;return&quot; Then &apos; 40 of the above 43 are of shape (K return x)
+			result = True
+		End If
+	End If
+	isKreturn = result
+End Function
+
+Function bindStats(p As Parser, f As Object)
+	&apos; 43 of 51 are of shape (K p)
+	&apos; 40 of those 43 are of shape (K return x)
+	If isKreturn(f) Then
+		bindFns = cons(car(partialArgs(f)).st, bindFns)
 	End If
 End Function
 
@@ -372,10 +409,10 @@ End Function
 Function pBinDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pChoice(_
-			pBind(pStr(&quot;0&quot;), fstArg(pReturn(0))), _
-			pBind(pStr(&quot;1&quot;), fstArg(pReturn(1)))_
-		)
+&apos;		result = pChoice(_
+&apos;			pBind(pStr(&quot;0&quot;), fstArg(pReturn(0))), _
+&apos;			pBind(pStr(&quot;1&quot;), fstArg(pReturn(1)))_
+&apos;		)
 		&apos;&apos;not paying off (yet):
 		result = pBind(pItem, compose(ite(inRange(Asc(&quot;0&quot;), Asc(&quot;1&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), Fn.asc)
 	End If
@@ -385,14 +422,14 @@ End Function
 Function pDecDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pChoice(pBinDigit,	pBind(pStr(&quot;2&quot;), fstArg(pReturn(2))))
-		result = pChoice(result,	pBind(pStr(&quot;3&quot;), fstArg(pReturn(3))))
-		result = pChoice(result,	pBind(pStr(&quot;4&quot;), fstArg(pReturn(4))))
-		result = pChoice(result,	pBind(pStr(&quot;5&quot;), fstArg(pReturn(5))))
-		result = pChoice(result,	pBind(pStr(&quot;6&quot;), fstArg(pReturn(6))))
-		result = pChoice(result,	pBind(pStr(&quot;7&quot;), fstArg(pReturn(7))))
-		result = pChoice(result,	pBind(pStr(&quot;8&quot;), fstArg(pReturn(8))))
-		result = pChoice(result,	pBind(pStr(&quot;9&quot;), fstArg(pReturn(9))))
+&apos;		result = pChoice(pBinDigit,	pBind(pStr(&quot;2&quot;), fstArg(pReturn(2))))
+&apos;		result = pChoice(result,	pBind(pStr(&quot;3&quot;), fstArg(pReturn(3))))
+&apos;		result = pChoice(result,	pBind(pStr(&quot;4&quot;), fstArg(pReturn(4))))
+&apos;		result = pChoice(result,	pBind(pStr(&quot;5&quot;), fstArg(pReturn(5))))
+&apos;		result = pChoice(result,	pBind(pStr(&quot;6&quot;), fstArg(pReturn(6))))
+&apos;		result = pChoice(result,	pBind(pStr(&quot;7&quot;), fstArg(pReturn(7))))
+&apos;		result = pChoice(result,	pBind(pStr(&quot;8&quot;), fstArg(pReturn(8))))
+&apos;		result = pChoice(result,	pBind(pStr(&quot;9&quot;), fstArg(pReturn(9))))
 		&apos;pDecDigit = result
 		&apos;Exit Function
 
@@ -409,12 +446,12 @@ End Function
 Function pHexDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pChoice(pDecDigit,	pBind(pChoice(pStr(&quot;A&quot;), pStr(&quot;a&quot;)), fstArg(pReturn(10))) )
-		result = pChoice(result,	pBind(pChoice(pStr(&quot;B&quot;), pStr(&quot;b&quot;)), fstArg(pReturn(11))) )
-		result = pChoice(result,	pBind(pChoice(pStr(&quot;C&quot;), pStr(&quot;c&quot;)), fstArg(pReturn(12))) )
-		result = pChoice(result,	pBind(pChoice(pStr(&quot;D&quot;), pStr(&quot;d&quot;)), fstArg(pReturn(13))) )
-		result = pChoice(result,	pBind(pChoice(pStr(&quot;E&quot;), pStr(&quot;e&quot;)), fstArg(pReturn(14))) )
-		result = pChoice(result,	pBind(pChoice(pStr(&quot;F&quot;), pStr(&quot;f&quot;)), fstArg(pReturn(15))) )
+&apos;		result = pChoice(pDecDigit,	pBind(pChoice(pStr(&quot;A&quot;), pStr(&quot;a&quot;)), fstArg(pReturn(10))) )
+&apos;		result = pChoice(result,	pBind(pChoice(pStr(&quot;B&quot;), pStr(&quot;b&quot;)), fstArg(pReturn(11))) )
+&apos;		result = pChoice(result,	pBind(pChoice(pStr(&quot;C&quot;), pStr(&quot;c&quot;)), fstArg(pReturn(12))) )
+&apos;		result = pChoice(result,	pBind(pChoice(pStr(&quot;D&quot;), pStr(&quot;d&quot;)), fstArg(pReturn(13))) )
+&apos;		result = pChoice(result,	pBind(pChoice(pStr(&quot;E&quot;), pStr(&quot;e&quot;)), fstArg(pReturn(14))) )
+&apos;		result = pChoice(result,	pBind(pChoice(pStr(&quot;F&quot;), pStr(&quot;f&quot;)), fstArg(pReturn(15))) )
 		&apos;pHexDigit = result
 		&apos;Exit Function
 
@@ -612,8 +649,8 @@ Function parse(pName As String, s As String)
 End Function
 
 Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
+	applyP_callCount = applyP_callCount + 1
 	Dim p As Parser
-	Dim fResult As Variant
 	If IsNull(parser) Or IsEmpty(parser) Then
 		croak(&quot;applyP: invalid arg parser - &quot; &amp; toString(parser))
 	ElseIf TypeName(parser) = &quot;Object&quot; Then
@@ -624,8 +661,13 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 	If IsMissing(pos) Then
 		pos = 1
 	End If
+	applyP = _applyP(p, s, pos, False)
+End Function
 
+Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolean)
+	_applyP_callCount = _applyP_callCount + 1
 	Dim result As Variant
+	Dim fResult As Variant
 	Dim nxtPos As Integer
 	Dim i As Integer, j As Integer, k As Integer
 	Dim innerParser As Parser
@@ -633,10 +675,13 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 	Dim lst As Object
 	nxtPos = pos
 	If p.tp = &quot;return&quot; Then
+		applyP_return = applyP_return + 1
 		result = Array(p.st, nxtPos)
 	ElseIf p.tp = &quot;fail&quot; Then
+		applyP_fail = applyP_fail + 1
 		result = parseFailure
 	ElseIf p.tp = &quot;item&quot; Then
+		applyP_item = applyP_item + 1
 		If pos &lt;= Len(s) Then
 			nxtPos = pos + 1
 			result = Array(Mid(s, pos, 1), nxtPos)
@@ -644,6 +689,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 			result = parseFailure
 		End If
 	ElseIf p.tp = &quot;str&quot; Then
+		applyP_str = applyP_str + 1
 		Dim match As String
 		Dim matchLen As Integer
 		match = p.st
@@ -657,17 +703,18 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		&apos;MsgBox(&quot;str(&quot; &amp; toString(match) &amp; &quot;), s=&quot; &amp; toString(s) &amp; &quot;, pos=&quot; &amp; toString(pos) &amp; &quot;, matchLen=&quot; &amp; toString(matchLen)_
 		&apos;	&amp; chr(13) &amp; &quot;~&gt;&quot; &amp; toString(result))
 	ElseIf p.tp = &quot;choice&quot; Then
+		applyP_choice = applyP_choice + 1
 		innerParsers = p.st
 		k = length(innerParsers)
 		If k = 2 Then	&apos; if there are two alternatives
-			result = applyP(car(innerParsers), s, pos)
+			result = _applyP(car(innerParsers), s, pos, isUnderSkip)
 			If isParseFailure(result) Then
-				result = applyP(cadr(innerParsers), s, pos)
+				result = _applyP(cadr(innerParsers), s, pos, isUnderSkip)
 			End If
 		ElseIf k &gt; 2 Then	&apos; more than 2 alternatives
 			Do
 				innerParser = car(innerParsers)
-				result = applyP(innerParser, s, pos)
+				result = _applyP(innerParser, s, pos, isUnderSkip)
 				innerParsers = cdr(innerParsers)
 			Loop Until (isNil(innerParsers) Or Not(isParseFailure(result)))
 		Else
@@ -679,12 +726,12 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		lstLen = 0
 		Set lst = nil
 		innerParser = p.st
-		result = applyP(innerParser, s, nxtPos)
+		result = _applyP(innerParser, s, nxtPos, isUnderSkip)
 		While Not(isParseFailure(result))
 			nxtPos = result(1)
 			Set lst = cons(result(0), lst)
 			lstLen = lstLen + 1
-			result = applyP(innerParser, s, nxtPos)
+			result = _applyP(innerParser, s, nxtPos, isUnderSkip)
 		Wend
 		If isNil(lst) Then
 			result = parseFailure
@@ -692,14 +739,19 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 			result = Array(lst, nxtPos)
 		End If
 	ElseIf p.tp = &quot;bind&quot; Then
-		result = applyP(p.st(0), s, pos)
+		applyP_bind = applyP_bind + 1
+		If isKreturn(p.st(1)) Then
+			apply_bind_K_return = apply_bind_K_return + 1
+		End If
+		result = _applyP(p.st(0), s, pos, isUnderSkip)
 		If Not isParseFailure(result) Then
 			nxtPos = result(1)
 			fResult = apply1(p.st(1), result(0))
 			&apos; do NOT access .tp on fResult - it&apos;s effectively as fixing fResult&apos;s type to Object...!
-			result = applyP(fResult, s, nxtPos)
+			result = _applyP(fResult, s, nxtPos, isUnderSkip)
 		End If
 	ElseIf p.tp = &quot;seq&quot; Then
+		applyP_seq = applyP_seq + 1
 		Dim t As Variant
 		innerParsers = p.st(0)
 		i = LBound(innerParsers)
@@ -708,7 +760,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		Dim iResults As Object
 		iResults = nil
 		Do
-			t = applyP(innerParsers(i), s, nxtPos)
+			t = _applyP(innerParsers(i), s, nxtPos, isUnderSkip)
 			If Not isParseFailure(t) Then
 				nxtPos = t(1)
 				If Not(isPSkip(innerParsers(i))) Then
@@ -730,7 +782,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		result = &quot;unknown Parser &apos;&quot; &amp; p.tp &amp; &quot;&apos;&quot;
 		MsgBox(&quot;Error in applyP: &quot; &amp; result)
 	End If
-	applyP = result
+	_applyP = result
 End Function
 
 
@@ -756,6 +808,8 @@ Function test_Parser(Optional what)
 	Dim tm As Double, aCount As Integer, aPerSec As Double
 	aCount = assertionCount
 	tm = GetSystemTicks
+	
+	bindFns = nil
 	
 	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;primitives&quot;) Then
 		test_Parser_fail()
@@ -794,7 +848,7 @@ Function test_Parser(Optional what)
 		test_Parser_TypeCtor()
 		test_Parser_TypeExpr()
 	End If
-
+	
 end_of_Parser_tests:	
 	aCount = assertionCount - aCount
 	tm = CLng(10 * (GetSystemTicks() - tm) / ticksPerSec) / 10
@@ -806,6 +860,18 @@ end_of_Parser_tests:
 		&amp; chr(13) &amp; &quot;that&apos;s ~&quot; &amp; aPerSec &amp; &quot; assertions/sec&quot;
 		MsgBox(summary)
 		result = summary
+
+		msgbox(&quot;applyP_callCount: &quot; &amp; applyP_callCount _
+				&amp; chr(13) &amp; &quot;_applyP_callCount: &quot; &amp; _applyP_callCount _
+				&amp; chr(13) &amp; &quot;apply_return: &quot; &amp; applyP_return _
+				&amp; chr(13) &amp; &quot;apply_fail: &quot; &amp; applyP_fail _
+				&amp; chr(13) &amp; &quot;apply_item: &quot; &amp; applyP_item _
+				&amp; chr(13) &amp; &quot;apply_bind: &quot; &amp; applyP_bind _
+				&amp; chr(13) &amp; &quot;apply_bind_K_return: &quot; &amp; apply_bind_K_return _
+				&amp; chr(13) &amp; &quot;apply_choice: &quot; &amp; applyP_choice _
+				&amp; chr(13) &amp; &quot;apply_str: &quot; &amp; applyP_str _
+				&amp; chr(13) &amp; &quot;apply_seq: &quot; &amp; applyP_seq _
+				&amp; chr(13) &amp; length(bindFns) &amp; &quot; bindFns: &quot; &amp; toString(bindFns))
 	Else
 		result = Join(Array(&quot;test_Parser(&quot; &amp; what &amp; &quot;):&quot;, tm, aCount), &quot; &quot;)
 	End If

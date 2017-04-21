@@ -216,11 +216,18 @@ End Function
 
 Function reverse(Optional xs As TList)
 	If isMissing(xs) Then : reverse = Fn.reverse : Exit Function : End If
-	Dim result As TList
+	Dim result As Object
 	If xs.len &lt;= 1 Then
 		result = xs
 	Else
-		result = foldl(swap(cons), nil, xs)
+		&apos;result = foldl(swap(cons), nil, xs)
+		Dim ts As Object
+		ts = xs
+		result = nil
+		While (ts.len &gt; 0)
+			result = cons(ts.head, result)
+			ts = ts.tail
+		Wend
 	End If
 	reverse = result
 End Function
