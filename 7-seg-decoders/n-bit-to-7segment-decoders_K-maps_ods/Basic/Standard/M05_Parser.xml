@@ -732,29 +732,21 @@ Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolea
 		End If
 	ElseIf p.tp = &quot;seq&quot; Then
 		applyP_seq = applyP_seq + 1
-		Dim t As Variant
 		innerParsers = p.st(0)
-		i = LBound(innerParsers)
-		k = UBound(innerParsers)
 		nxtPos = pos
 		Dim iResults As Object
 		iResults = nil
-		Do
-			t = _applyP(innerParsers(i), s, nxtPos, isUnderSkip)
-			If Not isParseFailure(t) Then
-				nxtPos = t(1)
-				If Not(isPSkip(innerParsers(i))) Then
-					iResults = cons(t(0), iResults)
-				End If
-				i = i + 1
+		For i = LBound(innerParsers) To UBound(innerParsers)
+			result = _applyP(innerParsers(i), s, nxtPos, isUnderSkip)
+			If isParseFailure(result) Then
+				Exit For
 			End If
-		Loop Until (i &gt; k) Or isParseFailure(t)
-		If isParseFailure(t) Then
-			result = t
-		Else
-			If isEmpty(iResults) Then
-				msgBox(toString(iResults))
+			nxtPos = result(1)
+			If Not(isPSkip(innerParsers(i))) Then
+				iResults = cons(result(0), iResults)
 			End If
+		Next
+		If Not(isParseFailure(result)) Then
 			fResult = applyToList(p.st(1), reverse(iResults))
 			&apos; ATTENTION: do not reuse t, type of result value may not match
 			&apos;            and an implicit conversion might happen!
@@ -804,9 +796,10 @@ Function test_Parser(Optional what)
 	End If
 	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;multiplicity&quot;) Then
 		test_Parser_zeroOrOne()
+		test_Parser_skip_zeroOrOne()
 		test_Parser_many()
-		test_Parser_many1()	
-	End If	
+		test_Parser_many1()
+	End If
 	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;basic&quot;) Then
 		test_Parser_str()
 		test_Parser_white()
@@ -1258,6 +1251,35 @@ Function test_Parser_zeroOrOne()
 	assert_parses(p, &quot; x&quot;, 	zeroMatches, 1).x
 	assert_parses(p, &quot; xx&quot;, zeroMatches, 1).x
 	assert_parses(p, &quot; xxx&quot;,zeroMatches, 1).x
+End Function
+
+Function test_Parser_skip_zeroOrOne()
+	Dim p As Parser
+	Dim data As Variant
+			
+	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
+		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
+		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
+	)
+
+	p = pSkip(pZeroOrOne(pStr(&quot;x&quot;)))
+	assert_parses(p, data,	Empty, 1).x
+	assert_parses(p, &quot;x&quot;, 	Empty, 2).x
+	assert_parses(p, &quot;xx&quot;, 	Empty, 2).x
+	assert_parses(p, &quot;xxx&quot;, Empty, 2).x
+	assert_parses(p, &quot; x&quot;, 	Empty, 1).x
+	assert_parses(p, &quot; xx&quot;, Empty, 1).x
+	assert_parses(p, &quot; xxx&quot;,Empty, 1).x
+	
+	&apos;TODO: is that what we want?: pZeroOrOne (pSkip p) = pSkip (pZeroOrOne p)  ...?
+	p = pZeroOrOne(pSkip(pStr(&quot;x&quot;)))
+	assert_parses(p, data,	Empty, 1).x
+	assert_parses(p, &quot;x&quot;, 	Empty, 2).x
+	assert_parses(p, &quot;xx&quot;, 	Empty, 2).x
+	assert_parses(p, &quot;xxx&quot;, Empty, 2).x
+	assert_parses(p, &quot; x&quot;, 	Empty, 1).x
+	assert_parses(p, &quot; xx&quot;, Empty, 1).x
+	assert_parses(p, &quot; xxx&quot;,Empty, 1).x
 End Function
 
 Function test_Parser_white()
