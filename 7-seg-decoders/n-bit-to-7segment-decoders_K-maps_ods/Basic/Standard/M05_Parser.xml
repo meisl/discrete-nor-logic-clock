@@ -19,9 +19,10 @@ Public applyP_item As Integer
 Public applyP_bind As Integer
 Public apply_bind_K_return As Integer
 Public applyP_choice As Integer
-Public applyP_many1rev As Integer
+Public applyP_many1 As Integer
 Public applyP_str As Integer
 Public applyP_seq As Integer
+Public applyP_skip As Integer
 
 Sub Main
 	test_Parser()
@@ -215,7 +216,9 @@ End Function
 &apos; pattern-matches p against &quot;q &gt;&gt;= K (return Empty)&quot; where q any parser
 Function isPSkip(p As Parser)
 	Dim result As Boolean : result = False
-	If p.tp = &quot;bind&quot; Then
+	If p.tp = &quot;skip&quot; Then
+		result = True
+	ElseIf p.tp = &quot;bind&quot; Then
 		Dim f As Object
 		f = p.st(1)
 		If (getFnName(f) = getFnName(Fn.fstArg)) And (arity(f) = 1) Then
@@ -237,6 +240,7 @@ Function pSkip(p As Object)
 				result = p
 			Else
 				result = pBind(p, fstArg(pReturn(Empty)))
+				&apos;result = mkParser(&quot;skip&quot;, p)
 			End If
 	End Select
 	pSkip = result
@@ -332,32 +336,22 @@ Function pZeroOrOne(p As Parser)
 	End If
 End Function
 
-&apos; never fails: if p fails than pMany(p) returns nil + same pos as result,
-&apos; otherwise returns a *REVERSED list* of p results + last pos
+&apos; pMany: never fails: if p fails than pMany(p) returns nil + same pos as result,
+&apos; otherwise returns a of p results (in the order as in the parsed string) + last pos
 &apos; matches as many as possible
-Function pManyRev(p As Parser)
-	pManyRev = pChoice( pMany1Rev(p), pReturn(nil) )
-End Function
-
-&apos; same as pManyRev but with the list in the order as in the parsed string
 Function pMany(p As Parser)
 	&apos; Note: direct impl might give a little more perf
-	pMany = pSeq(Array(pManyRev(p)), Fn.reverse)
+	pMany = pChoice(pMany1(p), pReturn(nil))
 End Function
 
-&apos; same as pManyRev but fails if there is no match at all
-&apos; matches as many as possible
-Function pMany1Rev(p As Parser)
-	pMany1Rev = mkParser(&quot;many1Rev&quot;, p)
-End Function
-
-&apos; same as pMany but fails if there is no match at all
+&apos; pMany1: same as pMany except that it fails if there is no match at all
 &apos; matches as many as possible
 Function pMany1(p As Parser)
-	pMany1 = pSeq(Array(pMany1Rev(p)), Fn.reverse)
+&apos;	pMany1 = pSeq(Array(mkParser(&quot;many1Rev&quot;, p)), Fn.reverse)
+	pMany1 = mkParser(&quot;many1&quot;, p)
 End Function
 
-&apos; pSeq - make a sequence of parsers, collect their results in a list 
+&apos; pSeq: make a sequence of parsers, collect their results in a list 
 &apos; and finally process that list by passing it to the given function
 &apos; fails if any of the given parsers fails
 &apos; if instead all succeed, collects their results in a list 
@@ -675,9 +669,20 @@ Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolea
 	Dim innerParsers As Variant
 	Dim lst As Object
 	nxtPos = pos
-	If p.tp = &quot;return&quot; Then
+	If p.tp = &quot;skip&quot; Then
+		applyP_skip = applyP_skip + 1
+		result = _applyP(p.st, s, pos, True)
+		If Not(isParseFailure(result)) Then
+			&apos;msgbox(toString(result))
+			result(0) = Empty &apos; TODO: remove setting skipped result to Empty
+		End If
+	ElseIf p.tp = &quot;return&quot; Then
 		applyP_return = applyP_return + 1
-		result = Array(p.st, nxtPos)
+		If isUnderSkip Then
+			result = Array(Empty, nxtPos)
+		Else
+			result = Array(p.st, nxtPos)
+		End If
 	ElseIf p.tp = &quot;fail&quot; Then
 		applyP_fail = applyP_fail + 1
 		result = parseFailure
@@ -685,7 +690,11 @@ Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolea
 		applyP_item = applyP_item + 1
 		If pos &lt;= Len(s) Then
 			nxtPos = pos + 1
-			result = Array(Mid(s, pos, 1), nxtPos)
+			If isUnderSkip Then
+				result = Array(Empty, nxtPos)
+			Else
+				result = Array(Mid(s, pos, 1), nxtPos)
+			End If
 		Else
 			result = parseFailure
 		End If
@@ -697,7 +706,11 @@ Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolea
 		matchLen = Len(match)
 		If (Mid(s, pos, matchLen) = match) Then
 			nxtPos = pos + matchLen
-			result = Array(match, nxtPos)
+			If isUnderSkip Then
+				result = Array(Empty, nxtPos)
+			Else
+				result = Array(match, nxtPos)
+			End If
 		Else
 			result = parseFailure
 		End If
@@ -721,8 +734,8 @@ Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolea
 		Else
 			croak(&quot;applying pChoice: invalid list of alternatives &quot; &amp; chr(13) &amp; toString(innerParsers))
 		End If
-	ElseIf (p.tp = &quot;many1Rev&quot;) Then
-		applyP_many1rev = applyP_many1rev + 1
+	ElseIf (p.tp = &quot;many1&quot;) Then
+		applyP_many1 = applyP_many1 + 1
 		Dim lstLen As Integer
 		nxtPos = pos
 		lstLen = 0
@@ -738,7 +751,7 @@ Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolea
 		If isNil(lst) Then
 			result = parseFailure
 		Else
-			result = Array(lst, nxtPos)
+			result = Array(reverse(lst), nxtPos)
 		End If
 	ElseIf p.tp = &quot;bind&quot; Then
 		applyP_bind = applyP_bind + 1
@@ -774,6 +787,9 @@ Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolea
 		If isParseFailure(t) Then
 			result = t
 		Else
+			If isEmpty(iResults) Then
+				msgBox(toString(iResults))
+			End If
 			fResult = applyToList(p.st(1), reverse(iResults))
 			&apos; ATTENTION: do not reuse t, type of result value may not match
 			&apos;            and an implicit conversion might happen!
@@ -824,9 +840,7 @@ Function test_Parser(Optional what)
 	End If
 	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;multiplicity&quot;) Then
 		test_Parser_zeroOrOne()
-		test_Parser_manyRev()
 		test_Parser_many()
-		test_Parser_many1Rev()
 		test_Parser_many1()	
 	End If	
 	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;basic&quot;) Then
@@ -869,9 +883,10 @@ end_of_Parser_tests:
 				&amp; chr(13) &amp; &quot;apply_fail: &quot; &amp; applyP_fail _
 				&amp; chr(13) &amp; &quot;apply_item: &quot; &amp; applyP_item _
 				&amp; chr(13) &amp; &quot;apply_choice: &quot; &amp; applyP_choice _
-				&amp; chr(13) &amp; &quot;apply_many1Rev: &quot; &amp; applyP_many1Rev _
+				&amp; chr(13) &amp; &quot;apply_many1: &quot; &amp; applyP_many1 _
 				&amp; chr(13) &amp; &quot;apply_str: &quot; &amp; applyP_str _
 				&amp; chr(13) &amp; &quot;apply_seq: &quot; &amp; applyP_seq _
+				&amp; chr(13) &amp; &quot;apply_skip: &quot; &amp; applyP_skip _
 				&amp; chr(13) &amp; &quot;apply_bind: &quot; &amp; applyP_bind _
 				&amp; chr(13) &amp; &quot;  (apply_bind_K_return: &quot; &amp; apply_bind_K_return &amp; &quot;)&quot; _
 				&amp; chr(13) &amp; length(bindFns) &amp; &quot; bindFns: &quot; &amp; toString(bindFns))
@@ -1626,47 +1641,6 @@ Function test_Parser_hexDigit()
 	refute_parses(p, &quot;gsadf&quot;).x
 End Function
 
-
-Function test_Parser_manyRev()
-	Dim p As Parser
-	Dim data As Variant
-	Dim zeroMatches As Variant
-	zeroMatches = nil
-	
-	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
-		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
-		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
-	)
-	p = pManyRev(pFail)
-	assert_parses(p, data, zeroMatches, 1).x
-	
-	&apos;p = pMany(pReturn(3)) - yields infite sequence of 3s, even on empty string
-	
-	p = pManyRev(pItem)
-	assert_parses(p, &quot;&quot;, 			zeroMatches, 1).x
-	assert_parses(p, &quot; &quot;, 			List(&quot; &quot;), 2).x
-	assert_parses(p, &quot; &quot; &amp; chr(13),	List(&quot;\n&quot;, &quot; &quot;), 3).x
-	assert_parses(p, &quot;asdf&quot;,		List(&quot;f&quot;, &quot;d&quot;, &quot;s&quot;, &quot;a&quot;), 5).x
-	
-	p = pManyRev(pStr(&quot; &quot;))
-	assert_parses(p, &quot;&quot;, 			zeroMatches, 1).x
-	assert_parses(p, &quot; &quot;, 			List(&quot; &quot;), 2).x
-	assert_parses(p, &quot; &quot; &amp; chr(13),	List(&quot; &quot;), 2).x
-	assert_parses(p, &quot;asdf&quot;,		zeroMatches, 1).x
-	assert_parses(p, &quot;  &quot;,			List(&quot; &quot;, &quot; &quot;), 3).x
-	assert_parses(p, &quot;   &quot;,			List(&quot; &quot;, &quot; &quot;, &quot; &quot;), 4).x
-	assert_parses(p, &quot; x &quot;,			List(&quot; &quot;), 2).x
-	assert_parses(p, &quot; x  &quot;,		List(&quot; &quot;), 2).x
-	assert_parses(p, &quot;  x &quot;,		List(&quot; &quot;, &quot; &quot;), 3).x
-	
-	p = pManyRev(pDecDigit)
-	assert_parses(p, &quot;&quot;, 			zeroMatches, 1).x
-	assert_parses(p, &quot; &quot;, 			zeroMatches, 1).x
-	assert_parses(p, &quot;1&quot;, 			List(1), 2).x
-	assert_parses(p, &quot;10 &quot;, 		List(0, 1), 3).x
-	assert_parses(p, &quot;102345&quot;, 		List(5, 4, 3, 2, 0, 1), 7).x
-End Function
-
 Function test_Parser_many()
 	Dim p As Parser
 	Dim data As Variant
@@ -1705,45 +1679,6 @@ Function test_Parser_many()
 	assert_parses(p, &quot;1&quot;, 			List(1), 2).x
 	assert_parses(p, &quot;10 &quot;, 		List(1, 0), 3).x
 	assert_parses(p, &quot;102345&quot;, 		List(1, 0, 2, 3, 4, 5), 7).x
-End Function
-
-
-Function test_Parser_many1Rev()
-	Dim p As Parser
-	Dim data As Variant
-	
-	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
-		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
-		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
-	)
-	p = pMany1Rev(pFail)
-	refute_parses(p, data).x
-	
-	&apos;p = pMany1(pReturn(3)) - yields infite sequence of 3s, except on empty string
-	
-	p = pMany1Rev(pItem)
-	refute_parses(p, &quot;&quot;).x
-	assert_parses(p, &quot; &quot;, 			List(&quot; &quot;), 2).x
-	assert_parses(p, &quot; &quot; &amp; chr(13),	List(&quot;\n&quot;, &quot; &quot;), 3).x
-	assert_parses(p, &quot;asdf&quot;,		List(&quot;f&quot;, &quot;d&quot;, &quot;s&quot;, &quot;a&quot;), 5).x
-	
-	p = pMany1Rev(pStr(&quot; &quot;))
-	refute_parses(p, &quot;&quot;).x
-	assert_parses(p, &quot; &quot;, 			List(&quot; &quot;), 2).x
-	assert_parses(p, &quot; &quot; &amp; chr(13),	List(&quot; &quot;), 2).x
-	refute_parses(p, &quot;asdf&quot;).x
-	assert_parses(p, &quot;  &quot;,			List(&quot; &quot;, &quot; &quot;), 3).x
-	assert_parses(p, &quot;   &quot;,			List(&quot; &quot;, &quot; &quot;, &quot; &quot;), 4).x
-	assert_parses(p, &quot; x &quot;,			List(&quot; &quot;), 2).x
-	assert_parses(p, &quot; x  &quot;,		List(&quot; &quot;), 2).x
-	assert_parses(p, &quot;  x &quot;,		List(&quot; &quot;, &quot; &quot;), 3).x
-	
-	p = pMany1Rev(pDecDigit)
-	refute_parses(p, &quot;&quot;).x
-	refute_parses(p, &quot; &quot;).x
-	assert_parses(p, &quot;1&quot;, 			List(1), 2).x
-	assert_parses(p, &quot;10 &quot;, 		List(0, 1), 3).x
-	assert_parses(p, &quot;102345&quot;, 		List(5, 4, 3, 2, 0, 1), 7).x
 End Function
 
 Function test_Parser_many1()
