@@ -188,21 +188,8 @@ End Function
 &apos; Requires both, p and q to succeed in sequence, but throws away q&apos;s result value
 &apos; and instead returns p&apos;s value together with q&apos;s pos.
 &apos; This is useful to eat up trailing whitespace, for example.
-&apos; ---
-&apos; pThen = p &gt;&gt;= (\v.q &gt;&gt;= \_.return v)
-&apos;       = p &gt;&gt;= (\v.q &gt;&gt;= (K ° return) v
-&apos;		= p &gt;&gt;= (\r f v.let x = applyP r
-&apos;						in if (fail? x)
-&apos;						   then fail
-&apos;						   else f v
-&apos;				) q (K ° return)
-&apos;		= p &gt;&gt;= (\v.let x = applyP q
-&apos;					in if (fail? x)
-&apos;					   then fail
-&apos;					   else (K ° return) v
-&apos;		= p &gt;&gt;= (((&gt;&gt;=) q ) ° (K ° return)))
 Function pThen(p As Parser, q As Parser)
-	pThen = pBind(p, compose(pBind(q), compose(fstArg, pReturn)))
+	pThen = pSeq(Array(p, pSkip(q)), id)
 End Function
 
 &apos; fails on empty string but succeeds on all others
@@ -336,18 +323,17 @@ Function pZeroOrOne(p As Parser)
 	End If
 End Function
 
-&apos; pMany: never fails: if p fails than pMany(p) returns nil + same pos as result,
+&apos; pMany: never fails: if p fails then pMany(p) returns nil + same pos as result,
 &apos; otherwise returns a of p results (in the order as in the parsed string) + last pos
 &apos; matches as many as possible
 Function pMany(p As Parser)
-	&apos; Note: direct impl might give a little more perf
+	&apos; Note: direct impl might give a little more perf (not worth it)
 	pMany = pChoice(pMany1(p), pReturn(nil))
 End Function
 
 &apos; pMany1: same as pMany except that it fails if there is no match at all
 &apos; matches as many as possible
 Function pMany1(p As Parser)
-&apos;	pMany1 = pSeq(Array(mkParser(&quot;many1Rev&quot;, p)), Fn.reverse)
 	pMany1 = mkParser(&quot;many1&quot;, p)
 End Function
 
@@ -736,16 +722,12 @@ Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolea
 		End If
 	ElseIf (p.tp = &quot;many1&quot;) Then
 		applyP_many1 = applyP_many1 + 1
-		Dim lstLen As Integer
-		nxtPos = pos
-		lstLen = 0
 		Set lst = nil
 		innerParser = p.st
 		result = _applyP(innerParser, s, nxtPos, isUnderSkip)
 		While Not(isParseFailure(result))
 			nxtPos = result(1)
 			Set lst = cons(result(0), lst)
-			lstLen = lstLen + 1
 			result = _applyP(innerParser, s, nxtPos, isUnderSkip)
 		Wend
 		If isNil(lst) Then
