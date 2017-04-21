@@ -698,21 +698,11 @@ Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolea
 	ElseIf p.tp = &quot;choice&quot; Then
 		applyP_choice = applyP_choice + 1
 		innerParsers = p.st
-		k = length(innerParsers)
-		If k = 2 Then	&apos; if there are two alternatives
-			result = _applyP(car(innerParsers), s, pos, isUnderSkip)
-			If isParseFailure(result) Then
-				result = _applyP(cadr(innerParsers), s, pos, isUnderSkip)
-			End If
-		ElseIf k &gt; 2 Then	&apos; more than 2 alternatives
-			Do
-				innerParser = car(innerParsers)
-				result = _applyP(innerParser, s, pos, isUnderSkip)
-				innerParsers = cdr(innerParsers)
-			Loop Until (isNil(innerParsers) Or Not(isParseFailure(result)))
-		Else
-			croak(&quot;applying pChoice: invalid list of alternatives &quot; &amp; chr(13) &amp; toString(innerParsers))
-		End If
+		Do
+			innerParser = car(innerParsers)
+			result = _applyP(innerParser, s, pos, isUnderSkip)
+			innerParsers = cdr(innerParsers)
+		Loop Until (isNil(innerParsers) Or Not(isParseFailure(result)))
 	ElseIf (p.tp = &quot;many1&quot;) Then
 		applyP_many1 = applyP_many1 + 1
 		Set lst = nil
