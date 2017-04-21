@@ -185,13 +185,6 @@ Function bindStats(p As Parser, f As Object)
 	End If
 End Function
 
-&apos; Requires both, p and q to succeed in sequence, but throws away q&apos;s result value
-&apos; and instead returns p&apos;s value together with q&apos;s pos.
-&apos; This is useful to eat up trailing whitespace, for example.
-Function pThen(p As Parser, q As Parser)
-	pThen = pSeq(Array(p, pSkip(q)), id)
-End Function
-
 &apos; fails on empty string but succeeds on all others
 &apos; by returning the first character; and increasing pos by 1
 Function pItem()
@@ -816,8 +809,7 @@ Function test_Parser(Optional what)
 		test_Parser_return()
 		test_Parser_item()
 		test_Parser_choice()
-		test_Parser_bind()	
-		test_Parser_then()	
+		test_Parser_bind()
 		test_Parser_skip()
 	End If
 	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;multiplicity&quot;) Then
@@ -1068,30 +1060,6 @@ Function test_Parser_bind()
 	assert_parses(p, &quot;xx&quot;,		&quot;FOOx&quot;, 2).x
 	assert_parses(p, &quot;yx&quot;,		&quot;FOOy&quot;, 2).x
 	assert_parses(p, &quot; yabcd&quot;,	&quot;FOO &quot;, 2).x
-End Function
-
-Function test_Parser_then()
-	Dim p As Object
-	&apos;TODO: make pThen (partially) applicable
-&apos;	p = pThen
-&apos;	assertEqual(isFn(p), True).x
-&apos;	assertEqual(arity(p),   2).x
-	
-	p = pThen(pStr(&quot;x&quot;), pStr(&quot; &quot;))
-	refute_parses(p, &quot;xabcd&quot;).x
-	refute_parses(p, &quot;yabcd&quot;).x
-	refute_parses(p, &quot;y abcd&quot;).x
-	assert_parses(p, &quot;x abcd&quot;,		&quot;x&quot;, 3).x
-	assert_parses(p, &quot;x  abcd&quot;,		&quot;x&quot;, 3).x
-	assert_parses(p, &quot;x   abcd&quot;,	&quot;x&quot;, 3).x
-
-	p = pThen(pStr(&quot;x&quot;), pMany(pStr(&quot; &quot;)))
-	assert_parses(p, &quot;xabcd&quot;,		&quot;x&quot;, 2).x
-	refute_parses(p, &quot;yabcd&quot;).x
-	refute_parses(p, &quot;y abcd&quot;).x
-	assert_parses(p, &quot;x abcd&quot;,		&quot;x&quot;, 3).x
-	assert_parses(p, &quot;x  abcd&quot;,		&quot;x&quot;, 4).x
-	assert_parses(p, &quot;x   abcd&quot;,	&quot;x&quot;, 5).x
 End Function
 
 Function test_Parser_skip()
