@@ -23,6 +23,7 @@ Public applyP_many1 As Integer
 Public applyP_str As Integer
 Public applyP_seq As Integer
 Public applyP_skip As Integer
+Public applyP_sat As Integer
 
 Sub Main
 	test_Parser()
@@ -193,6 +194,11 @@ Function pItem()
 	pItem = result
 End Function
 
+Function pSat(predicate As Object)
+&apos;	pSat = pBind( pItem, ite(predicate, pReturn, fstArg(pFail)) )
+	pSat = mkParser(&quot;sat&quot;, predicate)
+End Function
+
 &apos; pattern-matches p against &quot;q &gt;&gt;= K (return Empty)&quot; where q any parser
 Function isPSkip(p As Parser)
 	Dim result As Boolean : result = False
@@ -359,11 +365,7 @@ End Function
 Function pAlphaLower()
 	Static result As Object
 	If isNull(result) Then
-		result = pBind(pItem, _
-					ite(compose(inRange(Asc(&quot;a&quot;), Asc(&quot;z&quot;)), Fn.asc), _
-						pReturn, _
-						fstArg(pFail) _
-				 )	)
+		result = pSat(compose(inRange(Asc(&quot;a&quot;), Asc(&quot;z&quot;)), Fn.asc))
 	End If
 	pAlphaLower = result
 End Function
@@ -371,11 +373,7 @@ End Function
 Function pAlphaUpper()
 	Static result As Object
 	If isNull(result) Then
-		result = pBind(pItem, _
-					ite(compose(inRange(Asc(&quot;A&quot;), Asc(&quot;Z&quot;)), Fn.asc), _
-						pReturn, _
-						fstArg(pFail) _
-				 )	)
+		result = pSat(compose(inRange(Asc(&quot;A&quot;), Asc(&quot;Z&quot;)), Fn.asc))
 	End If
 	pAlphaUpper = result
 End Function
@@ -653,7 +651,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 	If IsMissing(pos) Then
 		pos = 1
 	End If
-	If 0 = 1 Then
+	If 0 = 0 Then
 		Dim endPos As Integer, parseResult As Variant
 		parseResult = _applyP2(p, s, pos, endPos, False)
 		If endPos &lt; 0 Then &apos; indicates failure
@@ -747,6 +745,20 @@ Function _applyP2(p As Parser, s As String, pos As Integer, endPos As Integer, B
 			result = _applyP2(p.st, s, pos, endPos, True)
 			If endPos &gt; 0 Then
 				assertEqual(result, Empty).x
+			End If
+		Case &quot;sat&quot;
+			applyP_sat = applyP_sat + 1
+			
+			If pos &gt; Len(s) Then
+				Goto _applyP2_parseFailure
+			End If
+			result = Mid(s, pos, 1)
+			If Not(apply(p.st, result)) Then
+				Goto _applyP2_parseFailure
+			End If
+			endPos = pos + 1
+			If isUnderSkip Then
+				result = Empty
 			End If
 		Case &quot;many1&quot;
 			applyP_many1 = applyP_many1 + 1
@@ -964,6 +976,7 @@ Function test_Parser(Optional what)
 		test_Parser_str()
 		test_Parser_choice()
 		test_Parser_bind()
+		test_Parser_sat()
 		test_Parser_skip()
 	End If
 	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;multiplicity&quot;) Then
@@ -1015,6 +1028,7 @@ end_of_Parser_tests:
 				&amp; chr(13) &amp; &quot;apply_return: &quot; &amp; applyP_return _
 				&amp; chr(13) &amp; &quot;apply_seq: &quot; &amp; applyP_seq _
 				&amp; chr(13) &amp; &quot;apply_skip: &quot; &amp; applyP_skip _
+				&amp; chr(13) &amp; &quot;apply_sat: &quot; &amp; applyP_sat _
 				&amp; chr(13) &amp; &quot;apply_many1: &quot; &amp; applyP_many1 _
 				&amp; chr(13) &amp; &quot;apply_fail: &quot; &amp; applyP_fail _
 				&amp; chr(13) &amp; length(bindFns) &amp; &quot; bindFns: &quot; &amp; toString(bindFns))
@@ -1254,6 +1268,21 @@ Function test_Parser_bind()
 	assert_parses(p, &quot;xx&quot;,		&quot;FOOx&quot;, 2).x
 	assert_parses(p, &quot;yx&quot;,		&quot;FOOy&quot;, 2).x
 	assert_parses(p, &quot; yabcd&quot;,	&quot;FOO &quot;, 2).x
+End Function
+
+Function test_Parser_sat()
+	Dim p As Parser, actual As Variant
+	Set p = pSat(apply(Fn.equ, &quot;a&quot;)
+	
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot; &quot;).x
+	assert_parses(p, &quot;a&quot;,		&quot;a&quot;, 2).x
+	assert_parses(p, &quot;aa&quot;,		&quot;a&quot;, 2).x
+	refute_parses(p, &quot;1&quot;).x
+	refute_parses(p, &quot;[]&quot;).x
+	assert_parses(p, &quot;abcd&quot;,	&quot;a&quot;, 2).x
+	refute_parses(p, chr(13)).x
+	refute_parses(p, chr( 9)).x
 End Function
 
 Function test_Parser_skip()
