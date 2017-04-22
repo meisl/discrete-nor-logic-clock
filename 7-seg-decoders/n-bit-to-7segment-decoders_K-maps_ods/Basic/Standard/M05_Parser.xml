@@ -24,6 +24,7 @@ Public applyP_str As Integer
 Public applyP_seq As Integer
 Public applyP_skip As Integer
 Public applyP_sat As Integer
+Public applyP_end As Integer
 
 Sub Main
 	test_Parser()
@@ -53,7 +54,9 @@ Function TParser_toString(Optional p As Object)
 			Case &quot;fail&quot;:		result = &quot;fail&quot;
 			Case &quot;return&quot;:		result = &quot;(return &quot; &amp; toString(p.st) &amp; &quot;)&quot;
 			Case &quot;item&quot;: 		result = &quot;item&quot;
-			Case &quot;str&quot;:			result = &quot;(str &quot; &amp; toString(p.st) &amp; &quot;)&quot;
+			Case &quot;str&quot;:			result = &quot;(str &quot; &amp; toString(p.st(0)) &amp; &quot;)&quot;
+			Case &quot;skip&quot;:		result = &quot;(skip &quot; &amp; toString(p.st) &amp; &quot;)&quot;
+			Case &quot;many1&quot;:		result = toString(p.st) &amp; &quot;+&quot;
 			Case &quot;choice&quot;
 				Dim alts As Object
 				alts = p.st
@@ -61,6 +64,8 @@ Function TParser_toString(Optional p As Object)
 					&apos; it has shape p +++ return Empty
 					&apos; so it&apos;s effectively &quot;zero-or-one&quot; p, which can be written as &quot;p?&quot;
 					result = TParser_toString(car(alts)) &amp; &quot;?&quot;
+				ElseIf isPMany(p) Then
+					result = TParser_toString(car(alts).st) &amp; &quot;*&quot;
 				Else
 					result = &quot;(&quot; &amp; TParser_toString(car(alts))
 					alts = cdr(alts)
@@ -194,6 +199,13 @@ Function pItem()
 	pItem = result
 End Function
 
+&apos; succeeds on empty string (by returning Empty) but fails on all others
+Function pEnd()
+	Static result As Object
+	If isNull(result) Then : result = mkParser(&quot;end&quot;, Empty) : End If
+	pEnd = result
+End Function
+
 Function pSat(predicate As Object)
 &apos;	pSat = pBind( pItem, ite(predicate, pReturn, fstArg(pFail)) )
 	pSat = mkParser(&quot;sat&quot;, predicate)
@@ -204,14 +216,14 @@ Function isPSkip(p As Parser)
 	Dim result As Boolean : result = False
 	If p.tp = &quot;skip&quot; Then
 		result = True
-	ElseIf p.tp = &quot;bind&quot; Then
-		Dim f As Object
-		f = p.st(1)
-		If (getFnName(f) = getFnName(Fn.fstArg)) And (arity(f) = 1) Then
-			Dim innerP As Object
-			innerP = car(partialArgs(f))
-			result = (innerP.tp = &quot;return&quot;) And isEmpty(innerP.st)
-		End If
+	&apos;ElseIf p.tp = &quot;bind&quot; Then
+	&apos;	Dim f As Object
+	&apos;	f = p.st(1)
+	&apos;	If (getFnName(f) = getFnName(Fn.fstArg)) And (arity(f) = 1) Then
+	&apos;		Dim innerP As Object
+	&apos;		innerP = car(partialArgs(f))
+	&apos;		result = (innerP.tp = &quot;return&quot;) And isEmpty(innerP.st)
+	&apos;	End If
 	End If
 	isPSkip = result
 End Function
@@ -235,14 +247,14 @@ End Function
 &apos; succeeds on strings with the given prefix t by returning t,
 &apos; and advancing pos by the length of t
 Function pStr(Optional t As String)
-	Static oFn As Object : If isNull(oFn) Then : oFn = mkParser(&quot;str&quot;) : End If
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.pStr : End If
 	If isMissing(t) Then
 		pStr = oFn
 	Else
 		If (Len(t) = 0) Then
 			croak(&quot;pStr: cannot match &apos;exactly&apos; the empty string t=&apos;&apos;&quot;)
 		Else
-			pStr = mkParser(&quot;str&quot;, t)
+			pStr = mkParser(&quot;str&quot;, Array(t, Len(t)))
 		End If	
 	End If
 End Function
@@ -320,6 +332,27 @@ Function pZeroOrOne(p As Parser)
 	Else
 		pZeroOrOne = pChoice(p, pReturn(Empty))
 	End If
+End Function
+
+Function isPMany1(p As Parser) As Boolean
+	isPMany1 = (p.tp = &quot;many1&quot;)
+End Function
+
+Function isPMany(p As Parser) As Boolean
+	Dim result As Boolean
+	result = False
+	If p.tp = &quot;many&quot; Then
+		result = True
+	ElseIf p.tp = &quot;choice&quot; Then
+		If length(p.st) = 2 Then
+			If (cadr(p.st).tp = &quot;return&quot;) And isObject(cadr(p.st).st) Then
+				If isNil(cadr(p.st).st) Then
+					result = isPMany1(car(p.st))
+				End If
+			End If
+		End If
+	End If
+	isPMany = result
 End Function
 
 &apos; pMany: never fails: if p fails then pMany(p) returns nil + same pos as result,
@@ -577,8 +610,12 @@ Function pTypeCtor()
 &apos;		result = foldl1( pChoice, _
 &apos;						 map(pStr, List(&quot;List&quot;, &quot;Maybe&quot;, &quot;Parser&quot;)) )
 		result = pSeq(_
-			Array(pSeq(Array(pAlphaUpper, pMany1(pAlphaLower)), cons)), _
-			foldl1(concat) _
+					Array(pSeq(_
+							Array(pAlphaUpper, pMany1(pAlphaLower)), _
+							cons _
+						  ) _
+					), _
+					foldl1(concat) _
 		)
 	End If
 	pTypeCtor = result
@@ -677,8 +714,8 @@ Function _applyP2(p As Parser, s As String, pos As Integer, endPos As Integer, B
 			applyP_str = applyP_str + 1
 			Dim match As String
 			Dim matchLen As Integer
-			match = p.st
-			matchLen = Len(match)	&apos; TODO: pre-calculate Len(match)
+			match = p.st(0)
+			matchLen = p.st(1)
 			If (Mid(s, pos, matchLen) &lt;&gt; match) Then
 				Goto _applyP2_parseFailure
 			End If
@@ -703,6 +740,12 @@ Function _applyP2(p As Parser, s As String, pos As Integer, endPos As Integer, B
 			If Not(isUnderSkip) Then
 				result = Mid(s, pos, 1)
 			End If
+		Case &quot;return&quot;
+			applyP_return = applyP_return + 1
+			If Not(isUnderSkip) Then
+				result = p.st
+			End If
+			endPos = pos
 		Case &quot;bind&quot;
 			applyP_bind = applyP_bind + 1
 			If isKreturn(p.st(1)) Then
@@ -711,12 +754,6 @@ Function _applyP2(p As Parser, s As String, pos As Integer, endPos As Integer, B
 			result = _applyP2(p.st(0), s, pos, endPos, isUnderSkip)
 			If endPos &lt; 0 Then : Exit Function : End If
 			result = _applyP2(apply1(p.st(1), result), s, endPos, endPos, isUnderSkip)
-		Case &quot;return&quot;
-			applyP_return = applyP_return + 1
-			If Not(isUnderSkip) Then
-				result = p.st
-			End If
-			endPos = pos
 		Case &quot;seq&quot;
 			applyP_seq = applyP_seq + 1
 			innerParsers = p.st(0)
@@ -786,6 +823,12 @@ Function _applyP2(p As Parser, s As String, pos As Integer, endPos As Integer, B
 		Case &quot;fail&quot;
 			applyP_fail = applyP_fail + 1
 			Goto _applyP2_parseFailure
+		Case &quot;end&quot;
+			applyP_end = applyP_end + 1
+			If pos &lt;= Len(s) Then
+				Goto _applyP2_parseFailure
+			End If
+			endPos = pos
 		Case Else
 			result = &quot;unknown Parser &apos;&quot; &amp; p.tp &amp; &quot;&apos;&quot;
 			MsgBox(&quot;Error in applyP: &quot; &amp; result)
@@ -973,6 +1016,7 @@ Function test_Parser(Optional what)
 		test_Parser_fail()
 		test_Parser_return()
 		test_Parser_item()
+		test_Parser_end()
 		test_Parser_str()
 		test_Parser_choice()
 		test_Parser_bind()
@@ -990,6 +1034,8 @@ Function test_Parser(Optional what)
 		test_Parser_seq()
 		test_Parser_alphaLower()
 		test_Parser_alphaUpper()
+	End If
+	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;toString&quot;) Then
 		test_Parser_toString()
 	End If
 	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;numbers&quot;) Then
@@ -1023,6 +1069,7 @@ end_of_Parser_tests:
 				&amp; chr(13) &amp; &quot;apply_str: &quot; &amp; applyP_str _
 				&amp; chr(13) &amp; &quot;apply_choice: &quot; &amp; applyP_choice _
 				&amp; chr(13) &amp; &quot;apply_item: &quot; &amp; applyP_item _
+				&amp; chr(13) &amp; &quot;apply_end: &quot; &amp; applyP_end _
 				&amp; chr(13) &amp; &quot;apply_bind: &quot; &amp; applyP_bind _
 				&amp; chr(13) &amp; &quot;  (apply_bind_K_return: &quot; &amp; apply_bind_K_return &amp; &quot;)&quot; _
 				&amp; chr(13) &amp; &quot;apply_return: &quot; &amp; applyP_return _
@@ -1160,6 +1207,16 @@ Function test_Parser_item()
 	assert_parses(p, &quot;abcd&quot;,	&quot;a&quot;, 2).x
 	assert_parses(p, chr(13),	chr(13), 2).x
 	assert_parses(p, chr( 9),	chr( 9), 2).x
+End Function
+
+Function test_Parser_end()
+	Dim p As Object
+	
+	p = pEnd
+	assert_parses(p, &quot;&quot;, Empty, 1).x
+	refute_parses(p, &quot; &quot;).x
+	refute_parses(p, &quot;a&quot;).x
+	refute_parses(p, &quot;5&quot;).x
 End Function
 
 Function test_Parser_str()
@@ -1704,7 +1761,7 @@ Function test_Parser_TypeCtor()
 	refute_parses(p, &quot;long&quot;).x
 
 	assert_parses(p, &quot;Avalidtypector&quot;, &quot;Avalidtypector&quot;, 15).x
-&apos;	refute_parses(p, &quot;NotAValidTypeCtor&quot;).x
+	assert_parses(p, &quot;NotAValidTypeCtor&quot;, &quot;Not&quot;, 4).x
 End Function
 
 Function test_Parser_TypeExpr()
@@ -2021,12 +2078,23 @@ Function test_Parser_toString()
 	assert_toStr(pFail, 							&quot;fail&quot;).x
 	assert_toStr(pReturn(7), 						&quot;(return 7)&quot;).x
 	assert_toStr(pReturn(&quot;seven&quot;),					&quot;(return &apos;seven&apos;)&quot;).x
+	assert_toStr(pItem,								&quot;item&quot;).x
 	assert_toStr(pStr(&quot;a&quot;),							&quot;(str &apos;a&apos;)&quot;).x
+	assert_toStr(pSkip(pItem), 						&quot;(skip item)&quot;).x
+	assert_toStr(pSkip(pStr(&quot;a&quot;)),					&quot;(skip (str &apos;a&apos;))&quot;).x
 	assert_toStr(pChoice(pStr(&quot;a&quot;), pStr(&quot;b&quot;)),		&quot;((str &apos;a&apos;) +++ (str &apos;b&apos;))&quot;).x
 	assert_toStr(pChoice(pStr(&quot;b&quot;), pStr(&quot;a&quot;)),		&quot;((str &apos;b&apos;) +++ (str &apos;a&apos;))&quot;).x
 	assert_toStr(pZeroOrOne(pStr(&quot;a&quot;)),				&quot;(str &apos;a&apos;)?&quot;).x
 	&apos; double p?? is the same as p?:
 	assert_toStr(pZeroOrOne(pZeroOrOne(pStr(&quot;a&quot;))),	&quot;(str &apos;a&apos;)?&quot;).x
+
+	assert_toStr(pMany1(pItem),						&quot;item+&quot;).x
+	assert_toStr(pSkip(pMany1(pItem)),				&quot;(skip item+)&quot;).x
+	assert_toStr(pMany1(pWhite),					toString(pWhite) &amp; &quot;+&quot;).x
+	assert_toStr(pSkip(pMany1(pWhite)),				&quot;(skip &quot; &amp; toString(pWhite) &amp; &quot;+)&quot;).x
+
+	assert_toStr(pMany(pItem),						&quot;item*&quot;).x
+	assert_toStr(pSkip(pMany(pItem)),				&quot;(skip item*)&quot;).x
 End Function
 
 Function test_Parser_hexNum()

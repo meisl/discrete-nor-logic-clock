@@ -46,6 +46,7 @@ Type TFnObjs
 	
 	TParser_toString	As Object
 	mkParser 			As Object
+	pStr				As Object
 	pBind				As Object
 	pChoice				As Object
 	maybeMakeArrowType	As Object
@@ -107,6 +108,7 @@ Function Fn
 
 		result.TParser_toString = lookupFn(&quot;TParser_toString&quot;)
 		result.mkParser	= lookupFn(&quot;mkParser&quot;)
+		result.pStr		= lookupFn(&quot;pStr&quot;)
 		result.pBind	= lookupFn(&quot;pBind&quot;)
 		result.pChoice	= lookupFn(&quot;pChoice&quot;)
 		result.maybeMakeArrowType = lookupFn(&quot;maybeMakeArrowType&quot;)
@@ -230,6 +232,7 @@ Function fnObjs()
 			_
 			newFn(&quot;TParser_toString&quot;,	1, &quot;Parser a -&gt; Str&quot;), _
 			newFn(&quot;mkParser&quot;,			2, &quot;Str -&gt; Any -&gt; Parser a&quot;), _
+			newFn(&quot;pStr&quot;,				1, &quot;Str -&gt; Parser Str&quot;), _
 			newFn(&quot;pBind&quot;,				2, &quot;Parser a -&gt; (a -&gt; Parser b) -&gt; Parser b&quot;), _
 			newFn(&quot;pChoice&quot;,			2, &quot;Parser a -&gt; Parser a -&gt; Parser a&quot;), _
 			newFn(&quot;maybeMakeArrowType&quot;,	2, &quot;Typ -&gt; Maybe Typ -&gt; Typ&quot;), _
@@ -379,6 +382,7 @@ applyLast_of_one:
 		Case &quot;flatten&quot;:		result = flatten(	a0)
 		Case &quot;reverse&quot;: 	result = reverse(	a0)
 		Case &quot;toArray&quot;: 	result = toArray(	a0)
+		Case &quot;pStr&quot;: 		result = pStr(		a0)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select
