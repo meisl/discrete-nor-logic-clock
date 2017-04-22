@@ -339,7 +339,7 @@ End Function
 &apos; parsers pos to give the overall result
 Function pSeq(ps As Array, ByVal f As Variant)
 	&apos;TODO: pSeq: check if ps is proper Array of Parsers
-	f = asFn(f, &quot;pSeq: invalid 2nd arg&quot;)
+	f = asFn(f, &quot;pSeq: invalid 2nd arg &quot; &amp; toString(f))
 	pSeq = mkParser(&quot;seq&quot;, Array(ps, f))
 End Function
 
@@ -357,8 +357,8 @@ Function pWhite()
 End Function
 
 Function pAlphaLower()
-	Static result As Parser	&apos; an uninitialized instance of Parser at first
-	If result.tp = &quot;&quot; Then
+	Static result As Object
+	If isNull(result) Then
 		result = pBind(pItem, _
 					ite(compose(inRange(Asc(&quot;a&quot;), Asc(&quot;z&quot;)), Fn.asc), _
 						pReturn, _
@@ -369,8 +369,8 @@ Function pAlphaLower()
 End Function
 
 Function pAlphaUpper()
-	Static result As Parser	&apos; an uninitialized instance of Parser at first
-	If result.tp = &quot;&quot; Then
+	Static result As Object
+	If isNull(result) Then
 		result = pBind(pItem, _
 					ite(compose(inRange(Asc(&quot;A&quot;), Asc(&quot;Z&quot;)), Fn.asc), _
 						pReturn, _
@@ -569,14 +569,18 @@ Function pBaseType()
 End Function
 
 Function pTypeVar()
-	pTypeVar = pAlphaLower
+&apos;	pTypeVar = pBind(pAlphaLower, compose(pReturn, concat(&quot;&apos;&quot;)))
+	pTypeVar = pSeq(Array(pAlphaLower), concat(&quot;&apos;&quot;))
 End Function
 
 Function pTypeCtor()
 	Static result As Object
 	If isNull(result) Then
-		result = foldl1(pChoice, _
-						map(pStr, List(&quot;List&quot;, &quot;Maybe&quot;, &quot;Parser&quot;))_
+&apos;		result = foldl1( pChoice, _
+&apos;						 map(pStr, List(&quot;List&quot;, &quot;Maybe&quot;, &quot;Parser&quot;)) )
+		result = pSeq(_
+			Array(pSeq(Array(pAlphaUpper, pMany1(pAlphaLower)), cons)), _
+			foldl1(concat) _
 		)
 	End If
 	pTypeCtor = result
@@ -595,7 +599,21 @@ Function maybeMakeArrowType(i, o)
 End Function
 
 Function mkTypeCtor(ctorName As String, typeArgs As Object)
-	mkTypeCtor = &quot;(&quot; &amp; ctorName &amp; &quot; &quot; &amp; toString(typeArgs) &amp; &quot;)&quot;
+	Dim result As String
+	result = &quot;(&quot; &amp; ctorName
+	If isNil(typeArgs) Then
+		result = result &amp; &quot; [])&quot;
+	Else
+		Dim toStr As Object
+		&apos;  \acc a.concat acc (concat &quot;, &quot; a)
+		&apos;= \acc a.(swap concat) (concat &quot;, &quot; a) acc
+		&apos;= swap \a acc.(swap concat) (concat &quot;, &quot; a) acc
+		&apos;= swap \a.(swap concat) (concat &quot;, &quot; a)
+		&apos;= swap ((swap concat) ° (concat &quot;, &quot;))
+		toStr = swap(compose(swap(concat) , concat(&quot;, &quot;)))
+		result = result &amp; &quot; [&quot; &amp; foldl1(toStr, typeArgs) &amp; &quot;])&quot;
+	End If
+	mkTypeCtor = result
 End Function
 
 
@@ -635,7 +653,138 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 	If IsMissing(pos) Then
 		pos = 1
 	End If
-	applyP = _applyP(p, s, pos, False)
+	If 0 = 1 Then
+		Dim endPos As Integer, parseResult As Variant
+		parseResult = _applyP2(p, s, pos, endPos, False)
+		If endPos &lt; 0 Then &apos; indicates failure
+			applyP = parseFailure
+		Else &apos; package up result and endPos for the outside world			
+			applyP = Array(parseResult, endPos)
+		End If
+	Else
+		applyP = _applyP(p, s, pos, False)
+	End If
+End Function
+
+Function _applyP2(p As Parser, s As String, pos As Integer, endPos As Integer, ByVal isUnderSkip As Boolean)
+	_applyP_callCount = _applyP_callCount + 1
+	Dim result As Variant
+	Dim i As Integer
+	Dim innerParser As Parser
+	Dim innerParsers As Variant
+	Dim lst As Object
+	
+	Select Case p.tp
+		Case &quot;str&quot;
+			applyP_str = applyP_str + 1
+			Dim match As String
+			Dim matchLen As Integer
+			match = p.st
+			matchLen = Len(match)	&apos; TODO: pre-calculate Len(match)
+			If (Mid(s, pos, matchLen) &lt;&gt; match) Then
+				Goto _applyP2_parseFailure
+			End If
+			endPos = pos + matchLen
+			If Not(isUnderSkip) Then
+				result = match
+			End If
+		Case &quot;choice&quot;
+			applyP_choice = applyP_choice + 1
+			innerParsers = p.st
+			Do
+				innerParser = car(innerParsers)
+				result = _applyP2(innerParser, s, pos, endPos, isUnderSkip)
+				innerParsers = cdr(innerParsers)
+			Loop Until (isNil(innerParsers) Or (endPos &gt; 0))
+		Case &quot;item&quot;
+			applyP_item = applyP_item + 1
+			If pos &gt; Len(s) Then
+				Goto _applyP2_parseFailure
+			End If
+			endPos = pos + 1
+			If Not(isUnderSkip) Then
+				result = Mid(s, pos, 1)
+			End If
+		Case &quot;bind&quot;
+			applyP_bind = applyP_bind + 1
+			If isKreturn(p.st(1)) Then
+				apply_bind_K_return = apply_bind_K_return + 1
+			End If
+			result = _applyP2(p.st(0), s, pos, endPos, isUnderSkip)
+			If endPos &lt; 0 Then : Exit Function : End If
+			result = _applyP2(apply1(p.st(1), result), s, endPos, endPos, isUnderSkip)
+		Case &quot;return&quot;
+			applyP_return = applyP_return + 1
+			If Not(isUnderSkip) Then
+				result = p.st
+			End If
+			endPos = pos
+		Case &quot;seq&quot;
+			applyP_seq = applyP_seq + 1
+			innerParsers = p.st(0)
+			If isUnderSkip Then
+				For i = LBound(innerParsers) To UBound(innerParsers)
+					_applyP2(innerParsers(i), s, pos, endPos, True)
+					If endPos &lt; 0 Then : Exit Function : End If
+					pos = endPos
+				Next		
+			Else
+				lst = nil
+				For i = LBound(innerParsers) To UBound(innerParsers)
+					innerParser = innerParsers(i)
+					result = _applyP2(innerParser, s, pos, endPos, False)
+					If endPos &lt; 0 Then : Exit Function : End If
+					pos = endPos
+					&apos; TODO: precalculate isPSkip check in pSeq
+					If Not(isPSkip(innerParser)) Then
+						lst = cons(result, lst)
+					End If
+				Next
+				result = applyToList(p.st(1), reverse(lst))
+			End If
+		Case &quot;skip&quot;
+			applyP_skip = applyP_skip + 1
+			result = _applyP2(p.st, s, pos, endPos, True)
+			If endPos &gt; 0 Then
+				assertEqual(result, Empty).x
+			End If
+		Case &quot;many1&quot;
+			applyP_many1 = applyP_many1 + 1
+			innerParser = p.st
+			If isUnderSkip Then
+				_applyP2(innerParser, s, pos, endPos, True)
+				If endPos &lt; 0 Then : Exit Function : End If
+				Do
+					pos = endPos
+					_applyP2(innerParser, s, pos, endPos, True)
+				Loop Until (endPos &lt; 0)
+				endPos = pos
+			Else
+				Set lst = nil
+				result = _applyP2(innerParser, s, pos, endPos, False)
+				If endPos &lt; 0 Then : Exit Function : End If
+				Do
+					Set lst = cons(result, lst)
+					pos = endPos
+					result = _applyP2(innerParser, s, pos, endPos, False)
+				Loop Until (endPos &lt; 0)
+				endPos = pos
+				result = reverse(lst)
+			End If
+		Case &quot;fail&quot;
+			applyP_fail = applyP_fail + 1
+			Goto _applyP2_parseFailure
+		Case Else
+			result = &quot;unknown Parser &apos;&quot; &amp; p.tp &amp; &quot;&apos;&quot;
+			MsgBox(&quot;Error in applyP: &quot; &amp; result)
+	End Select
+	&apos;If isUnderSkip And Not(isParseFailure(result)) Then
+	&apos;	assertEqual(result(0), Empty).x
+	&apos;End If
+	_applyP2 = result
+	Exit Function
+_applyP2_parseFailure:
+	endPos = -1
 End Function
 
 Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolean)
@@ -652,8 +801,7 @@ Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolea
 		applyP_skip = applyP_skip + 1
 		result = _applyP(p.st, s, pos, True)
 		If Not(isParseFailure(result)) Then
-			&apos;msgbox(toString(result))
-			result(0) = Empty &apos; TODO: remove setting skipped result to Empty
+			assertEqual(result(0), Empty).x
 		End If
 	ElseIf p.tp = &quot;return&quot; Then
 		applyP_return = applyP_return + 1
@@ -693,8 +841,6 @@ Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolea
 		Else
 			result = parseFailure
 		End If
-		&apos;MsgBox(&quot;str(&quot; &amp; toString(match) &amp; &quot;), s=&quot; &amp; toString(s) &amp; &quot;, pos=&quot; &amp; toString(pos) &amp; &quot;, matchLen=&quot; &amp; toString(matchLen)_
-		&apos;	&amp; chr(13) &amp; &quot;~&gt;&quot; &amp; toString(result))
 	ElseIf p.tp = &quot;choice&quot; Then
 		applyP_choice = applyP_choice + 1
 		innerParsers = p.st
@@ -861,16 +1007,16 @@ end_of_Parser_tests:
 
 		msgbox(&quot;applyP_callCount: &quot; &amp; applyP_callCount _
 				&amp; chr(13) &amp; &quot;_applyP_callCount: &quot; &amp; _applyP_callCount _
-				&amp; chr(13) &amp; &quot;apply_return: &quot; &amp; applyP_return _
-				&amp; chr(13) &amp; &quot;apply_fail: &quot; &amp; applyP_fail _
-				&amp; chr(13) &amp; &quot;apply_item: &quot; &amp; applyP_item _
-				&amp; chr(13) &amp; &quot;apply_choice: &quot; &amp; applyP_choice _
-				&amp; chr(13) &amp; &quot;apply_many1: &quot; &amp; applyP_many1 _
 				&amp; chr(13) &amp; &quot;apply_str: &quot; &amp; applyP_str _
-				&amp; chr(13) &amp; &quot;apply_seq: &quot; &amp; applyP_seq _
-				&amp; chr(13) &amp; &quot;apply_skip: &quot; &amp; applyP_skip _
+				&amp; chr(13) &amp; &quot;apply_choice: &quot; &amp; applyP_choice _
+				&amp; chr(13) &amp; &quot;apply_item: &quot; &amp; applyP_item _
 				&amp; chr(13) &amp; &quot;apply_bind: &quot; &amp; applyP_bind _
 				&amp; chr(13) &amp; &quot;  (apply_bind_K_return: &quot; &amp; apply_bind_K_return &amp; &quot;)&quot; _
+				&amp; chr(13) &amp; &quot;apply_return: &quot; &amp; applyP_return _
+				&amp; chr(13) &amp; &quot;apply_seq: &quot; &amp; applyP_seq _
+				&amp; chr(13) &amp; &quot;apply_skip: &quot; &amp; applyP_skip _
+				&amp; chr(13) &amp; &quot;apply_many1: &quot; &amp; applyP_many1 _
+				&amp; chr(13) &amp; &quot;apply_fail: &quot; &amp; applyP_fail _
 				&amp; chr(13) &amp; length(bindFns) &amp; &quot; bindFns: &quot; &amp; toString(bindFns))
 	Else
 		result = Join(Array(&quot;test_Parser(&quot; &amp; what &amp; &quot;):&quot;, tm, aCount), &quot; &quot;)
@@ -1473,33 +1619,33 @@ Function test_Parser_TypeVar()
 		&quot;A&quot;, &quot;B&quot;, &quot;C&quot;, &quot;D&quot;, &quot;E&quot;, &quot;F&quot;, &quot;G&quot;, &quot;H&quot;, &quot;I&quot;, &quot;J&quot;, &quot;K&quot;, &quot;L&quot;, &quot;M&quot;, _
 		&quot;N&quot;, &quot;O&quot;, &quot;P&quot;, &quot;Q&quot;, &quot;R&quot;, &quot;S&quot;, &quot;T&quot;, &quot;U&quot;, &quot;V&quot;, &quot;W&quot;, &quot;X&quot;, &quot;Y&quot;, &quot;Z&quot;, _
 		&quot;&quot;)).x
-	assert_parses(p, &quot;asdf&quot;, &quot;a&quot;, 2).x
-	assert_parses(p, &quot;a&quot;, &quot;a&quot;, 2).x
-	assert_parses(p, &quot;b&quot;, &quot;b&quot;, 2).x
-	assert_parses(p, &quot;c&quot;, &quot;c&quot;, 2).x
-	assert_parses(p, &quot;d&quot;, &quot;d&quot;, 2).x
-	assert_parses(p, &quot;e&quot;, &quot;e&quot;, 2).x
-	assert_parses(p, &quot;f&quot;, &quot;f&quot;, 2).x
-	assert_parses(p, &quot;g&quot;, &quot;g&quot;, 2).x
-	assert_parses(p, &quot;h&quot;, &quot;h&quot;, 2).x
-	assert_parses(p, &quot;i&quot;, &quot;i&quot;, 2).x
-	assert_parses(p, &quot;j&quot;, &quot;j&quot;, 2).x
-	assert_parses(p, &quot;k&quot;, &quot;k&quot;, 2).x
-	assert_parses(p, &quot;l&quot;, &quot;l&quot;, 2).x
-	assert_parses(p, &quot;m&quot;, &quot;m&quot;, 2).x
-	assert_parses(p, &quot;n&quot;, &quot;n&quot;, 2).x
-	assert_parses(p, &quot;o&quot;, &quot;o&quot;, 2).x
-	assert_parses(p, &quot;p&quot;, &quot;p&quot;, 2).x
-	assert_parses(p, &quot;q&quot;, &quot;q&quot;, 2).x
-	assert_parses(p, &quot;r&quot;, &quot;r&quot;, 2).x
-	assert_parses(p, &quot;s&quot;, &quot;s&quot;, 2).x
-	assert_parses(p, &quot;t&quot;, &quot;t&quot;, 2).x
-	assert_parses(p, &quot;u&quot;, &quot;u&quot;, 2).x
-	assert_parses(p, &quot;v&quot;, &quot;v&quot;, 2).x
-	assert_parses(p, &quot;w&quot;, &quot;w&quot;, 2).x
-	assert_parses(p, &quot;x&quot;, &quot;x&quot;, 2).x
-	assert_parses(p, &quot;y&quot;, &quot;y&quot;, 2).x
-	assert_parses(p, &quot;z&quot;, &quot;z&quot;, 2).x
+	assert_parses(p, &quot;asdf&quot;, &quot;&apos;a&quot;, 2).x
+	assert_parses(p, &quot;a&quot;, &quot;&apos;a&quot;, 2).x
+	assert_parses(p, &quot;b&quot;, &quot;&apos;b&quot;, 2).x
+	assert_parses(p, &quot;c&quot;, &quot;&apos;c&quot;, 2).x
+	assert_parses(p, &quot;d&quot;, &quot;&apos;d&quot;, 2).x
+	assert_parses(p, &quot;e&quot;, &quot;&apos;e&quot;, 2).x
+	assert_parses(p, &quot;f&quot;, &quot;&apos;f&quot;, 2).x
+	assert_parses(p, &quot;g&quot;, &quot;&apos;g&quot;, 2).x
+	assert_parses(p, &quot;h&quot;, &quot;&apos;h&quot;, 2).x
+	assert_parses(p, &quot;i&quot;, &quot;&apos;i&quot;, 2).x
+	assert_parses(p, &quot;j&quot;, &quot;&apos;j&quot;, 2).x
+	assert_parses(p, &quot;k&quot;, &quot;&apos;k&quot;, 2).x
+	assert_parses(p, &quot;l&quot;, &quot;&apos;l&quot;, 2).x
+	assert_parses(p, &quot;m&quot;, &quot;&apos;m&quot;, 2).x
+	assert_parses(p, &quot;n&quot;, &quot;&apos;n&quot;, 2).x
+	assert_parses(p, &quot;o&quot;, &quot;&apos;o&quot;, 2).x
+	assert_parses(p, &quot;p&quot;, &quot;&apos;p&quot;, 2).x
+	assert_parses(p, &quot;q&quot;, &quot;&apos;q&quot;, 2).x
+	assert_parses(p, &quot;r&quot;, &quot;&apos;r&quot;, 2).x
+	assert_parses(p, &quot;s&quot;, &quot;&apos;s&quot;, 2).x
+	assert_parses(p, &quot;t&quot;, &quot;&apos;t&quot;, 2).x
+	assert_parses(p, &quot;u&quot;, &quot;&apos;u&quot;, 2).x
+	assert_parses(p, &quot;v&quot;, &quot;&apos;v&quot;, 2).x
+	assert_parses(p, &quot;w&quot;, &quot;&apos;w&quot;, 2).x
+	assert_parses(p, &quot;x&quot;, &quot;&apos;x&quot;, 2).x
+	assert_parses(p, &quot;y&quot;, &quot;&apos;y&quot;, 2).x
+	assert_parses(p, &quot;z&quot;, &quot;&apos;z&quot;, 2).x
 End Function
 
 Function test_Parser_TypeCtor()
@@ -1515,17 +1661,21 @@ Function test_Parser_TypeCtor()
 	assert_parses(p, &quot;List&quot;, &quot;List&quot;, 5).x
 	assert_parses(p, &quot;Maybe&quot;, &quot;Maybe&quot;, 6).x
 
-	refute_parses(p, &quot;Bool&quot;).x
+	&apos; any capitalized String with more than 2 chars does
+	assert_parses(p, &quot;Bool&quot;, &quot;Bool&quot;, 5).x &apos; 
 	refute_parses(p, &quot;bool&quot;).x
 
-	refute_parses(p, &quot;Str&quot;).x
+	assert_parses(p, &quot;Str&quot;, &quot;Str&quot;, 4).x
 	refute_parses(p, &quot;str&quot;).x
 
-	refute_parses(p, &quot;Int&quot;).x
+	assert_parses(p, &quot;Int&quot;, &quot;Int&quot;, 4).x
 	refute_parses(p, &quot;int&quot;).x
 
-	refute_parses(p, &quot;Long&quot;).x
+	assert_parses(p, &quot;Long&quot;, &quot;Long&quot;, 5).x
 	refute_parses(p, &quot;long&quot;).x
+
+	assert_parses(p, &quot;Avalidtypector&quot;, &quot;Avalidtypector&quot;, 15).x
+&apos;	refute_parses(p, &quot;NotAValidTypeCtor&quot;).x
 End Function
 
 Function test_Parser_TypeExpr()
@@ -1536,17 +1686,18 @@ Function test_Parser_TypeExpr()
 	assert_parses(p, &quot;Int&quot;,	 			&quot;Int&quot;, 4).x
 	assert_parses(p, &quot;Int-&gt;Int&quot;,	 	&quot;(-&gt; Int Int)&quot;, 9).x
 	assert_parses(p, &quot;Int-&gt;Str-&gt;Bool&quot;,	&quot;(-&gt; Int (-&gt; Str Bool))&quot;, 15).x
-	assert_parses(p, &quot;a-&gt;b-&gt;c&quot;,	 		&quot;(-&gt; a (-&gt; b c))&quot;, 8).x
-	assert_parses(p, &quot;(a-&gt;b)-&gt;c&quot;,	 	&quot;(-&gt; (-&gt; a b) c)&quot;, 10).x
-	assert_parses(p, &quot;(a-&gt;b)-&gt;(c)&quot;,	 	&quot;(-&gt; (-&gt; a b) c)&quot;, 12).x
+	assert_parses(p, &quot;a-&gt;b-&gt;c&quot;,	 		&quot;(-&gt; &apos;a (-&gt; &apos;b &apos;c))&quot;, 8).x
+	assert_parses(p, &quot;(a-&gt;b)-&gt;c&quot;,	 	&quot;(-&gt; (-&gt; &apos;a &apos;b) &apos;c)&quot;, 10).x
+	assert_parses(p, &quot;(a-&gt;b)-&gt;(c)&quot;,	 	&quot;(-&gt; (-&gt; &apos;a &apos;b) &apos;c)&quot;, 12).x
 	assert_parses(p, &quot;List&quot;,	 		&quot;(List [])&quot;, 5).x
-	assert_parses(p, &quot;List a&quot;,	 		&quot;(List [&apos;a&apos;])&quot;, 7).x
-	assert_parses(p, &quot;List a b&quot;,	 	&quot;(List [&apos;a&apos;, &apos;b&apos;])&quot;, 9).x
-	assert_parses(p, &quot;List a-&gt;b&quot;,	 	&quot;(-&gt; (List [&apos;a&apos;]) b)&quot;, 10).x
-	assert_parses(p, &quot;List (a-&gt;b)&quot;,	 	&quot;(List [&apos;(-&gt; a b)&apos;])&quot;, 12).x
-	assert_parses(p, &quot;List Maybe a&quot;,	&quot;(List [&apos;(Maybe [&apos;a&apos;])&apos;])&quot;, 13).x
-	assert_parses(p, &quot;List Maybe a b&quot;,	&quot;(List [&apos;(Maybe [&apos;a&apos;, &apos;b&apos;])&apos;])&quot;, 15).x
-	assert_parses(p, &quot;List (Maybe a) b&quot;,&quot;(List [&apos;(Maybe [&apos;a&apos;])&apos;, &apos;b&apos;])&quot;, 17).x
+	assert_parses(p, &quot;List a&quot;,	 		&quot;(List [&apos;a])&quot;, 7).x
+	assert_parses(p, &quot;List a b&quot;,	 	&quot;(List [&apos;a, &apos;b])&quot;, 9).x
+	assert_parses(p, &quot;List Int&quot;,	 	&quot;(List [Int])&quot;, 9).x
+	assert_parses(p, &quot;List a-&gt;b&quot;,	 	&quot;(-&gt; (List [&apos;a]) &apos;b)&quot;, 10).x
+	assert_parses(p, &quot;List (a-&gt;b)&quot;,	 	&quot;(List [(-&gt; &apos;a &apos;b)])&quot;, 12).x
+	assert_parses(p, &quot;List Maybe a&quot;,	&quot;(List [(Maybe [&apos;a])])&quot;, 13).x
+	assert_parses(p, &quot;List Maybe a b&quot;,	&quot;(List [(Maybe [&apos;a, &apos;b])])&quot;, 15).x
+	assert_parses(p, &quot;List (Maybe a) b&quot;,&quot;(List [(Maybe [&apos;a]), &apos;b])&quot;, 17).x
 	
 	refute_parses(p, &quot;-&gt;a&quot;).x
 	&apos;refute_parses(p, &quot;a-&gt;&quot;).x
@@ -1562,6 +1713,21 @@ Function test_Parser_TypeExpr()
 	assert_parses(p, &quot; Int   &quot;,	 				&quot;Int&quot;,  8).x
 	assert_parses(p, &quot; Int -&gt; Int           &quot;,	&quot;(-&gt; Int Int)&quot;, 23).x
 	assert_parses(p, &quot; Int  -&gt; Str -&gt;  Bool &quot;,	&quot;(-&gt; Int (-&gt; Str Bool))&quot;, 23).x
+
+	assert_parses(p, getFnTypeStr(Fn.isNil), &quot;(-&gt; (List [&apos;a]) Bool)&quot;, 15).x
+	assert_parses(p, getFnTypeStr(Fn.flatten), &quot;(-&gt; (List [(List [&apos;a])]) (List [&apos;a]))&quot;, 22).x
+
+	Dim fns As Object, f As Object, fName As String, typStr As String
+	fns = fnObjs
+	While Not(isNil(fns))
+		f = car(fns)
+		typStr = getFnTypeStr(f)
+		If typStr &lt;&gt; &quot;&quot; Then
+			fName = getFnName(f)
+&apos;			assert_parses(p, typStr, fName &amp; &quot; :: asdf&quot;, Len(typStr) + 1).x
+		End If
+		fns = cdr(fns)
+	Wend
 End Function
 
 Function test_Parser_binDigit()

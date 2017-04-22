@@ -62,7 +62,7 @@ Function newFn(name As String, arity As Integer, Optional typ)
 	result.which = name
 	result.arity = arity
 	If Not(isMissing(typ)) Then
-		result.str = name &amp; &quot; :: &quot; &amp; toString(typ)
+		result.str = name &amp; &quot; :: &quot; &amp; typ
 	Else
 		result.str = name
 	End If
@@ -211,8 +211,8 @@ Function fnObjs()
 			_
 			newFn(&quot;TList_toString&quot;,	1), _
 			newFn(&quot;TList_equ&quot;,		2), _
-			newFn(&quot;isNil&quot;,			1), _
-			newFn(&quot;cons&quot;,			2), _
+			newFn(&quot;isNil&quot;,			1, &quot;List a -&gt; Bool&quot;), _
+			newFn(&quot;cons&quot;,			2, &quot;a -&gt; [a] -&gt; [a]&quot;), _
 			newFn(&quot;length&quot;,			1), _
 			newFn(&quot;car&quot;,			1), _
 			newFn(&quot;cdr&quot;,			1), _
@@ -268,6 +268,12 @@ End Function
 
 Function arity(fn As Object) As Integer
 	arity = fn.arity
+End Function
+
+Function getFnTypeStr(f As Object) As String
+	Dim fName As String
+	fName = getFnName(f)
+	getFnTypeStr = Mid(f.str, Len(fName &amp; &quot; :: &quot;) + 1)
 End Function
 
 Function isFn(ByVal fn As Variant) As Boolean
@@ -475,6 +481,7 @@ Function applyToList(ByVal fn As Variant, ByVal args As Object)
 		fstr = toString(fn)
 		croak(&quot;applyToList: empty args list for &quot; &amp; chr(13) &amp; fstr)
 	Else
+		&apos; applyToList = foldl apply1 f args
 		result = fn
 		While Not(isNil(args))
 			result = apply1(result, car(args))
