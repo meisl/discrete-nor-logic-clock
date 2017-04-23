@@ -295,6 +295,9 @@ Function bindStats(p As Parser, f As Object)
 	&apos; 43 of 51 are of shape (K p)
 	&apos; 40 of those 43 are of shape (K return x)
 	If isKreturn(f) Then
+		If isNull(bindFns) Then
+			bindFns = nil
+		End If
 		bindFns = cons(car(partialArgs(f)).st, bindFns)
 	End If
 End Function
@@ -550,14 +553,14 @@ End Function
 Function pDecDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-&apos;		result = pChoice(pBinDigit,	pBind(pStr(&quot;2&quot;), fstArg(pReturn(2))))
-&apos;		result = pChoice(result,	pBind(pStr(&quot;3&quot;), fstArg(pReturn(3))))
-&apos;		result = pChoice(result,	pBind(pStr(&quot;4&quot;), fstArg(pReturn(4))))
-&apos;		result = pChoice(result,	pBind(pStr(&quot;5&quot;), fstArg(pReturn(5))))
-&apos;		result = pChoice(result,	pBind(pStr(&quot;6&quot;), fstArg(pReturn(6))))
-&apos;		result = pChoice(result,	pBind(pStr(&quot;7&quot;), fstArg(pReturn(7))))
-&apos;		result = pChoice(result,	pBind(pStr(&quot;8&quot;), fstArg(pReturn(8))))
-&apos;		result = pChoice(result,	pBind(pStr(&quot;9&quot;), fstArg(pReturn(9))))
+		&apos;result = pChoice(pBinDigit,	pBind(pStr(&quot;2&quot;), fstArg(pReturn(2))))
+		&apos;result = pChoice(result,	pBind(pStr(&quot;3&quot;), fstArg(pReturn(3))))
+		&apos;result = pChoice(result,	pBind(pStr(&quot;4&quot;), fstArg(pReturn(4))))
+		&apos;result = pChoice(result,	pBind(pStr(&quot;5&quot;), fstArg(pReturn(5))))
+		&apos;result = pChoice(result,	pBind(pStr(&quot;6&quot;), fstArg(pReturn(6))))
+		&apos;result = pChoice(result,	pBind(pStr(&quot;7&quot;), fstArg(pReturn(7))))
+		&apos;result = pChoice(result,	pBind(pStr(&quot;8&quot;), fstArg(pReturn(8))))
+		&apos;result = pChoice(result,	pBind(pStr(&quot;9&quot;), fstArg(pReturn(9))))
 		&apos;pDecDigit = result
 		&apos;Exit Function
 
@@ -643,7 +646,6 @@ End Function
 Function pTypeExpr()
 	Static result As Object
 	If isNull(result) Then
-		Dim pLeft As Object
 		Dim pRight As Object
 		Dim pS As Object
 		Dim pParenS As Object
@@ -654,18 +656,13 @@ Function pTypeExpr()
 		
 		pS = pInd
 		pN = pInd
-		
-		&apos; Left ::= ws* N
-		&apos; pLeft = do _ &lt;- many white
-		&apos;            n &lt;- N
-		&apos;         return n
-		pLeft = pSeq(Array(pSkip(pMany(pWhite)), pN), id)
-&apos;msgbox(tostring(pLeft))
+
 		&apos; Right ::= &quot;-&gt;&quot; S
 		&apos; pRight = do _ &lt;- (str &quot;-&gt;&quot;)
 		&apos;             s &lt;- S
 		&apos;          return s
-		pRight = pSeq(Array(pSkip(pStr(&quot;-&gt;&quot;)), pS), id)
+		&apos;pRight = pSeq(Array(pSkip(pStr(&quot;-&gt;&quot;)), pS), id)
+		pRight = pBind(pStr(&quot;-&gt;&quot;), fstArg(pS))
 		
 		&apos; S ::= ws* N ws* ((str &quot;-&gt;&quot;) S)?
 		&apos; pS = do   _ &lt;- many white
@@ -811,7 +808,7 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 		pos = 1
 	End If
 	Dim endPos As Integer, parseResult As Variant
-	parseResult = _applyP2(p, s, pos, endPos, False)
+	parseResult = _applyP(p, s, pos, endPos, False)
 	If endPos &lt; 0 Then &apos; indicates failure
 		applyP = parseFailure
 	Else &apos; package up result and endPos for the outside world			
@@ -819,7 +816,13 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 	End If
 End Function
 
-Function _applyP2(ByVal p As Parser, s As String, ByVal pos As Integer, ByRef endPos As Integer, ByVal isUnderSkip As Boolean)
+Function _applyP( _
+	ByVal p As Parser, _
+	ByRef s As String, _
+	ByVal pos As Integer, _
+	ByRef endPos As Integer, _
+	ByVal isUnderSkip As Boolean _
+)
 	_applyP_callCount = _applyP_callCount + 1
 	Dim result As Variant
 	Dim i As Integer
@@ -836,7 +839,7 @@ _applyP_begin:
 			match = p.st(0)
 			matchLen = p.st(1)
 			If (Mid(s, pos, matchLen) &lt;&gt; match) Then
-				Goto _applyP2_parseFailure
+				Goto _applyP_parseFailure
 			End If
 			endPos = pos + matchLen
 			If Not(isUnderSkip) Then
@@ -844,16 +847,16 @@ _applyP_begin:
 			End If
 		Case &quot;choice&quot;	&apos; tail-recursive
 			applyP_choice = applyP_choice + 1
-			result = _applyP2(p.st(0), s, pos, endPos, isUnderSkip)
+			result = _applyP(p.st(0), s, pos, endPos, isUnderSkip)
 			If endPos &lt; 0 Then
-				&apos;result = _applyP2(p.st(1), s, pos, endPos, isUnderSkip)
+				&apos;result = _applyP(p.st(1), s, pos, endPos, isUnderSkip)
 				p = p.st(1)
 				Goto _applyP_begin
 			End If
 		Case &quot;item&quot;
 			applyP_item = applyP_item + 1
 			If pos &gt; Len(s) Then
-				Goto _applyP2_parseFailure
+				Goto _applyP_parseFailure
 			End If
 			endPos = pos + 1
 			If Not(isUnderSkip) Then
@@ -870,18 +873,24 @@ _applyP_begin:
 			If isKreturn(p.st(1)) Then
 				apply_bind_K_return = apply_bind_K_return + 1
 			End If
-			result = _applyP2(p.st(0), s, pos, endPos, isUnderSkip)
+			&apos;ATTENTION: when applying the parser (bind&apos;s 1st arg)
+			&apos;           we MUST NOT propagate down isUnderSkip
+			&apos;           because the fn (bind&apos;s 2nd arg) might need it
+			result = _applyP(p.st(0), s, pos, endPos, False)
 			If endPos &lt; 0 Then : Exit Function : End If
-			&apos;result = _applyP2(apply1(p.st(1), result), s, endPos, endPos, isUnderSkip)
+			&apos;HOWEVER: when applying the parser produced by the fn
+			&apos;         we must do this under the isUnderSkip:
+			&apos;result = _applyP(apply1(p.st(1), result), s, endPos, endPos, isUnderSkip)
 			p = apply1(p.st(1), result)
 			pos = endPos
+			If isUnderSkip Then : result = Empty : End If
 			Goto _applyP_begin
 		Case &quot;seq&quot;
 			applyP_seq = applyP_seq + 1
 			innerParsers = p.st(0)
 			If isUnderSkip Then
 				For i = LBound(innerParsers) To UBound(innerParsers)
-					_applyP2(innerParsers(i), s, pos, endPos, True)
+					_applyP(innerParsers(i), s, pos, endPos, True)
 					If endPos &lt; 0 Then : Exit Function : End If
 					pos = endPos
 				Next		
@@ -889,7 +898,7 @@ _applyP_begin:
 				lst = nil
 				For i = LBound(innerParsers) To UBound(innerParsers)
 					innerParser = innerParsers(i)
-					result = _applyP2(innerParser, s, pos, endPos, False)
+					result = _applyP(innerParser, s, pos, endPos, False)
 					If endPos &lt; 0 Then : Exit Function : End If
 					pos = endPos
 					&apos; TODO: precalculate isPSkip check in pSeq
@@ -904,18 +913,18 @@ _applyP_begin:
 			p = p.st
 			isUnderSkip = True
 			Goto _applyP_begin
-			&apos;result = _applyP2(p.st, s, pos, endPos, True)
+			&apos;result = _applyP(p.st, s, pos, endPos, True)
 			&apos;If endPos &gt; 0 Then
 			&apos;	assertEqual(result, Empty).x
 			&apos;End If
 		Case &quot;sat&quot;
 			applyP_sat = applyP_sat + 1
 			If pos &gt; Len(s) Then
-				Goto _applyP2_parseFailure
+				Goto _applyP_parseFailure
 			End If
 			result = Mid(s, pos, 1)
 			If Not(apply(p.st, result)) Then
-				Goto _applyP2_parseFailure
+				Goto _applyP_parseFailure
 			End If
 			endPos = pos + 1
 			If isUnderSkip Then
@@ -925,37 +934,37 @@ _applyP_begin:
 			applyP_many1 = applyP_many1 + 1
 			innerParser = p.st
 			If isUnderSkip Then
-				_applyP2(innerParser, s, pos, endPos, True)
+				_applyP(innerParser, s, pos, endPos, True)
 				If endPos &lt; 0 Then : Exit Function : End If
 				Do
 					pos = endPos
-					_applyP2(innerParser, s, pos, endPos, True)
+					_applyP(innerParser, s, pos, endPos, True)
 				Loop Until (endPos &lt; 0)
 				endPos = pos
 			Else
 				Set lst = nil
-				result = _applyP2(innerParser, s, pos, endPos, False)
+				result = _applyP(innerParser, s, pos, endPos, False)
 				If endPos &lt; 0 Then : Exit Function : End If
 				Do
 					Set lst = cons(result, lst)
 					pos = endPos
-					result = _applyP2(innerParser, s, pos, endPos, False)
+					result = _applyP(innerParser, s, pos, endPos, False)
 				Loop Until (endPos &lt; 0)
 				endPos = pos
 				result = reverse(lst)
 			End If
 		Case &quot;fail&quot;
 			applyP_fail = applyP_fail + 1
-			Goto _applyP2_parseFailure
+			Goto _applyP_parseFailure
 		Case &quot;ind&quot;	&apos; tail-recursive
 			applyP_ind = applyP_ind + 1
 			p = p.st
 			Goto _applyP_begin
-&apos;			result = _applyP2(p.st, s, pos, endPos, isUnderSkip)
+&apos;			result = _applyP(p.st, s, pos, endPos, isUnderSkip)
 		Case &quot;end&quot;
 			applyP_end = applyP_end + 1
 			If pos &lt;= Len(s) Then
-				Goto _applyP2_parseFailure
+				Goto _applyP_parseFailure
 			End If
 			endPos = pos
 		Case Else
@@ -965,9 +974,9 @@ _applyP_begin:
 	&apos;If isUnderSkip And Not(isParseFailure(result)) Then
 	&apos;	assertEqual(result(0), Empty).x
 	&apos;End If
-	_applyP2 = result
+	_applyP = result
 	Exit Function
-_applyP2_parseFailure:
+_applyP_parseFailure:
 	endPos = -1
 End Function
 
@@ -1309,12 +1318,34 @@ Function test_Parser_bind()
 	refute_parses(p, &quot;yx&quot;).x
 	assert_parses(p, &quot; yabcd&quot;, &quot;y&quot;, 3).x
 	
-&apos;	p = pBind(pItem, \a.return (concat &quot;FOO&quot; a))
+&apos;	p = item &gt;&gt;= return ° (concat &quot;FOO&quot;)
 	p = pBind(pItem, compose(pReturn, concat(&quot;FOO&quot;)))
 	assert_parses(p, &quot;xy&quot;,		&quot;FOOx&quot;, 2).x
 	assert_parses(p, &quot;xx&quot;,		&quot;FOOx&quot;, 2).x
 	assert_parses(p, &quot;yx&quot;,		&quot;FOOy&quot;, 2).x
 	assert_parses(p, &quot; yabcd&quot;,	&quot;FOO &quot;, 2).x
+	
+&apos;	p = item &gt;&gt;= \x.if (=? &quot;y&quot; x) then (return x) else fail 
+&apos;     = item &gt;&gt;= \x.ite (=? &quot;y&quot;) return (K fail)
+	p = pBind( pItem, ite(equ(&quot;y&quot;), pReturn, fstArg(pFail)) )
+	refute_parses(p, &quot;xy&quot;).x
+	refute_parses(p, &quot;xx&quot;).x
+	assert_parses(p, &quot;yx&quot;,		&quot;y&quot;, 2).x
+	assert_parses(p, &quot;yy&quot;,		&quot;y&quot;, 2).x
+	refute_parses(p, &quot; yabcd&quot;).x
+	
+	
+	&apos; skip must not be passed down into bind because the
+	&apos; function (2nd arg of bind) might need the parser&apos;s (1st arg of bind)
+	&apos; result in order to decide what parser to produce:
+&apos;	p = (skip ( item &gt;&gt;= \x.if (=? &quot;y&quot; x) then (return x) else fail ))
+&apos;     = (skip ( item &gt;&gt;= \x.ite (=? &quot;y&quot;) return (K fail) ))
+	p = pSkip(pBind( pItem, ite(equ(&quot;y&quot;), pReturn, fstArg(pFail)) ))
+	refute_parses(p, &quot;xy&quot;).x
+	refute_parses(p, &quot;xx&quot;).x
+	assert_parses(p, &quot;yx&quot;,		Empty, 2).x	&apos; succeeds but skips result
+	assert_parses(p, &quot;yy&quot;,		Empty, 2).x	&apos; succeeds but skips result
+	refute_parses(p, &quot; yabcd&quot;).x
 End Function
 
 Function test_Parser_sat()

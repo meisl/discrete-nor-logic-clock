@@ -113,40 +113,47 @@ Function inRange(Optional lo As Long, Optional hi As Long, Optional x As Long)
 	inRange = _apply(Fn.inRange, lo, hi, x)
 End Function
 
-Function equ(a As Variant, b As Variant) As Boolean
-	Dim ta As String, tb As String, tmp As String
-	Dim result as Boolean
-	ta = typeOf(a)
-	tb = typeOf(b)
-	If Not(ta = tb) Then
-		If (isNull(a) And startsWith(tb, ta)) Or (isNull(b) And startsWith(ta, tb)) Then
-			result = False
-		Else
-			croak(&quot;equ: incompatible types &quot; &amp; ta &amp; &quot; and &quot; &amp; tb)
+Function equ(Optional a As Variant, Optional b As Variant)
+	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.equ : End If
+	Dim result as Variant
+	If isMissing(a) Then
+		result = oFn
+	ElseIf isMissing(b) Then
+		result = apply(oFn, a)
+	Else
+		Dim ta As String, tb As String, tmp As String
+		ta = typeOf(a)
+		tb = typeOf(b)
+		If Not(ta = tb) Then
+			If (isNull(a) And startsWith(tb, ta)) Or (isNull(b) And startsWith(ta, tb)) Then
+				result = False
+			Else
+				croak(&quot;equ: incompatible types &quot; &amp; ta &amp; &quot; and &quot; &amp; tb)
+			End If
+		Else &apos; ta = tb
+			Select Case ta
+				Case &quot;Object&quot;	&apos; Object without a .tyname field
+					result = CBool(isNull(a) And isNull(b))
+					If Not(result) Then
+						croak(&quot;equ: cannot compare values of underspecified type &quot; &amp; ta)
+					End If
+				Case &quot;Object/&quot;	&apos; Object with a uninitialized .tyname field
+					croak(&quot;equ: cannot compare (uninitialized) values of type &quot; &amp; ta)
+				Case &quot;Empty&quot;:	result = True
+				&apos;Case &quot;&quot;: result = 
+				Case Else
+					If isObject(a) Then	&apos;they are instances of the same custom type (with non-empty.tyname)
+						&apos; ATTENTION: do NOT access .tyname directly!
+						Dim fName As String
+						fName = _tyname(a) &amp; &quot;_equ&quot;
+						result = apply(fName, a, b)
+					ElseIf isArray(a) Then
+						croak(&quot;equ: NYI - comparing arrays&quot;)
+					Else
+						result = CBool(a = b)
+					End If
+			End Select
 		End If
-	Else &apos; ta = tb
-		Select Case ta
-			Case &quot;Object&quot;	&apos; Object without a .tyname field
-				result = (isNull(a) And isNull(b))
-				If Not(result) Then
-					croak(&quot;equ: cannot compare values of underspecified type &quot; &amp; ta)
-				End If
-			Case &quot;Object/&quot;	&apos; Object with a uninitialized .tyname field
-				croak(&quot;equ: cannot compare (uninitialized) values of type &quot; &amp; ta)
-			Case &quot;Empty&quot;:	result = True
-			&apos;Case &quot;&quot;: result = 
-			Case Else
-				If isObject(a) Then	&apos;they are instances of the same custom type (with non-empty.tyname)
-					&apos; ATTENTION: do NOT access .tyname directly!
-					Dim fName As String
-					fName = _tyname(a) &amp; &quot;_equ&quot;
-					result = apply(fName, a, b)
-				ElseIf isArray(a) Then
-					croak(&quot;equ: NYI - comparing arrays&quot;)
-				Else
-					result = (a = b)
-				End If
-		End Select
 	End If
 	equ = result
 End Function
