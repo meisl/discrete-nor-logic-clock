@@ -535,19 +535,8 @@ End Function
 
 &apos;= tests ============================================================
 
-
-Function blaha(ByVal xs As Object)
-	xs.len = 1
-	xs = nil
-	blaha = xs
-End Function
-
 Function test_Fn()
 	Dim i As Integer
-	Dim xs As Object
-	xs = List(&quot;x&quot;, &quot;y&quot;)
-	assertEqual(toString(blaha(xs)), &quot;[]&quot;).x
-	&apos;assertEqual(toString(xs), &quot;[&apos;x&apos;, &apos;y&apos;]&quot;).x
 		
 	Dim fId As Variant
 	fId = Fn.id

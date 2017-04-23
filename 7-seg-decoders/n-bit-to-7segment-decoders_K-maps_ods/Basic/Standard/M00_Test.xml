@@ -178,6 +178,25 @@ Function assertEqual(actual As Variant, expected As Variant)
 		Else &apos; one null, the other not
 			Goto assertEqual_failed
 		End If
+	ElseIf (isArray(actual) And isArray(expected)) Then
+		Dim actualDim As Integer, expectedDim As Integer
+		actualDim = getDim(actual)
+		expectedDim = getDim(expected)
+		If actualDim = expectedDim Then
+			If actualDim = 1 Then
+				If (LBound(actual) = LBound(expected)) And (UBound(actual) = UBound(expected)) Then
+					Dim i As Integer
+					For i = LBound(actual) To UBound(actual)
+						If actual(i) &lt;&gt; expected(i) Then &apos; TODO: assertEqual: more general equ for array elems
+							Goto assertEqual_failed
+						End If
+					Next
+					Goto assertEqual_passed
+				End If
+			Else
+				croak(&quot;assertEqual: cannot compare Arrays of dim = &quot; &amp; actualDim &amp; &quot; &gt; 1&quot;)
+			End If
+		End If
 	ElseIf (actual = expected) Then
 		Goto assertEqual_passed
 	End If

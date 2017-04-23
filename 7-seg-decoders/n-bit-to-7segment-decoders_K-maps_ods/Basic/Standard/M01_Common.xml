@@ -10,6 +10,9 @@ Type TTest_Tyname
 	tyname As String
 End Type
 
+Type TTest_Foo
+	bar As Integer
+End Type
 
 Sub Main
 	test_Common()
@@ -240,6 +243,7 @@ End Function
 
 Function test_Common()
 	testLevel = 0
+	test_passing_pointers()
 	test_concat()
 	test_typeOf()
 	test_isString()
@@ -256,6 +260,112 @@ Function test_Common()
 	test_readHex()
 End Function
 
+
+Function test_passPtrByVal_Object(ByVal o As Object)
+	o.bar = o.bar + 1
+	o = Nothing
+	test_passPtrByVal_Object = o
+End Function
+
+Function test_passPtrByVal_Type(ByVal o As TTest_Foo)
+	o.bar = o.bar + 1
+	o = Nothing
+	test_passPtrByVal_Type = o
+End Function
+
+Function test_passPtrByRef_Object(ByRef o As Object)
+	o.bar = o.bar + 1
+	o = Nothing
+	test_passPtrByRef_Object = o
+End Function
+
+Function test_passPtrByRef_Type(o As TTest_Foo)
+	o.bar = o.bar + 1
+	o = Nothing
+	test_passPtrByRef_Type = o
+End Function
+
+Function test_passing_pointers()
+	Dim o As Object
+	o = New TTest_Foo
+	o.bar = 7
+	
+	&apos; make sure fn was actually executed:
+	assertEqual(test_passPtrByVal_Object(o), Nothing).x
+	&apos; fn did not change the pointer o (because it was passed ByVal):
+	assertEqual(isNull(o), False).x
+	&apos; fn did however change the object pointed to:
+	assertEqual(o.bar, 8).x
+	
+	&apos; Same if parameter is declared with the custom type instead of Object
+	&apos; make sure fn was actually executed:
+	assertEqual(test_passPtrByVal_Type(o), Nothing).x
+	&apos; fn did not change the pointer o (because it was passed ByVal):
+	assertEqual(isNull(o), False).x
+	&apos; fn did however change the object pointed to:
+	assertEqual(o.bar, 9).x
+
+	&apos;Things change when we pass it ByRef (which is the default)
+	Dim o2 As Object
+	o2 = o	&apos; keep original in different var
+	&apos; call fn
+	assertEqual(test_passPtrByRef_Object(o), Nothing).x
+	&apos; fn did change the pointer o (because it was passed ByRef):
+	assertEqual(isNull(o), True).x
+	&apos; fn also did change the object pointed to:
+	assertEqual(o2.bar, 10).x
+	
+	&apos; Same if parameter is declared with the custom type instead of Object
+	o = o2 &apos; restore o
+	&apos; make sure fn was actually executed:
+	assertEqual(test_passPtrByRef_Type(o), Nothing).x
+	&apos; fn did change the pointer o (because it was passed ByRef):
+	assertEqual(isNull(o), True).x
+	&apos; fn did however change the object pointed to:
+	assertEqual(o2.bar, 11).x
+
+	
+	&apos; Now try with an argument declared as the custom type (instead of Object):
+	&apos;--------------------------------------------------------------------------
+	Dim p As New TTest_Foo
+	p.bar = 7
+
+	&apos; make sure fn was actually executed:
+	assertEqual(test_passPtrByVal_Object(p), Nothing).x
+	&apos; fn did not change the pointer p (because it was passed ByVal):
+	assertEqual(isNull(p), False).x
+	&apos; fn did however change the object pointed to:
+	assertEqual(p.bar, 8).x
+	
+	&apos; Same if parameter is declared with the custom type instead of Object
+	&apos; make sure fn was actually executed:
+	assertEqual(test_passPtrByVal_Object(p), Nothing).x
+	&apos; fn did not change the pointer p (because it was passed ByVal):
+	assertEqual(isNull(p), False).x
+	&apos; fn did however change the object pointed to:
+	assertEqual(p.bar, 9).x
+
+
+	&apos;Things change when we pass it ByRef (which is the default)
+	Dim p2 As Object
+	p2 = p	&apos; keep original in different var
+	&apos; call fn
+	assertEqual(test_passPtrByRef_Type(p), Nothing).x
+	&apos; fn did change the pointer p (because it was passed ByRef):
+	assertEqual(isNull(p), True).x
+	&apos; fn also did change the object pointed to:
+	assertEqual(p2.bar, 10).x
+	
+	&apos; Same if parameter is declared with the custom type instead of Object
+	p = p2 &apos; restore p
+	&apos; make sure fn was actually executed:
+	assertEqual(test_passPtrByRef_Type(p), Nothing).x
+	&apos; fn did change the pointer p (because it was passed ByRef):
+	assertEqual(isNull(p), True).x
+	&apos; fn did however change the object pointed to:
+	assertEqual(p2.bar, 11).x
+End Function
+	
 Function test_concat()
 	assertEqual(concat(&quot;&quot;, &quot;&quot;), &quot;&quot;).x
 	assertEqual(concat(&quot;a&quot;, &quot;&quot;), &quot;a&quot;).x

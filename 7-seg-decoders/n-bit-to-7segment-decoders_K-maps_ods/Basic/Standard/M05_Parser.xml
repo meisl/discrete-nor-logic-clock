@@ -6,6 +6,7 @@ Option Explicit
 
 Type Parser
 	tyname As String
+	id As Integer
 	tp As String
 	st As Variant
 End Type
@@ -25,6 +26,7 @@ Public applyP_seq As Integer
 Public applyP_skip As Integer
 Public applyP_sat As Integer
 Public applyP_end As Integer
+Public applyP_ind As Integer
 
 Sub Main
 	test_Parser()
@@ -40,7 +42,6 @@ Sub Main
 		&quot;applying parser &apos;&quot; &amp; p.tp &amp; &quot;&apos; to &quot; &amp; toString(s) &amp; &quot;: &quot; &amp; chr(13) _
 		&amp; toString(applyP(p, s)) _
 	)
-
 End Sub
 
 &apos;==================================================================
@@ -55,8 +56,8 @@ Function TParser_toString(Optional p As Object)
 			Case &quot;return&quot;:		result = &quot;(return &quot; &amp; toString(p.st) &amp; &quot;)&quot;
 			Case &quot;item&quot;: 		result = &quot;item&quot;
 			Case &quot;str&quot;:			result = &quot;(str &quot; &amp; toString(p.st(0)) &amp; &quot;)&quot;
-			Case &quot;skip&quot;:		result = &quot;(skip &quot; &amp; toString(p.st) &amp; &quot;)&quot;
-			Case &quot;many1&quot;:		result = toString(p.st) &amp; &quot;+&quot;
+			Case &quot;skip&quot;:		result = &quot;(skip &quot; &amp; TParser_toString(p.st) &amp; &quot;)&quot;
+			Case &quot;many1&quot;:		result = TParser_toString(p.st) &amp; &quot;+&quot;
 			Case &quot;choice&quot;
 				Dim alts As Object
 				alts = p.st
@@ -100,6 +101,7 @@ End Function
 
 Function mkParser(Optional tp As String, Optional st As Variant)
 	Static oFn As Object
+	Static instId As Long
 	Dim result As Object
 	If isMissing(st) Then
 		If isNull(oFn) Then : Set oFn = Fn.mkParser : End If
@@ -111,6 +113,8 @@ Function mkParser(Optional tp As String, Optional st As Variant)
 	Else
 		Set result = New Parser
 		result.tyname = &quot;TParser&quot;
+		result.id = instId
+		instId = instId + 1
 		result.tp = tp
 		result.st = st
 	End If
@@ -382,6 +386,23 @@ Function pSeq(ps As Array, ByVal f As Variant)
 	pSeq = mkParser(&quot;seq&quot;, Array(ps, f))
 End Function
 
+&apos; pInd: for building recursive parsers; returns a dummy Parser instance
+&apos; which serves as an indirection to another Parser. This pointer later 
+&apos; has to set calling fixIndirection with the dummy and the actual instance
+Function pInd()
+	pInd = mkParser(&quot;ind&quot;, Nothing)
+End Function
+
+Function fixIndirection(dummy As Parser, target As Parser)
+	If dummy.tp &lt;&gt; &quot;ind&quot; Then
+		croak(&quot;fixIndirection: invalid dummy - tp = &quot; &amp; dummy.tp
+	End If
+	If Not(isNull(dummy.st)) Then
+		croak(&quot;fixIndirection: cannot set target &quot; &amp; target.id &amp; &quot; - already points to &quot; &amp; dummy.st.id)
+	End If
+	dummy.st = target
+	fixIndirection = dummy
+End Function
 
 
 &apos;==================================================================
@@ -526,65 +547,52 @@ Function pTypeExpr()
 		Dim pParenS As Object
 		Dim pTypeArg As Object
 		Dim pCtor As Object
-		Dim pN
+		Dim pN As Object
 		Dim recDummy As Object
+		
+		pS = pInd
+		pN = pInd
 		
 		&apos; Left ::= ws* N
 		&apos; pLeft = do _ &lt;- many white
 		&apos;            n &lt;- N
 		&apos;         return n
-		&apos;pLeft = pSeq(Array(pMany(pWhite), recDummy), sndArg)
-		pLeft = pSeq(Array(pSkip(pMany(pWhite)), recDummy), id)
+		pLeft = pSeq(Array(pSkip(pMany(pWhite)), pN), id)
 		
 		&apos; Right ::= &quot;-&gt;&quot; S
 		&apos; pRight = do _ &lt;- (str &quot;-&gt;&quot;)
 		&apos;             s &lt;- S
 		&apos;          return s
-		&apos;pRight = pSeq(Array(pStr(&quot;-&gt;&quot;), recDummy), sndArg)
-		pRight = pSeq(Array(pSkip(pStr(&quot;-&gt;&quot;)), recDummy), id)
+		pRight = pSeq(Array(pSkip(pStr(&quot;-&gt;&quot;)), pS), id)
 		
 		&apos; S ::= Left ws* Right?
 		&apos; pS = do lft &lt;- pLeft
 		&apos;           _ &lt;- many white
 		&apos;         rgt &lt;- zeroOrOne pRight
 		&apos;      return (if (empty? rgt) left else (mkArrowType lft rgt))
-		&apos;pS = pSeq(Array(pLeft,_
-		&apos;				pSeq(Array(pMany(pWhite), pZeroOrOne(pRight)),_
-		&apos;				sndArg),_
-		&apos;		  ), Fn.maybeMakeArrowType)
-		&apos;
-		pS = pSeq(Array(pLeft,_
-						pSkip(pMany(pWhite)),_
-						pZeroOrOne(pRight)_
-				  ), Fn.maybeMakeArrowType)
-		pRight.st(0)(1) = pS &apos; fix up recursive call to S in Right
+		pS = fixIndirection(pS, _
+				pSeq(Array(pLeft, _
+						   pSkip(pMany(pWhite)), _
+						   pZeroOrOne(pRight) _
+				  	 ), Fn.maybeMakeArrowType _
+			  )	)
 		
 		&apos; ParenS ::= &quot;(&quot; S &quot;)&quot;
-		&apos;pParenS = pSeq(Array(pSeq(Array(pStr(&quot;(&quot;), pS), sndArg),_
-		&apos;				     pStr(&quot;)&quot;)_
-		&apos;			   ), fstArg)
-		
 		pParenS = pSeq(Array(pSkip(pStr(&quot;(&quot;)), _
 							 pS, _
 						     pSkip(pStr(&quot;)&quot;)) _
 					   ), id)
 		
 		&apos; TypeArg ::= ws+ N
-		&apos;pTypeArg = pSeq(Array(pMany1(pWhite), recDummy), sndArg)
-		pTypeArg = pSeq(Array(pSkip(pMany1(pWhite)), recDummy), id)
+		pTypeArg = pSeq(Array(pSkip(pMany1(pWhite)), pN), id)
 		
 		&apos; Ctor ::= TypeCtor TypeArg*
 		pCtor = pSeq(Array(pTypeCtor, pMany(pTypeArg)), Fn.mkTypeCtor)
 		
 		&apos; N ::= ParenS | BaseType | Ctor | TypeVar
-		pN = foldl1(pChoice, List(pParenS, pBaseType, pCtor, pTypeVar))
-		
-		pLeft.st(0)(1) = pN &apos; fix up recursive call to N in Left
-		pTypeArg.st(0)(1) = pN &apos; fix up recursive call to N in TypeArg
+		pN = fixIndirection( pN, foldl1(pChoice, List(pParenS, pBaseType, pCtor, pTypeVar)) )
 			
 		result = pS
-
-		&apos;msgbox(toString(pLeft))
 	End If
 	pTypeExpr = result
 End Function
@@ -688,20 +696,16 @@ Function applyP(ByVal parser As Variant, s As String, Optional pos As Integer)
 	If IsMissing(pos) Then
 		pos = 1
 	End If
-	If 0 = 0 Then
-		Dim endPos As Integer, parseResult As Variant
-		parseResult = _applyP2(p, s, pos, endPos, False)
-		If endPos &lt; 0 Then &apos; indicates failure
-			applyP = parseFailure
-		Else &apos; package up result and endPos for the outside world			
-			applyP = Array(parseResult, endPos)
-		End If
-	Else
-		applyP = _applyP(p, s, pos, False)
+	Dim endPos As Integer, parseResult As Variant
+	parseResult = _applyP2(p, s, pos, endPos, False)
+	If endPos &lt; 0 Then &apos; indicates failure
+		applyP = parseFailure
+	Else &apos; package up result and endPos for the outside world			
+		applyP = Array(parseResult, endPos)
 	End If
 End Function
 
-Function _applyP2(p As Parser, s As String, pos As Integer, endPos As Integer, ByVal isUnderSkip As Boolean)
+Function _applyP2(p As Parser, s As String, pos As Integer, endPos As Integer, isUnderSkip As Boolean)
 	_applyP_callCount = _applyP_callCount + 1
 	Dim result As Variant
 	Dim i As Integer
@@ -723,7 +727,7 @@ Function _applyP2(p As Parser, s As String, pos As Integer, endPos As Integer, B
 			If Not(isUnderSkip) Then
 				result = match
 			End If
-		Case &quot;choice&quot;
+		Case &quot;choice&quot;	&apos; tail-recursive
 			applyP_choice = applyP_choice + 1
 			innerParsers = p.st
 			Do
@@ -746,7 +750,7 @@ Function _applyP2(p As Parser, s As String, pos As Integer, endPos As Integer, B
 				result = p.st
 			End If
 			endPos = pos
-		Case &quot;bind&quot;
+		Case &quot;bind&quot;	&apos; tail-recursive
 			applyP_bind = applyP_bind + 1
 			If isKreturn(p.st(1)) Then
 				apply_bind_K_return = apply_bind_K_return + 1
@@ -777,7 +781,7 @@ Function _applyP2(p As Parser, s As String, pos As Integer, endPos As Integer, B
 				Next
 				result = applyToList(p.st(1), reverse(lst))
 			End If
-		Case &quot;skip&quot;
+		Case &quot;skip&quot;	&apos; tail-recursive
 			applyP_skip = applyP_skip + 1
 			result = _applyP2(p.st, s, pos, endPos, True)
 			If endPos &gt; 0 Then
@@ -823,6 +827,9 @@ Function _applyP2(p As Parser, s As String, pos As Integer, endPos As Integer, B
 		Case &quot;fail&quot;
 			applyP_fail = applyP_fail + 1
 			Goto _applyP2_parseFailure
+		Case &quot;ind&quot;	&apos; tail-recursive
+			applyP_ind = applyP_ind + 1
+			result = _applyP2(p.st, s, pos, endPos, isUnderSkip)
 		Case &quot;end&quot;
 			applyP_end = applyP_end + 1
 			If pos &lt;= Len(s) Then
@@ -840,150 +847,6 @@ Function _applyP2(p As Parser, s As String, pos As Integer, endPos As Integer, B
 	Exit Function
 _applyP2_parseFailure:
 	endPos = -1
-End Function
-
-Function _applyP(p As Parser, s As String, pos As Integer, isUnderSkip As Boolean)
-	_applyP_callCount = _applyP_callCount + 1
-	Dim result As Variant
-	Dim fResult As Variant
-	Dim nxtPos As Integer
-	Dim i As Integer, j As Integer, k As Integer
-	Dim innerParser As Parser
-	Dim innerParsers As Variant
-	Dim lst As Object
-	nxtPos = pos
-	If p.tp = &quot;skip&quot; Then
-		applyP_skip = applyP_skip + 1
-		result = _applyP(p.st, s, pos, True)
-		If Not(isParseFailure(result)) Then
-			assertEqual(result(0), Empty).x
-		End If
-	ElseIf p.tp = &quot;return&quot; Then
-		applyP_return = applyP_return + 1
-		If isUnderSkip Then
-			result = Array(Empty, nxtPos)
-		Else
-			result = Array(p.st, nxtPos)
-		End If
-	ElseIf p.tp = &quot;fail&quot; Then
-		applyP_fail = applyP_fail + 1
-		result = parseFailure
-	ElseIf p.tp = &quot;item&quot; Then
-		applyP_item = applyP_item + 1
-		If pos &lt;= Len(s) Then
-			nxtPos = pos + 1
-			If isUnderSkip Then
-				result = Array(Empty, nxtPos)
-			Else
-				result = Array(Mid(s, pos, 1), nxtPos)
-			End If
-		Else
-			result = parseFailure
-		End If
-	ElseIf p.tp = &quot;str&quot; Then
-		applyP_str = applyP_str + 1
-		Dim match As String
-		Dim matchLen As Integer
-		match = p.st
-		matchLen = Len(match)
-		If (Mid(s, pos, matchLen) = match) Then
-			nxtPos = pos + matchLen
-			If isUnderSkip Then
-				result = Array(Empty, nxtPos)
-			Else
-				result = Array(match, nxtPos)
-			End If
-		Else
-			result = parseFailure
-		End If
-	ElseIf p.tp = &quot;choice&quot; Then
-		applyP_choice = applyP_choice + 1
-		innerParsers = p.st
-		Do
-			innerParser = car(innerParsers)
-			result = _applyP(innerParser, s, pos, isUnderSkip)
-			innerParsers = cdr(innerParsers)
-		Loop Until (isNil(innerParsers) Or Not(isParseFailure(result)))
-	ElseIf (p.tp = &quot;many1&quot;) Then
-		applyP_many1 = applyP_many1 + 1
-		innerParser = p.st
-		If isUnderSkip Then
-			result = _applyP(innerParser, s, nxtPos, isUnderSkip)
-			If Not(isParseFailure(result)) Then
-				Dim dummyResult As Variant
-				dummyResult = result
-				Do
-					nxtPos = dummyResult(1)
-					dummyResult = _applyP(innerParser, s, nxtPos, isUnderSkip)
-				Loop Until isParseFailure(dummyResult)
-				result(1) = nxtPos
-			End If
-		Else
-			Set lst = nil
-			result = _applyP(innerParser, s, nxtPos, isUnderSkip)
-			While Not(isParseFailure(result))
-				nxtPos = result(1)
-				Set lst = cons(result(0), lst)
-				result = _applyP(innerParser, s, nxtPos, isUnderSkip)
-			Wend
-			If isNil(lst) Then
-				result = parseFailure
-			Else
-				result = Array(reverse(lst), nxtPos)
-			End If
-		End If
-	ElseIf p.tp = &quot;bind&quot; Then
-		applyP_bind = applyP_bind + 1
-		If isKreturn(p.st(1)) Then
-			apply_bind_K_return = apply_bind_K_return + 1
-		End If
-		result = _applyP(p.st(0), s, pos, isUnderSkip)
-		If Not(isParseFailure(result)) Then
-			nxtPos = result(1)
-			fResult = apply1(p.st(1), result(0))
-			&apos; do NOT access .tp on fResult - it&apos;s effectively as fixing fResult&apos;s type to Object...!
-			result = _applyP(fResult, s, nxtPos, isUnderSkip)
-		End If
-	ElseIf p.tp = &quot;seq&quot; Then
-		applyP_seq = applyP_seq + 1
-		innerParsers = p.st(0)
-		nxtPos = pos
-		If isUnderSkip Then
-			For i = LBound(innerParsers) To UBound(innerParsers)
-				result = _applyP(innerParsers(i), s, nxtPos, isUnderSkip)
-				If isParseFailure(result) Then
-					Exit For
-				End If
-				nxtPos = result(1)
-			Next		
-		Else
-			Dim iResults As Object
-			iResults = nil
-			For i = LBound(innerParsers) To UBound(innerParsers)
-				result = _applyP(innerParsers(i), s, nxtPos, isUnderSkip)
-				If isParseFailure(result) Then
-					Exit For
-				End If
-				nxtPos = result(1)
-				If Not(isPSkip(innerParsers(i))) Then
-					iResults = cons(result(0), iResults)
-				End If
-			Next
-			If Not(isParseFailure(result)) Then
-				fResult = applyToList(p.st(1), reverse(iResults))
-				&apos; ATTENTION: do not reuse result, type of result value may not match
-				&apos;            and an implicit conversion might happen!
-				result = Array(fResult, nxtPos)
-			End If
-		End If
-	Else
-		result = &quot;unknown Parser &apos;&quot; &amp; p.tp &amp; &quot;&apos;&quot;
-		MsgBox(&quot;Error in applyP: &quot; &amp; result)
-	End If
-	&apos;If isUnderSkip And Not(isParseFailure(result)) Then
-	&apos;	assertEqual(result(0), Empty).x
-	&apos;End If
-	_applyP = result
 End Function
 
 
@@ -1035,7 +898,8 @@ Function test_Parser(Optional what)
 		test_Parser_alphaLower()
 		test_Parser_alphaUpper()
 	End If
-	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;toString&quot;) Then
+	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;special&quot;) Then
+		test_Parser_indirect()
 		test_Parser_toString()
 	End If
 	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;numbers&quot;) Then
@@ -1063,8 +927,11 @@ end_of_Parser_tests:
 		&amp; chr(13) &amp; &quot;that&apos;s ~&quot; &amp; aPerSec &amp; &quot; assertions/sec&quot;
 		MsgBox(summary)
 		result = summary
+		Dim parserInstCount As Integer
+		parserInstCount = pReturn(&quot;just something&quot;).id
 
-		msgbox(&quot;applyP_callCount: &quot; &amp; applyP_callCount _
+		msgbox(parserInstCount &amp; &quot; Parser instances&quot; _
+				&amp; chr(13) &amp; &quot;applyP_callCount: &quot; &amp; applyP_callCount _
 				&amp; chr(13) &amp; &quot;_applyP_callCount: &quot; &amp; _applyP_callCount _
 				&amp; chr(13) &amp; &quot;apply_str: &quot; &amp; applyP_str _
 				&amp; chr(13) &amp; &quot;apply_choice: &quot; &amp; applyP_choice _
@@ -1078,6 +945,7 @@ end_of_Parser_tests:
 				&amp; chr(13) &amp; &quot;apply_sat: &quot; &amp; applyP_sat _
 				&amp; chr(13) &amp; &quot;apply_many1: &quot; &amp; applyP_many1 _
 				&amp; chr(13) &amp; &quot;apply_fail: &quot; &amp; applyP_fail _
+				&amp; chr(13) &amp; &quot;apply_ind: &quot; &amp; applyP_ind _
 				&amp; chr(13) &amp; length(bindFns) &amp; &quot; bindFns: &quot; &amp; toString(bindFns))
 	Else
 		result = Join(Array(&quot;test_Parser(&quot; &amp; what &amp; &quot;):&quot;, tm, aCount), &quot; &quot;)
@@ -1510,6 +1378,115 @@ Function test_Parser_skip()
 	assert_parses(p, &quot; foo  bar&quot;, 	expected, 10).x
 	assert_parses(p, &quot;foo  bar &quot;, 	expected, 10).x
 	assert_parses(p, &quot; foo bar &quot;, 	expected, 10).x
+End Function
+
+Function test_Parser_indirect()
+	Dim p As Parser, q As Parser, r As Parser
+	r = pInd
+	&apos;Note: most of the parsers we create here don&apos;t actually make sense
+	&apos;      the important thing for testing is their structure
+	
+	p = pInd : q = pInd
+	assertEqual(p.id = q.id, False).x
+	
+	p = pInd : q = pReturn(&quot;foo&quot;)
+	p = fixIndirection(p, q)
+	assertEqual(p.tp, r.tp).x		&apos; p points to q
+	assertEqual(p.st.id, q.id).x
+	
+	p = pInd : q = pFail
+	p = fixIndirection(p, q)
+	assertEqual(p.tp, r.tp).x		&apos; p points to q
+	assertEqual(p.st.id, q.id).x
+	
+	p = pInd : q = pItem
+	p = fixIndirection(p, q)
+	assertEqual(p.tp, r.tp).x		&apos; p points to q
+	assertEqual(p.st.id, q.id).x
+	
+	p = pInd : q = pStr(&quot;bar&quot;)
+	p = fixIndirection(p, q)
+	assertEqual(p.tp, r.tp).x		&apos; p points to q
+	assertEqual(p.st.id, q.id).x
+	
+	p = pInd : q = pSat(compose(inRange(5, 7), Fn.asc))
+	p = fixIndirection(p, q)
+	assertEqual(p.tp, r.tp).x		&apos; p points to q
+	assertEqual(p.st.id, q.id).x
+	
+	p = pInd : q = pSkip(pItem)
+	p = fixIndirection(p, q)
+	assertEqual(p.tp, r.tp).x		&apos; p points to q
+	assertEqual(p.st.id, q.id).x
+	
+	p = pInd : q = pSkip(pStr(&quot;foo&quot;))
+	p = fixIndirection(p, q)
+	assertEqual(p.tp, r.tp).x		&apos; p points to q
+	assertEqual(p.st.id, q.id).x
+	
+	p = pInd : q = pSkip(p)
+	p = fixIndirection(p, q)
+	assertEqual(p.tp, r.tp).x		&apos; p points to q
+	assertEqual(p.st.id, q.id).x
+	
+	p = pInd : q = pChoice(pStr(&quot;foo&quot;), p)
+	p = fixIndirection(p, q)
+	assertEqual(p.tp, r.tp).x		&apos; p points to q
+	assertEqual(p.st.id, q.id).x
+	Dim altsP As Object, altsQ As Object
+	altsP = p.st.st : altsQ = q.st
+	assertEqual(length(altsP), length(altsQ)).x
+	Dim alt1P As Object, alt1Q As Object
+	alt1P = car(altsP) : alt1Q = car(altsQ)
+	assertEqual(alt1P.tp, alt1Q.tp).x
+	assertEqual(alt1P.id, alt1Q.id).x
+	assertEqual(alt1P.st, alt1Q.st).x
+
+	Dim alt2P As Object, alt2Q As Object
+	alt2P = cadr(altsP) : alt2Q = cadr(altsQ)
+	assertEqual(alt2P.tp, alt2Q.tp).x
+	assertEqual(alt2P.id, alt2Q.id).x
+	assertEqual(alt2P.tp, p.tp).x &apos; there is the recursion!
+	assertEqual(alt2P.id, p.id).x &apos; there is the recursion!
+
+
+	p = pInd : q = pZeroOrOne(p)
+	p = fixIndirection(p, q)
+	assertEqual(p.tp, r.tp).x		&apos; p points to q
+	assertEqual(p.st.id, q.id).x
+
+	p = pInd : q = pMany1(p)
+	p = fixIndirection(p, q)
+	assertEqual(p.tp, r.tp).x		&apos; p points to q
+	assertEqual(p.st.id, q.id).x
+
+	p = pInd : q = pMany(p)
+	p = fixIndirection(p, q)
+	assertEqual(p.tp, r.tp).x		&apos; p points to q
+	assertEqual(p.st.id, q.id).x
+
+	p = pInd : q = pChoice( pStr(&quot;x&quot;), pSeq(Array(pSkip(pStr(&quot;(&quot;)), p, pSkip(pStr(&quot;)&quot;))), id) )
+	p = fixIndirection(p, q)
+	assertEqual(p.tp, r.tp).x		&apos; p points to q
+	assertEqual(p.st.id, q.id).x
+	
+	refute_parses(p, &quot;&quot;).x
+	refute_parses(p, &quot;()&quot;).x
+	refute_parses(p, &quot;(x&quot;).x
+	assert_parses(p, &quot;x))&quot;, 		&quot;x&quot;,  2).x
+	refute_parses(p, &quot;(())&quot;).x
+	refute_parses(p, &quot;((x)&quot;).x
+	assert_parses(p, &quot;(x))&quot;,		&quot;x&quot;,  4).x
+	assert_parses(p, &quot;x&quot;, 			&quot;x&quot;,  2).x
+	assert_parses(p, &quot;(x)&quot;, 		&quot;x&quot;,  4).x
+	assert_parses(p, &quot;((x))&quot;, 		&quot;x&quot;,  6).x
+	assert_parses(p, &quot;(((x)))&quot;, 	&quot;x&quot;,  8).x
+	assert_parses(p, &quot;((((x))))&quot;, 	&quot;x&quot;, 10).x
+	assert_parses(p, &quot;(((((x)))))&quot;,	&quot;x&quot;, 12).x
+	
+			
+	&apos;TODO: test_Parser_ind: fixIndirection .. bind
+	
 End Function
 
 Function test_Parser_zeroOrOne()
