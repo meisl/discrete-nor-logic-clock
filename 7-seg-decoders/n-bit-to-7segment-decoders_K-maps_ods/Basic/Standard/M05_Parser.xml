@@ -21,6 +21,8 @@ Public applyP_item As Integer
 Public applyP_bind As Integer
 Public applyP_bind_K_x As Integer
 Public applyP_bind_K_return As Integer
+Public applyP_bind_B_f_g As Integer
+Public applyP_bind_B_return_g As Integer
 Public applyP_choice As Integer
 Public applyP_many1 As Integer
 Public applyP_str As Integer
@@ -247,7 +249,7 @@ End Function
 
 &apos; always succeeds by returning the provided value; without increasing pos
 Function pReturn(Optional v As Variant)
-	Static oFn As Object : If isNull(oFn) Then : oFn = mkParser(&quot;return&quot;) : End If
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.pReturn : End If
 	Static returnEmpty As Object : If isNull(returnEmpty) Then : returnEmpty = mkParser(&quot;return&quot;, Empty) : End If
 	If isMissing(v) Then
 		pReturn = oFn
@@ -286,19 +288,36 @@ Function isKreturn(f As Object) As Boolean
 	Dim result As Boolean
 	result = False
 	If isKsomething(f) Then
-		Dim v As Parser
+		Dim v As Object
 		v = car(partialArgs(f))
-		If v.tp = &quot;return&quot; Then &apos; 40 of the above 43 are of shape (K return x)
+		If v.tp = &quot;return&quot; Then
 			result = True
 		End If
 	End If
 	isKreturn = result
 End Function
 
+Function isBsomething(f As Object) As Boolean
+	isBsomething = (getFnName(f) = getFnName(Fn.compose)) And (arity(f) = 1)
+End Function
+
+Function isBreturn(f As Object) As Boolean
+	Dim result As Boolean
+	result = False
+	If isBsomething(f) Then
+		Dim v As Object
+		v = cadr(partialArgs(f)) &apos; they&apos;re in reverse!
+		If getFnName(v) = getFnName(Fn.pReturn) Then
+			result = True
+		End If
+	End If
+	isBreturn = result
+End Function
+
 Function bindFns(Optional f As Object)
 	Static fns As Object : If isNull(fns) Then : fns = nil : End If
 	If isMissing(f) Then
-		Dim x As Object, xs As Object, out As Object
+		Dim x As Object, xs As Object, out As Object, xStr As String
 		xs = fns
 		out = nil
 		While Not(isNil(xs))
@@ -307,16 +326,22 @@ Function bindFns(Optional f As Object)
 				x = car(partialArgs(x))
 				If x.tp = &quot;ind&quot; Then
 					If isNull(x.st) Then
-						out = cons(&quot;K P???&quot; &amp; x.id &amp; chr(10), out)
+						xStr = &quot;K P???&quot; &amp; x.id
 					Else
-						out = cons(&quot;K P&quot; &amp; x.st.id &amp; chr(10), out)
+						xStr = &quot;K P&quot; &amp; x.st.id
 					End If
 				Else
-					out = cons(&quot;K &quot; &amp; TParser_toString(x) &amp; chr(10), out)
+					xStr = &quot;K &quot; &amp; TParser_toString(x)
 				End If
+			ElseIf isBsomething(x) Then
+				Dim g As Object, h As Object
+				g = cadr(partialArgs(x)) &apos; they&apos;re in reverse order!
+				h = car(partialArgs(x))
+				xStr = &quot;B (&quot; &amp; getFnName(g) &amp; &quot;...) (&quot; &amp; getFnName(h) &amp; &quot;...)&quot;
 			Else
-				out = cons(TFn_toString(x) &amp; chr(10), out)	
+				xStr = TFn_toString(x)
 			End If
+			out = cons(chr(10) &amp; &quot;  &quot; &amp; xStr, out)
 			xs = cdr(xs)
 		Wend
 		bindFns = out
@@ -910,6 +935,11 @@ _applyP_begin:
 				If isKreturn(p.st(1)) Then
 					applyP_bind_K_return = applyP_bind_K_return + 1
 				End If
+			ElseIf isBsomething(p.st(1)) Then
+				applyP_bind_B_f_g = applyP_bind_B_f_g + 1
+				If isBreturn(p.st(1)) Then
+					applyP_bind_B_return_g = applyP_bind_B_return_g + 1
+				End If
 			End If
 			&apos;ATTENTION: when applying the parser (bind&apos;s 1st arg)
 			&apos;           we MUST NOT propagate down isUnderSkip
@@ -1107,6 +1137,8 @@ end_of_Parser_tests:
 				&amp; chr(13) &amp; &quot;applyP_bind: &quot; &amp; applyP_bind _
 				&amp; chr(13) &amp; &quot;  (applyP_bind_K_x: &quot; &amp; applyP_bind_K_x &amp; &quot;)&quot; _
 				&amp; chr(13) &amp; &quot;  (applyP_bind_K_return: &quot; &amp; applyP_bind_K_return &amp; &quot;)&quot; _
+				&amp; chr(13) &amp; &quot;  (applyP_bind_B_f_g: &quot; &amp; applyP_bind_B_f_g &amp; &quot;)&quot; _
+				&amp; chr(13) &amp; &quot;  (applyP_bind_B_return_g: &quot; &amp; applyP_bind_B_return_g &amp; &quot;)&quot; _
 				&amp; chr(13) &amp; &quot;applyP_return: &quot; &amp; applyP_return _
 				&amp; chr(13) &amp; &quot;applyP_seq: &quot; &amp; applyP_seq _
 				&amp; chr(13) &amp; &quot;applyP_skip: &quot; &amp; applyP_skip _
