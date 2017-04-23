@@ -49,144 +49,157 @@ End Sub
 &apos;==================================================================
 
 Function TParser_toString(Optional ByVal p As Variant)
+	Dim result As Variant
 	If isMissing(p) Then
-		TParser_toString = Fn.TParser_toString
+		result = Fn.TParser_toString
 	Else
 		If isString(p) Then
 			p = lookupParser(p)
 		End If
-		Dim k As Integer
-		k = 0
-		TParser_toString = _TParser_toString(p, k, &quot;&quot;, False)
+		Dim rules As Object
+		rules = nil
+		result = _TParser_toString(p, 0, &quot;&quot;, False, rules)
+		If Not(isNil(rules)) Then
+			Dim newLine As String
+			newLine = chr(13) &amp; chr(10)
+			result = result &amp; &quot; where&quot; &amp; newLine _
+				   &amp; Join(toArray(rules), newLine)
+		End If
 	End If
+	TParser_toString = result
 End Function
 
-Function _TParser_toString(p As Object, ByRef k As Integer, ByVal indent As String, ByVal isNewLines As Boolean)
+Function _TParser_toString( _
+	ByVal p As Object, _
+	ByRef k As Integer, _
+	ByVal indent As String, _
+	ByVal isNewLines As Boolean, _
+	ByRef rules As Object _
+)
 	Dim result As String, f As Object
 	If p.str &lt;&gt; &quot;&quot; Then
 		result = p.str
-	Else
-		Select Case p.tp
-			Case &quot;ind&quot;
-				result = &quot;(ind &quot;
-				If isNull(p.st) Then
-					result = result &amp; &quot;Nothing&quot;
+	Else : Select Case p.tp
+		Case &quot;ind&quot;
+			If isNull(p.st) Then &apos; yet uninitialized indirection
+				result = &quot;(ind &quot; &amp; p.id &amp; &quot; Nothing)&quot;
+			ElseIf isString(p.st1) Then &apos; seen it before
+				result = p.st1 &apos; contains a name like P123
+			Else &apos; initialized but not seen before
+				p.st1 = &quot;P&quot; &amp; p.st.id
+				result = p.st1 &amp; &quot; ::= &quot;
+				&apos; In the new rule, start over fresh indent and var counter
+				indent = Space(Len(result))
+				Dim j As Integer
+				j = 0
+				result = result &amp; _TParser_toString(p.st, j, indent, True, rules)
+				rules = cons(result, rules)
+				result = p.st1
+				p.st1 = Nothing
+			End If
+		Case &quot;sat&quot;
+			result = &quot;(sat &quot;
+			If isPartialApp(p.st) Then
+				result = result &amp; &quot;(&quot; &amp; TFn_toString(p.st) &amp; &quot;)&quot;
+			Else
+				result = result &amp; getFnName(p.st)
+			End If
+			result = result &amp; &quot;)&quot;
+		Case &quot;fail&quot;:		result = &quot;fail&quot;
+		Case &quot;return&quot;:		result = &quot;(return &quot; &amp; toString(p.st) &amp; &quot;)&quot;
+		Case &quot;item&quot;: 		result = &quot;item&quot;
+		Case &quot;strXXX&quot;:			result = &quot;(str &quot; &amp; toString(p.st(0)) &amp; &quot;)&quot;
+		Case &quot;str&quot;:			result = toString(p.st(0))
+		Case &quot;skip&quot;
+			result = &quot;(skip &quot; &amp; _TParser_toString(p.st, k, indent, False, rules) &amp; &quot;)&quot;
+		Case &quot;many1&quot;
+			If p.st.tp = &quot;choice&quot; Then
+				result = &quot;(&quot; &amp; _TParser_toString(p.st, k, indent &amp; &quot; &quot;, False, rules) &amp; &quot;)&quot;
+			Else
+				result = _TParser_toString(p.st, k, indent, False, rules)
+			End If
+			result = result &amp; &quot;+&quot;
+		Case &quot;choice&quot;
+			Dim alts As Object
+			alts = p.st
+			If isPZeroOrOne(p) Then
+				&apos; it has shape p +++ return Empty
+				&apos; so it&apos;s effectively &quot;zero-or-one&quot; p, which can be written as &quot;p?&quot;
+				
+				If alts(0).tp = &quot;choice&quot; Then
+					result = &quot;(&quot; &amp; _TParser_toString(alts(0), k, indent &amp; &quot; &quot;, False, rules) &amp; &quot;)&quot;
 				Else
-					If isString(p.st1) Then
-						result = result &amp; p.st1
-					Else
-						p.st1 = &quot;P&quot; &amp; p.st.id
-						result = result &amp; p.st1 &amp; &quot; ::= &quot;
-						indent = indent &amp; Space(Len(result))
-						result = result &amp; _TParser_toString(p.st, k, indent, True)
-						p.st1 = Nothing
-					End If
+					result = _TParser_toString(alts(0), k, indent, False, rules)
 				End If
-				result = result &amp; &quot;)&quot;
-			Case &quot;sat&quot;
-				result = &quot;(sat &quot;
-				If isPartialApp(p.st) Then
-					result = result &amp; &quot;(&quot; &amp; TFn_toString(p.st) &amp; &quot;)&quot;
+				result = result &amp; &quot;?&quot;
+			ElseIf isPMany(p) Then
+				&apos; it has shape many1 p +++ return nil
+				If alts(0).st.tp = &quot;choice&quot; Then
+					result = &quot;(&quot; &amp; _TParser_toString(alts(0).st, k, indent &amp; &quot; &quot;, False, rules) &amp; &quot;)&quot;
 				Else
-					result = result &amp; getFnName(p.st)
+					result = _TParser_toString(alts(0).st, k, indent, False, rules)
 				End If
-				result = result &amp; &quot;)&quot;
-			Case &quot;fail&quot;:		result = &quot;fail&quot;
-			Case &quot;return&quot;:		result = &quot;(return &quot; &amp; toString(p.st) &amp; &quot;)&quot;
-			Case &quot;item&quot;: 		result = &quot;item&quot;
-			Case &quot;strXXX&quot;:			result = &quot;(str &quot; &amp; toString(p.st(0)) &amp; &quot;)&quot;
-			Case &quot;str&quot;:			result = toString(p.st(0))
-			Case &quot;skip&quot;
-				result = &quot;(skip &quot; &amp; _TParser_toString(p.st, k, indent, False) &amp; &quot;)&quot;
-			Case &quot;many1&quot;
-				If p.st.tp = &quot;choice&quot; Then
-					result = &quot;(&quot; &amp; _TParser_toString(p.st, k, indent &amp; &quot; &quot;, False) &amp; &quot;)&quot;
+				result = result &amp; &quot;*&quot;
+			Else
+				If isNewLines Then
+					result = _TParser_toString(alts(0), k, indent, isNewLines, rules) _
+						   &amp; chr(13) &amp; chr(10) _
+						   &amp; space(len(indent) - 2) _
+						   &amp; &quot;| &quot; _
+						   &amp; _TParser_toString(alts(1), k, indent, isNewLines, rules)
 				Else
-					result = _TParser_toString(p.st, k, indent, False)
+					result = _TParser_toString(alts(0), k, indent, isNewLines, rules) _
+						   &amp; &quot; | &quot; _
+						   &amp; _TParser_toString(alts(1), k, indent, isNewLines, rules)
 				End If
-				result = result &amp; &quot;+&quot;
-			Case &quot;choice&quot;
-				Dim alts As Object
-				alts = p.st
-				If isPZeroOrOne(p) Then
-					&apos; it has shape p +++ return Empty
-					&apos; so it&apos;s effectively &quot;zero-or-one&quot; p, which can be written as &quot;p?&quot;
-					
-					If alts(0).tp = &quot;choice&quot; Then
-						result = &quot;(&quot; &amp; _TParser_toString(alts(0), k, indent &amp; &quot; &quot;, False) &amp; &quot;)&quot;
-					Else
-						result = _TParser_toString(alts(0), k, indent, False)
-					End If
-					result = result &amp; &quot;?&quot;
-				ElseIf isPMany(p) Then
-					&apos; it has shape many1 p +++ return nil
-					If alts(0).st.tp = &quot;choice&quot; Then
-						result = &quot;(&quot; &amp; _TParser_toString(alts(0).st, k, indent &amp; &quot; &quot;, False) &amp; &quot;)&quot;
-					Else
-						result = _TParser_toString(alts(0).st, k, indent, False)
-					End If
-					result = result &amp; &quot;*&quot;
+			End If
+		Case &quot;bind&quot;
+			Dim q As Object
+			q = p.st(0)
+			f = p.st(1)
+			result = _TParser_toString(q, k, indent, False, rules) _
+					&amp; &quot; &gt;&gt;= &quot; &amp; TFn_toString(f)
+		Case &quot;seq&quot;
+			Dim ps As Variant, i As Integer
+			Dim fName As String, args As String
+			ps = p.st(0)
+			f  = p.st(1)
+			fName = getFnName(f)
+			result = &quot;(do &quot;
+			Dim addIndent As String, newLine As String, innerIndent As String
+			addIndent = Space(Len(result))
+			newLine = chr(13) &amp; chr(10) &amp; indent
+			innerIndent = indent &amp; addIndent &amp; Space(Len(&quot;aX &lt;- &quot;))
+			For i = LBound(ps) To UBound(ps)
+				If isPSkip(ps(i)) Then
+					result = result &amp; &quot; _ &lt;- &quot; _
+									&amp; _TParser_toString(ps(i).st, k, innerIndent, False, rules)
 				Else
-					If isNewLines Then
-						result = _TParser_toString(alts(0), k, indent, isNewLines) _
-							   &amp; chr(13) &amp; chr(10) _
-							   &amp; space(len(indent) - 2) _
-							   &amp; &quot;| &quot; _
-							   &amp; _TParser_toString(alts(1), k, indent, isNewLines)
-					Else
-						result = _TParser_toString(alts(0), k, indent, isNewLines) _
-							   &amp; &quot; | &quot; _
-							   &amp; _TParser_toString(alts(1), k, indent, isNewLines)
-					End If
+					result = result &amp; &quot;a&quot; &amp; k
+					args = args &amp; &quot; a&quot; &amp; k
+					k = k + 1
+					result = result &amp; &quot; &lt;- &quot; _
+									&amp; _TParser_toString(ps(i), k, innerIndent, False, rules)
 				End If
-			Case &quot;bind&quot;
-				Dim q As Object
-				q = p.st(0)
-				f = p.st(1)
-				result = _TParser_toString(q, k, indent, False) _
-						&amp; &quot; &gt;&gt;= &quot; &amp; TFn_toString(f)
-			Case &quot;seq&quot;
-				Dim ps As Variant, i As Integer
-				Dim fName As String, args As String
-				ps = p.st(0)
-				f  = p.st(1)
-				fName = getFnName(f)
-				result = &quot;(do &quot;
-				Dim addIndent As String, newLine As String, innerIndent As String
-				addIndent = Space(Len(result))
-				newLine = chr(13) &amp; chr(10) &amp; indent
-				innerIndent = indent &amp; addIndent &amp; Space(Len(&quot;aX &lt;- &quot;))
-				For i = LBound(ps) To UBound(ps)
-					If isPSkip(ps(i)) Then
-						result = result &amp; &quot; _ &lt;- &quot; _
-										&amp; _TParser_toString(ps(i).st, k, innerIndent, False)
-					Else
-						result = result &amp; &quot;a&quot; &amp; k
-						args = args &amp; &quot; a&quot; &amp; k
-						k = k + 1
-						result = result &amp; &quot; &lt;- &quot; _
-										&amp; _TParser_toString(ps(i), k, innerIndent, False)
-					End If
-					result = result &amp; newLine
-					If i &lt; UBound(ps) Then
-						result = result &amp; addIndent
-					End If
-				Next i
-				result = result &amp; &quot; return&quot;
-				If isPartialApp(f) Then
-					result = result &amp; &quot; (&quot; &amp; TFn_toString(f) &amp; args &amp; &quot;)&quot;
+				result = result &amp; newLine
+				If i &lt; UBound(ps) Then
+					result = result &amp; addIndent
+				End If
+			Next i
+			result = result &amp; &quot; return&quot;
+			If isPartialApp(f) Then
+				result = result &amp; &quot; (&quot; &amp; TFn_toString(f) &amp; args &amp; &quot;)&quot;
+			Else
+				If fName = &quot;id&quot; Then
+					result = result &amp; args
 				Else
-					If fName = &quot;id&quot; Then
-						result = result &amp; args
-					Else
-						result = result &amp; &quot; (&quot; &amp; fName &amp; args &amp; &quot;)&quot;
-					End If
+					result = result &amp; &quot; (&quot; &amp; fName &amp; args &amp; &quot;)&quot;
 				End If
-				result = result &amp; newLine &amp; &quot;)&quot;
-			Case Else
-				croak(&quot;TParser_toString/NYI: .tp = &quot; &amp; toString(p.tp))
-		End Select
-	End If
+			End If
+			result = result &amp; newLine &amp; &quot;)&quot;
+		Case Else
+			croak(&quot;TParser_toString/NYI: .tp = &quot; &amp; toString(p.tp))
+	End Select : End If
 	_TParser_toString = result
 End Function
 
@@ -654,13 +667,15 @@ Function pTypeExpr()
 		&apos;          return s
 		pRight = pSeq(Array(pSkip(pStr(&quot;-&gt;&quot;)), pS), id)
 		
-		&apos; S ::= Left ws* Right?
-		&apos; pS = do lft &lt;- pLeft
+		&apos; S ::= ws* N ws* ((str &quot;-&gt;&quot;) S)?
+		&apos; pS = do   _ &lt;- many white
+		&apos;		   in &lt;- S
 		&apos;           _ &lt;- many white
-		&apos;         rgt &lt;- zeroOrOne pRight
-		&apos;      return (if (empty? rgt) left else (mkArrowType lft rgt))
+		&apos;         out &lt;- zeroOrOne pRight
+		&apos;      return (if (empty? out) in else (mkArrowType in out))
 		pS = fixIndirection(pS, _
-				pSeq(Array(pLeft, _
+				pSeq(Array(pSkip(pMany(pWhite)), _
+						   pN, _
 						   pSkip(pMany(pWhite)), _
 						   pZeroOrOne(pRight) _
 				  	 ), Fn.maybeMakeArrowType _
@@ -679,7 +694,9 @@ Function pTypeExpr()
 		pCtor = pSeq(Array(pTypeCtor, pMany(pTypeArg)), Fn.mkTypeCtor)
 		
 		&apos; N ::= ParenS | BaseType | Ctor | TypeVar
-		pN = fixIndirection( pN, foldl1(pChoice, List(pParenS, pBaseType, pCtor, pTypeVar)) )
+		pN = fixIndirection( pN, _
+			foldl1(pChoice, List(pBaseType, pTypeVar, pParenS, pCtor)) _
+		)
 			
 		result = pS
 		&apos;MsgBox(toString(result))
@@ -700,8 +717,8 @@ Function pBaseType()
 End Function
 
 Function pTypeVar()
-&apos;	pTypeVar = pBind(pAlphaLower, compose(pReturn, concat(&quot;&apos;&quot;)))
-	pTypeVar = pSeq(Array(pAlphaLower), concat(&quot;&apos;&quot;))
+	pTypeVar = pBind(pAlphaLower, compose(pReturn, concat(&quot;&apos;&quot;)))
+&apos;	pTypeVar = pSeq(Array(pAlphaLower), concat(&quot;&apos;&quot;))
 End Function
 
 Function pTypeCtor()
@@ -709,6 +726,8 @@ Function pTypeCtor()
 	If isNull(result) Then
 &apos;		result = foldl1( pChoice, _
 &apos;						 map(pStr, List(&quot;List&quot;, &quot;Maybe&quot;, &quot;Parser&quot;)) )
+
+		&apos; \a bs.foldl1 concat (cons a bs)
 		result = pSeq(_
 					Array(pSeq(_
 							Array(pAlphaUpper, pMany1(pAlphaLower)), _
@@ -760,6 +779,8 @@ Function lookupParser(pName As String) As Parser
 		Case &quot;pWhite&quot;:		result = pWhite
 		Case &quot;pBinDigit&quot;:	result = pBinDigit
 		Case &quot;pDecDigit&quot;:	result = pDecDigit
+		Case &quot;pHexDigit&quot;:	result = pHexDigit
+		Case &quot;pHexNum&quot;:		result = pHexNum
 		Case &quot;pTypeExpr&quot;:	result = pTypeExpr
 		Case Else
 			croak(&quot;unknown parser &quot; &amp; pName)
