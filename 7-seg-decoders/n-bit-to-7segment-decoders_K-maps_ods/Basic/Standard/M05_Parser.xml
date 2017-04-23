@@ -890,10 +890,10 @@ Function _applyP( _
 	Dim innerParsers As Variant
 	Dim lst As Object
 	
-_applyP_begin:	
+_applyP_begin:
+	&apos;_applyP_stats(p, s, pos, endPos, isUnderSkip)
 	Select Case p.tp
 		Case &quot;str&quot;
-			applyP_str = applyP_str + 1
 			Dim match As String
 			Dim matchLen As Integer
 			match = p.st(0)
@@ -906,7 +906,6 @@ _applyP_begin:
 				result = match
 			End If
 		Case &quot;choice&quot;	&apos; tail-recursive
-			applyP_choice = applyP_choice + 1
 			result = _applyP(p.st(0), s, pos, endPos, isUnderSkip)
 			If endPos &lt; 0 Then
 				&apos;result = _applyP(p.st(1), s, pos, endPos, isUnderSkip)
@@ -914,7 +913,6 @@ _applyP_begin:
 				Goto _applyP_begin
 			End If
 		Case &quot;item&quot;
-			applyP_item = applyP_item + 1
 			If pos &gt; Len(s) Then
 				Goto _applyP_parseFailure
 			End If
@@ -923,24 +921,11 @@ _applyP_begin:
 				result = Mid(s, pos, 1)
 			End If
 		Case &quot;return&quot;
-			applyP_return = applyP_return + 1
 			If Not(isUnderSkip) Then
 				result = p.st
 			End If
 			endPos = pos
 		Case &quot;bind&quot;	&apos; tail-recursive
-			applyP_bind = applyP_bind + 1
-			If isKsomething(p.st(1)) Then
-				applyP_bind_K_x = applyP_bind_K_x + 1
-				If isKreturn(p.st(1)) Then
-					applyP_bind_K_return = applyP_bind_K_return + 1
-				End If
-			ElseIf isBsomething(p.st(1)) Then
-				applyP_bind_B_f_g = applyP_bind_B_f_g + 1
-				If isBreturn(p.st(1)) Then
-					applyP_bind_B_return_g = applyP_bind_B_return_g + 1
-				End If
-			End If
 			&apos;ATTENTION: when applying the parser (bind&apos;s 1st arg)
 			&apos;           we MUST NOT propagate down isUnderSkip
 			&apos;           because the fn (bind&apos;s 2nd arg) might need it
@@ -954,7 +939,6 @@ _applyP_begin:
 			If isUnderSkip Then : result = Empty : End If
 			Goto _applyP_begin
 		Case &quot;seq&quot;
-			applyP_seq = applyP_seq + 1
 			innerParsers = p.st(0)
 			If isUnderSkip Then
 				For i = LBound(innerParsers) To UBound(innerParsers)
@@ -977,7 +961,6 @@ _applyP_begin:
 				result = applyToList(p.st(1), reverse(lst))
 			End If
 		Case &quot;skip&quot;	&apos; tail-recursive
-			applyP_skip = applyP_skip + 1
 			p = p.st
 			isUnderSkip = True
 			Goto _applyP_begin
@@ -986,7 +969,6 @@ _applyP_begin:
 			&apos;	assertEqual(result, Empty).x
 			&apos;End If
 		Case &quot;sat&quot;
-			applyP_sat = applyP_sat + 1
 			If pos &gt; Len(s) Then
 				Goto _applyP_parseFailure
 			End If
@@ -999,7 +981,6 @@ _applyP_begin:
 				result = Empty
 			End If
 		Case &quot;many1&quot;
-			applyP_many1 = applyP_many1 + 1
 			innerParser = p.st
 			If isUnderSkip Then
 				_applyP(innerParser, s, pos, endPos, True)
@@ -1022,15 +1003,12 @@ _applyP_begin:
 				result = reverse(lst)
 			End If
 		Case &quot;fail&quot;
-			applyP_fail = applyP_fail + 1
 			Goto _applyP_parseFailure
 		Case &quot;ind&quot;	&apos; tail-recursive
-			applyP_ind = applyP_ind + 1
 			p = p.st
 			Goto _applyP_begin
 &apos;			result = _applyP(p.st, s, pos, endPos, isUnderSkip)
 		Case &quot;end&quot;
-			applyP_end = applyP_end + 1
 			If pos &lt;= Len(s) Then
 				Goto _applyP_parseFailure
 			End If
@@ -1048,6 +1026,51 @@ _applyP_parseFailure:
 	endPos = -1
 End Function
 
+Function _applyP_stats( _
+	ByVal p As Parser, _
+	ByRef s As String, _
+	ByVal pos As Integer, _
+	ByRef endPos As Integer, _
+	ByVal isUnderSkip As Boolean _
+)	
+	Select Case p.tp
+		Case &quot;str&quot;
+			applyP_str = applyP_str + 1
+		Case &quot;choice&quot;	&apos; tail-recursive
+			applyP_choice = applyP_choice + 1
+		Case &quot;item&quot;
+			applyP_item = applyP_item + 1
+		Case &quot;return&quot;
+			applyP_return = applyP_return + 1
+		Case &quot;bind&quot;	&apos; tail-recursive
+			applyP_bind = applyP_bind + 1
+			If isKsomething(p.st(1)) Then
+				applyP_bind_K_x = applyP_bind_K_x + 1
+				If isKreturn(p.st(1)) Then
+					applyP_bind_K_return = applyP_bind_K_return + 1
+				End If
+			ElseIf isBsomething(p.st(1)) Then
+				applyP_bind_B_f_g = applyP_bind_B_f_g + 1
+				If isBreturn(p.st(1)) Then
+					applyP_bind_B_return_g = applyP_bind_B_return_g + 1
+				End If
+			End If
+		Case &quot;seq&quot;
+			applyP_seq = applyP_seq + 1
+		Case &quot;skip&quot;	&apos; tail-recursive
+			applyP_skip = applyP_skip + 1
+		Case &quot;sat&quot;
+			applyP_sat = applyP_sat + 1
+		Case &quot;many1&quot;
+			applyP_many1 = applyP_many1 + 1
+		Case &quot;fail&quot;
+			applyP_fail = applyP_fail + 1
+		Case &quot;ind&quot;	&apos; tail-recursive
+			applyP_ind = applyP_ind + 1
+		Case &quot;end&quot;
+			applyP_end = applyP_end + 1
+	End Select
+End Function
 
 &apos;= tests ======================================================================
 
