@@ -13,14 +13,14 @@ Type Parser
 	str As String
 End Type
 
-Public bindFns As Object
 Public applyP_callCount As Integer
 Public _applyP_callCount As Integer
 Public applyP_return As Integer
 Public applyP_fail As Integer
 Public applyP_item As Integer
 Public applyP_bind As Integer
-Public apply_bind_K_return As Integer
+Public applyP_bind_K_x As Integer
+Public applyP_bind_K_return As Integer
 Public applyP_choice As Integer
 Public applyP_many1 As Integer
 Public applyP_str As Integer
@@ -108,8 +108,8 @@ Function _TParser_toString( _
 		Case &quot;fail&quot;:		result = &quot;fail&quot;
 		Case &quot;return&quot;:		result = &quot;(return &quot; &amp; toString(p.st) &amp; &quot;)&quot;
 		Case &quot;item&quot;: 		result = &quot;item&quot;
-		Case &quot;strXXX&quot;:			result = &quot;(str &quot; &amp; toString(p.st(0)) &amp; &quot;)&quot;
-		Case &quot;str&quot;:			result = toString(p.st(0))
+		Case &quot;str&quot;:			result = &quot;(str &quot; &amp; toString(p.st(0)) &amp; &quot;)&quot;
+		Case &quot;strXXX&quot;:			result = toString(p.st(0))
 		Case &quot;skip&quot;
 			result = &quot;(skip &quot; &amp; _TParser_toString(p.st, k, indent, False, rules) &amp; &quot;)&quot;
 		Case &quot;many1&quot;
@@ -278,10 +278,14 @@ Function pBind(Optional p As Parser, Optional f As Object)
 	End If
 End Function
 
+Function isKsomething(f As Object) As Boolean
+	isKsomething = (getFnName(f) = getFnName(Fn.fstArg)) And (arity(f) = 1)
+End Function
+
 Function isKreturn(f As Object) As Boolean
 	Dim result As Boolean
 	result = False
-	If (getFnName(f) = getFnName(Fn.fstArg)) And (arity(f) = 1) Then
+	If isKsomething(f) Then
 		Dim v As Parser
 		v = car(partialArgs(f))
 		If v.tp = &quot;return&quot; Then &apos; 40 of the above 43 are of shape (K return x)
@@ -291,15 +295,41 @@ Function isKreturn(f As Object) As Boolean
 	isKreturn = result
 End Function
 
-Function bindStats(p As Parser, f As Object)
-	&apos; 43 of 51 are of shape (K p)
-	&apos; 40 of those 43 are of shape (K return x)
-	If isKreturn(f) Then
-		If isNull(bindFns) Then
-			bindFns = nil
-		End If
-		bindFns = cons(car(partialArgs(f)).st, bindFns)
+Function bindFns(Optional f As Object)
+	Static fns As Object : If isNull(fns) Then : fns = nil : End If
+	If isMissing(f) Then
+		Dim x As Object, xs As Object, out As Object
+		xs = fns
+		out = nil
+		While Not(isNil(xs))
+			x = car(xs)
+			If isKsomething(x) Then
+				x = car(partialArgs(x))
+				If x.tp = &quot;ind&quot; Then
+					If isNull(x.st) Then
+						out = cons(&quot;K P???&quot; &amp; x.id &amp; chr(10), out)
+					Else
+						out = cons(&quot;K P&quot; &amp; x.st.id &amp; chr(10), out)
+					End If
+				Else
+					out = cons(&quot;K &quot; &amp; TParser_toString(x) &amp; chr(10), out)
+				End If
+			Else
+				out = cons(TFn_toString(x) &amp; chr(10), out)	
+			End If
+			xs = cdr(xs)
+		Wend
+		bindFns = out
+	Else
+		fns = cons(f, fns)
+		bindFns = fns
 	End If
+End Function
+
+Function bindStats(p As Parser, f As Object)
+	&apos;If isKsomething(f) Then
+		bindFns(f)
+	&apos;End If
 End Function
 
 &apos; fails on empty string but succeeds on all others
@@ -540,12 +570,12 @@ End Function
 Function pBinDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-&apos;		result = pChoice(_
-&apos;			pBind(pStr(&quot;0&quot;), fstArg(pReturn(0))), _
-&apos;			pBind(pStr(&quot;1&quot;), fstArg(pReturn(1)))_
-&apos;		)
+		result = pChoice(_
+			pBind(pStr(&quot;0&quot;), fstArg(pReturn(0))), _
+			pBind(pStr(&quot;1&quot;), fstArg(pReturn(1)))_
+		)
 		&apos;&apos;not paying off (yet):
-		result = pBind(pItem, compose(ite(inRange(Asc(&quot;0&quot;), Asc(&quot;1&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), Fn.asc)
+&apos;		result = pBind(pItem, compose(ite(inRange(Asc(&quot;0&quot;), Asc(&quot;1&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), Fn.asc)
 	End If
 	pBinDigit = result
 End Function
@@ -685,10 +715,15 @@ Function pTypeExpr()
 					   ), id)
 		
 		&apos; TypeArg ::= ws+ N
-		pTypeArg = pSeq(Array(pSkip(pMany1(pWhite)), pN), id)
+		&apos;pTypeArg = pSeq(Array(pSkip(pMany1(pWhite)), pN), id)
+		pTypeArg = pBind(pSkip(pMany1(pWhite)), fstArg(pN))
 		
-		&apos; Ctor ::= TypeCtor TypeArg*
-		pCtor = pSeq(Array(pTypeCtor, pMany(pTypeArg)), Fn.mkTypeCtor)
+		&apos; Ctor ::= TypeCtor pTypeArg*
+		pCtor = pSeq(Array( _
+						pTypeCtor, _
+						pMany(pTypeArg) _
+					), Fn.mkTypeCtor _
+				)
 		
 		&apos; N ::= ParenS | BaseType | Ctor | TypeVar
 		pN = fixIndirection( pN, _
@@ -870,8 +905,11 @@ _applyP_begin:
 			endPos = pos
 		Case &quot;bind&quot;	&apos; tail-recursive
 			applyP_bind = applyP_bind + 1
-			If isKreturn(p.st(1)) Then
-				apply_bind_K_return = apply_bind_K_return + 1
+			If isKsomething(p.st(1)) Then
+				applyP_bind_K_x = applyP_bind_K_x + 1
+				If isKreturn(p.st(1)) Then
+					applyP_bind_K_return = applyP_bind_K_return + 1
+				End If
 			End If
 			&apos;ATTENTION: when applying the parser (bind&apos;s 1st arg)
 			&apos;           we MUST NOT propagate down isUnderSkip
@@ -1004,8 +1042,6 @@ Function test_Parser(Optional what)
 	aCount = assertionCount
 	tm = GetSystemTicks
 	
-	bindFns = nil
-	
 	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;primitives&quot;) Then
 		test_Parser_fail()
 		test_Parser_return()
@@ -1064,19 +1100,20 @@ end_of_Parser_tests:
 		msgbox(parserInstCount &amp; &quot; Parser instances&quot; _
 				&amp; chr(13) &amp; &quot;applyP_callCount: &quot; &amp; applyP_callCount _
 				&amp; chr(13) &amp; &quot;_applyP_callCount: &quot; &amp; _applyP_callCount _
-				&amp; chr(13) &amp; &quot;apply_str: &quot; &amp; applyP_str _
-				&amp; chr(13) &amp; &quot;apply_choice: &quot; &amp; applyP_choice _
-				&amp; chr(13) &amp; &quot;apply_item: &quot; &amp; applyP_item _
-				&amp; chr(13) &amp; &quot;apply_end: &quot; &amp; applyP_end _
-				&amp; chr(13) &amp; &quot;apply_bind: &quot; &amp; applyP_bind _
-				&amp; chr(13) &amp; &quot;  (apply_bind_K_return: &quot; &amp; apply_bind_K_return &amp; &quot;)&quot; _
-				&amp; chr(13) &amp; &quot;apply_return: &quot; &amp; applyP_return _
-				&amp; chr(13) &amp; &quot;apply_seq: &quot; &amp; applyP_seq _
-				&amp; chr(13) &amp; &quot;apply_skip: &quot; &amp; applyP_skip _
-				&amp; chr(13) &amp; &quot;apply_sat: &quot; &amp; applyP_sat _
-				&amp; chr(13) &amp; &quot;apply_many1: &quot; &amp; applyP_many1 _
-				&amp; chr(13) &amp; &quot;apply_fail: &quot; &amp; applyP_fail _
-				&amp; chr(13) &amp; &quot;apply_ind: &quot; &amp; applyP_ind _
+				&amp; chr(13) &amp; &quot;applyP_str: &quot; &amp; applyP_str _
+				&amp; chr(13) &amp; &quot;applyP_choice: &quot; &amp; applyP_choice _
+				&amp; chr(13) &amp; &quot;applyP_item: &quot; &amp; applyP_item _
+				&amp; chr(13) &amp; &quot;applyP_end: &quot; &amp; applyP_end _
+				&amp; chr(13) &amp; &quot;applyP_bind: &quot; &amp; applyP_bind _
+				&amp; chr(13) &amp; &quot;  (applyP_bind_K_x: &quot; &amp; applyP_bind_K_x &amp; &quot;)&quot; _
+				&amp; chr(13) &amp; &quot;  (applyP_bind_K_return: &quot; &amp; applyP_bind_K_return &amp; &quot;)&quot; _
+				&amp; chr(13) &amp; &quot;applyP_return: &quot; &amp; applyP_return _
+				&amp; chr(13) &amp; &quot;applyP_seq: &quot; &amp; applyP_seq _
+				&amp; chr(13) &amp; &quot;applyP_skip: &quot; &amp; applyP_skip _
+				&amp; chr(13) &amp; &quot;applyP_sat: &quot; &amp; applyP_sat _
+				&amp; chr(13) &amp; &quot;applyP_many1: &quot; &amp; applyP_many1 _
+				&amp; chr(13) &amp; &quot;applyP_fail: &quot; &amp; applyP_fail _
+				&amp; chr(13) &amp; &quot;applyP_ind: &quot; &amp; applyP_ind _
 				&amp; chr(13) &amp; length(bindFns) &amp; &quot; bindFns: &quot; &amp; toString(bindFns))
 	Else
 		result = Join(Array(&quot;test_Parser(&quot; &amp; what &amp; &quot;):&quot;, tm, aCount), &quot; &quot;)
@@ -1332,12 +1369,11 @@ Function test_Parser_bind()
 	refute_parses(p, &quot;xx&quot;).x
 	assert_parses(p, &quot;yx&quot;,		&quot;y&quot;, 2).x
 	assert_parses(p, &quot;yy&quot;,		&quot;y&quot;, 2).x
-	refute_parses(p, &quot; yabcd&quot;).x
-	
-	
-	&apos; skip must not be passed down into bind because the
-	&apos; function (2nd arg of bind) might need the parser&apos;s (1st arg of bind)
-	&apos; result in order to decide what parser to produce:
+	refute_parses(p, &quot; yabcd&quot;).x	
+
+	&apos; under-skip-status MUST NOT be passed down into the parser (bind&apos;s 1st arg)
+	&apos; because the function (bind&apos;s 2nd arg) might need the parser&apos;s
+	&apos; result in order to decide what other parser to produce:
 &apos;	p = (skip ( item &gt;&gt;= \x.if (=? &quot;y&quot; x) then (return x) else fail ))
 &apos;     = (skip ( item &gt;&gt;= \x.ite (=? &quot;y&quot;) return (K fail) ))
 	p = pSkip(pBind( pItem, ite(equ(&quot;y&quot;), pReturn, fstArg(pFail)) ))

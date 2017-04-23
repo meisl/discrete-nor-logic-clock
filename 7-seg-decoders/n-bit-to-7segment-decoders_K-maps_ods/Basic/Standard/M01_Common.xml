@@ -76,6 +76,7 @@ Function sndArg(Optional x As Variant, Optional y As Variant)
 	sndArg = _apply(Fn.sndArg, x, y)
 End Function
 
+&apos;\f y x.f x y
 &apos; :: (b -&gt; a) -&gt; a -&gt; b = (b -&gt; a) -&gt; (a -&gt; b)
 Function swap(Optional f, Optional x, Optional y)
 	swap = _apply(Fn.swap, f, x, y)
