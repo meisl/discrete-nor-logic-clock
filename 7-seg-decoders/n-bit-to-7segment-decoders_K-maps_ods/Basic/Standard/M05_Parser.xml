@@ -784,14 +784,12 @@ Function pTypeCtor()
 &apos;		result = foldl1( pChoice, _
 &apos;						 map(pStr, List(&quot;List&quot;, &quot;Maybe&quot;, &quot;Parser&quot;)) )
 
-		&apos; \a bs.foldl1 concat (cons a bs)
-		result = pSeq(_
-					Array(pSeq(_
-							Array(pAlphaUpper, pMany1(pAlphaLower)), _
-							cons _
-						  ) _
-					), _
-					foldl1(concat) _
+		&apos; \a bs.foldl concat a bs
+		result = pSeq(Array( _
+						pAlphaUpper, _
+						pMany1(pAlphaLower) _
+					 ), _
+					 foldl(concat) _
 		)
 	End If
 	pTypeCtor = result
@@ -882,16 +880,17 @@ Function _applyP( _
 	ByVal pos As Integer, _
 	ByRef endPos As Integer, _
 	ByVal isUnderSkip As Boolean _
-)
+) As Variant
 	_applyP_callCount = _applyP_callCount + 1
 	Dim result As Variant
 	Dim i As Integer
 	Dim innerParser As Parser
 	Dim innerParsers As Variant
 	Dim lst As Object
+	&apos;_applyP = Empty
 	
 _applyP_begin:
-	&apos;_applyP_stats(p, s, pos, endPos, isUnderSkip)
+	_applyP_stats(p, s, pos, endPos, isUnderSkip)
 	Select Case p.tp
 		Case &quot;str&quot;
 			Dim match As String
@@ -921,10 +920,10 @@ _applyP_begin:
 				result = Mid(s, pos, 1)
 			End If
 		Case &quot;return&quot;
+			endPos = pos
 			If Not(isUnderSkip) Then
 				result = p.st
 			End If
-			endPos = pos
 		Case &quot;bind&quot;	&apos; tail-recursive
 			&apos;ATTENTION: when applying the parser (bind&apos;s 1st arg)
 			&apos;           we MUST NOT propagate down isUnderSkip
@@ -1458,6 +1457,7 @@ Function test_Parser_skip()
 	Dim p As Parser, actual As Variant
 	Set p = pSkip(pItem)
 	refute_parses(p, &quot;&quot;).x
+	applyP(p, &quot; &quot;)
 	assert_parses(p, &quot; &quot;,		Empty, 2).x
 	assert_parses(p, &quot;a&quot;,		Empty, 2).x
 	assert_parses(p, &quot;1&quot;,		Empty, 2).x
