@@ -50,6 +50,7 @@ Type TFnObjs
 	pStr				As Object
 	pBind				As Object
 	pChoice				As Object
+	mkTypeVar			As Object
 	maybeMakeArrowType	As Object
 	mkTypeCtor			As Object
 End Type
@@ -113,6 +114,7 @@ Function Fn
 		result.pStr		= lookupFn(&quot;pStr&quot;)
 		result.pBind	= lookupFn(&quot;pBind&quot;)
 		result.pChoice	= lookupFn(&quot;pChoice&quot;)
+		result.mkTypeVar		  = lookupFn(&quot;mkTypeVar&quot;)
 		result.maybeMakeArrowType = lookupFn(&quot;maybeMakeArrowType&quot;)
 		result.mkTypeCtor		  = lookupFn(&quot;mkTypeCtor&quot;)
 	End If
@@ -238,6 +240,7 @@ Function fnObjs()
 			newFn(&quot;pStr&quot;,				1, &quot;Str -&gt; Parser Str&quot;), _
 			newFn(&quot;pBind&quot;,				2, &quot;Parser a -&gt; (a -&gt; Parser b) -&gt; Parser b&quot;), _
 			newFn(&quot;pChoice&quot;,			2, &quot;Parser a -&gt; Parser a -&gt; Parser a&quot;), _
+			newFn(&quot;mkTypeVar&quot;,			1, &quot;Char -&gt; Str&quot;), _
 			newFn(&quot;maybeMakeArrowType&quot;,	2, &quot;Typ -&gt; Maybe Typ -&gt; Typ&quot;), _
 			newFn(&quot;mkTypeCtor&quot;,			2, &quot;Str -&gt; List Typ -&gt; Typ&quot;)_
 	))
@@ -387,6 +390,7 @@ applyLast_of_one:
 		Case &quot;toArray&quot;: 	result = toArray(	a0)
 		Case &quot;pStr&quot;: 		result = pStr(		a0)
 		Case &quot;pReturn&quot;:		result = pReturn(	a0)
+		Case &quot;mkTypeVar&quot;:	result = mkTypeVar(	a0)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select

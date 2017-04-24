@@ -9,7 +9,9 @@ Type Parser
 	id As Integer
 	tp As String
 	st As Variant
+	st0 As Variant
 	st1 As Variant
+	st2 As Variant
 	str As String
 End Type
 
@@ -122,37 +124,38 @@ Function _TParser_toString( _
 			End If
 			result = result &amp; &quot;+&quot;
 		Case &quot;choice&quot;
-			Dim alts As Object
-			alts = p.st
+			Dim altL As Object, altR As Object
+			altL = p.st0
+			altR = p.st1
 			If isPZeroOrOne(p) Then
 				&apos; it has shape p +++ return Empty
 				&apos; so it&apos;s effectively &quot;zero-or-one&quot; p, which can be written as &quot;p?&quot;
 				
-				If alts(0).tp = &quot;choice&quot; Then
-					result = &quot;(&quot; &amp; _TParser_toString(alts(0), k, indent &amp; &quot; &quot;, False, rules) &amp; &quot;)&quot;
+				If altL.tp = &quot;choice&quot; Then
+					result = &quot;(&quot; &amp; _TParser_toString(altL, k, indent &amp; &quot; &quot;, False, rules) &amp; &quot;)&quot;
 				Else
-					result = _TParser_toString(alts(0), k, indent, False, rules)
+					result = _TParser_toString(altL, k, indent, False, rules)
 				End If
 				result = result &amp; &quot;?&quot;
 			ElseIf isPMany(p) Then
 				&apos; it has shape many1 p +++ return nil
-				If alts(0).st.tp = &quot;choice&quot; Then
-					result = &quot;(&quot; &amp; _TParser_toString(alts(0).st, k, indent &amp; &quot; &quot;, False, rules) &amp; &quot;)&quot;
+				If altL.st.tp = &quot;choice&quot; Then
+					result = &quot;(&quot; &amp; _TParser_toString(altL.st, k, indent &amp; &quot; &quot;, False, rules) &amp; &quot;)&quot;
 				Else
-					result = _TParser_toString(alts(0).st, k, indent, False, rules)
+					result = _TParser_toString(altL.st, k, indent, False, rules)
 				End If
 				result = result &amp; &quot;*&quot;
 			Else
 				If isNewLines Then
-					result = _TParser_toString(alts(0), k, indent, isNewLines, rules) _
+					result = _TParser_toString(altL, k, indent, isNewLines, rules) _
 						   &amp; chr(13) &amp; chr(10) _
 						   &amp; space(len(indent) - 2) _
 						   &amp; &quot;| &quot; _
-						   &amp; _TParser_toString(alts(1), k, indent, isNewLines, rules)
+						   &amp; _TParser_toString(altR, k, indent, isNewLines, rules)
 				Else
-					result = _TParser_toString(alts(0), k, indent, isNewLines, rules) _
+					result = _TParser_toString(altL, k, indent, isNewLines, rules) _
 						   &amp; &quot; | &quot; _
-						   &amp; _TParser_toString(alts(1), k, indent, isNewLines, rules)
+						   &amp; _TParser_toString(altR, k, indent, isNewLines, rules)
 				End If
 			End If
 		Case &quot;bind&quot;
@@ -445,7 +448,7 @@ Function pChoice(Optional p1 As Parser, Optional p2 As Parser)
 		&apos; linearize choice of choice:
 		If (p1.tp = &quot;choice&quot;) Then &apos; if left-hand-side is a choice...
 			&apos;...then push its right alternative over to *our* right:
-			result = pChoice(p1.st(0), pChoice(p1.st(1), p2))
+			result = pChoice(p1.st0, pChoice(p1.st1, p2))
 		Else
 			If (p1.tp = &quot;ind&quot;) Then
 				If isNull(p1.st) Then
@@ -455,11 +458,13 @@ Function pChoice(Optional p1 As Parser, Optional p2 As Parser)
 				End If
 			End If
 			result = mkParser(&quot;choice&quot;, Array(p1, p2))
-			&apos; we use .st1 to count the total nr of alternatives:
+			result.st0 = p1
+			result.st1 = p2
+			&apos; we use .st2 to count the total nr of alternatives:
 			If p2.tp = &quot;choice&quot; Then
-				result.st1 = p2.st1 + 1
+				result.st2 = p2.st2 + 1
 			Else
-				result.st1 = 2
+				result.st2 = 2
 			End If
 		End If
 	End If
@@ -761,7 +766,7 @@ Function pBaseType()
 	Static result As Object
 	If isNull(result) Then
 		result = foldl1(pChoice, _
-						map(pStr, List(&quot;Bool&quot;, &quot;Str&quot;, &quot;Int&quot;, &quot;Long&quot;)) _
+						map(pStr, List(&quot;Any&quot;, &quot;Bool&quot;, &quot;Char&quot;, &quot;Str&quot;, &quot;Int&quot;, &quot;Long&quot;)) _
 		)
 		&apos;msgbox(toString(result))
 	End If
@@ -769,8 +774,8 @@ Function pBaseType()
 End Function
 
 Function pTypeVar()
-	pTypeVar = pBind(pAlphaLower, compose(pReturn, concat(&quot;&apos;&quot;)))
-&apos;	pTypeVar = pSeq(Array(pAlphaLower), concat(&quot;&apos;&quot;))
+&apos;	pTypeVar = pBind(pAlphaLower, compose(pReturn, mkTypeVar))
+	pTypeVar = pSeq(Array(pAlphaLower), mkTypeVar)
 End Function
 
 Function pTypeCtor()
@@ -788,6 +793,15 @@ Function pTypeCtor()
 		)
 	End If
 	pTypeCtor = result
+End Function
+
+Function mkTypeVar(Optional ByVal name As String)
+	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.mkTypeVar : End If
+	If isMissing(name) Then
+		mkTypeVar = oFn
+	Else
+		mkTypeVar = &quot;&apos;&quot; &amp; name
+	End If
 End Function
 
 Function mkArrowType(tIn, tOut)
@@ -902,14 +916,14 @@ _applyP_begin:
 			End If
 		Case &quot;choice&quot;	&apos; tail-recursive (in the 2nd alternative)
 _applyP_choiceL:
-			result = _applyP(p.st(0), s, pos, endPos, isUnderSkip)
+			result = _applyP(p.st0, s, pos, endPos, isUnderSkip)
 			If endPos &lt; 0 Then
-				&apos;result = _applyP(p.st(1), s, pos, endPos, isUnderSkip)
-				If p.st1 &gt; 2 Then	&apos; p.st1 = total nr alternatives
-					p = p.st(1)	&apos; 2nd alternative is a choice again
+				&apos;result = _applyP(p.st1, s, pos, endPos, isUnderSkip)
+				If p.st2 &gt; 2 Then	&apos; p.st2 = total nr alternatives
+					p = p.st1	&apos; 2nd alternative is a choice again
 					Goto _applyP_choiceL
 				Else	&apos; 2nd alt is NOT a choice
-					p = p.st(1)
+					p = p.st1
 					Goto _applyP_begin
 				End If
 			End If
