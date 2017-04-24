@@ -164,8 +164,23 @@ Function _TParser_toString( _
 			Dim q As Object
 			q = p.st(0)
 			f = p.st(1)
-			result = _TParser_toString(q, k, indent, False, rules) _
-					&amp; &quot; &gt;&gt;= &quot; &amp; TFn_toString(f)
+			result = _TParser_toString(q, k, indent, False, rules) &amp; &quot; &gt;&gt;= &quot;
+			If isKsomething(f) Then
+				q = car(partialArgs(f)) &apos; peel off the K
+				If isKreturn(f) Then
+					Dim v As Variant			
+					v = q.st &apos; peel off the pReturn
+					result = result &amp; &quot;\_.return &quot; &amp; toString(v)
+				Else
+					result = result &amp; &quot;\_.&quot; &amp; _TParser_toString(q, k, indent, False, rules)
+				End If
+			Else
+				If isBreturn(f) Then
+					f = car(partialArgs(f)) &apos; get out B&apos;s 2nd arg (they&apos;re in reverse!)
+					result = result &amp; &quot;return ° &quot;
+				End If
+				result = result &amp; TFn_toString(f)
+			End If
 		Case &quot;seq&quot;
 			Dim ps As Variant, i As Integer
 			Dim fName As String, args As String
@@ -480,7 +495,7 @@ Function pChoice(Optional p1 As Parser, Optional p2 As Parser)
 				If isNull(p1.st) Then
 					&apos;msgbox(&quot;pChoice: &quot; &amp; toString(mkParser(&quot;choice&quot;, Array(p1, p2)))
 				ElseIf (p1.st.tp = &quot;choice&quot;) Then
-					msgbox(&quot;pChoice!: &quot; &amp; toString(mkParser(&quot;choice&quot;, Array(p1, p2)))
+					&apos;msgbox(&quot;pChoice!: lhs ind to choice: &quot; &amp; toString(p1))
 				End If
 			End If
 			result = mkParser(&quot;choice&quot;, Array(p1, p2))
@@ -621,10 +636,11 @@ End Function
 Function pBinDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pChoice(_
+		result = pInd
+		result = fixIndirection(result, pChoice(_
 			pBind(pStr(&quot;0&quot;), fstArg(pReturn(0))), _
 			pBind(pStr(&quot;1&quot;), fstArg(pReturn(1)))_
-		)
+		))
 		&apos;&apos;not paying off (yet):
 &apos;		result = pBind(pItem, compose(ite(inRange(Asc(&quot;0&quot;), Asc(&quot;1&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), Fn.asc)
 	End If
@@ -634,16 +650,20 @@ End Function
 Function pDecDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		&apos;result = pChoice(pBinDigit,	pBind(pStr(&quot;2&quot;), fstArg(pReturn(2))))
-		&apos;result = pChoice(result,	pBind(pStr(&quot;3&quot;), fstArg(pReturn(3))))
-		&apos;result = pChoice(result,	pBind(pStr(&quot;4&quot;), fstArg(pReturn(4))))
-		&apos;result = pChoice(result,	pBind(pStr(&quot;5&quot;), fstArg(pReturn(5))))
-		&apos;result = pChoice(result,	pBind(pStr(&quot;6&quot;), fstArg(pReturn(6))))
-		&apos;result = pChoice(result,	pBind(pStr(&quot;7&quot;), fstArg(pReturn(7))))
-		&apos;result = pChoice(result,	pBind(pStr(&quot;8&quot;), fstArg(pReturn(8))))
-		&apos;result = pChoice(result,	pBind(pStr(&quot;9&quot;), fstArg(pReturn(9))))
-		&apos;pDecDigit = result
-		&apos;Exit Function
+		result = pInd
+		result = fixIndirection(result, foldl1(pChoice, _
+			List(pBinDigit, _
+				 pBind(pStr(&quot;2&quot;), fstArg(pReturn(2))), _
+				 pBind(pStr(&quot;3&quot;), fstArg(pReturn(3))), _
+				 pBind(pStr(&quot;4&quot;), fstArg(pReturn(4))), _
+				 pBind(pStr(&quot;5&quot;), fstArg(pReturn(5))), _
+				 pBind(pStr(&quot;6&quot;), fstArg(pReturn(6))), _
+				 pBind(pStr(&quot;7&quot;), fstArg(pReturn(7))), _
+				 pBind(pStr(&quot;8&quot;), fstArg(pReturn(8))), _
+				 pBind(pStr(&quot;9&quot;), fstArg(pReturn(9))) _
+		)   )
+		pDecDigit = result
+		Exit Function
 
 		&apos;&apos;this is in fact paying off:
 		Dim f as Object
@@ -702,7 +722,7 @@ End Function
 Function pHexLit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pSeq(Array(pStr(&quot;0x&quot;), pHexNum), sndArg)
+		result = pSeq(Array(pSkip(pStr(&quot;0x&quot;)), pHexNum), id)
 	End If
 	pHexLit = result
 End Function
@@ -729,6 +749,7 @@ Function pTypeExpr()
 	If isNull(result) Then
 		Dim pRight As Object
 		Dim pS As Object
+		Dim pBracketS As Object
 		Dim pParenS As Object
 		Dim pTypeArg As Object
 		Dim pCtor As Object
@@ -759,15 +780,29 @@ Function pTypeExpr()
 				  	 ), Fn.maybeMakeArrowType _
 			  )	)
 		
-		&apos; ParenS ::= &quot;(&quot; S &quot;)&quot;
+		&apos; BracketS ::= &quot;[&quot; S &quot;]&quot;
+		&apos;pBracketS = pSeq(Array(pSkip(pStr(&quot;[&quot;)), _
+		&apos;					 pS, _
+		&apos;				     pSkip(pStr(&quot;]&quot;)) _
+		&apos;			   ), compose(mkTypeCtor(&quot;List&quot;), swap(cons, nil)) _
+		&apos;			 )
+
+		pBracketS = pSeq(Array(pSkip(pStr(&quot;[&quot;)), _
+							 pSeq(Array(pS, pReturn(nil)), cons), _
+						     pSkip(pStr(&quot;]&quot;)) _
+					   ), mkTypeCtor(&quot;List&quot;) _
+					)
+
+		&apos; ParenS ::= &quot;(&quot; S? &quot;)&quot;
 		pParenS = pSeq(Array(pSkip(pStr(&quot;(&quot;)), _
-							 pS, _
-						     pSkip(pStr(&quot;)&quot;)) _
-					   ), id)
+					 pChoice(pS, pReturn(mkTypeCtor(&quot;Unit&quot;, nil))), _
+				     pSkip(pStr(&quot;)&quot;)) _
+				  ), id)
 		
 		&apos; TypeArg ::= ws+ N
 		&apos;pTypeArg = pSeq(Array(pSkip(pMany1(pWhite)), pN), id)
-		pTypeArg = pBind(pSkip(pMany1(pWhite)), fstArg(pN))
+		pTypeArg = pBind(pMany1(pWhite), fstArg(pN))
+		&apos; don&apos;t need to skip the pMany1(pWhite) - done by optimization
 		
 		&apos; Ctor ::= TypeCtor pTypeArg*
 		pCtor = pSeq(Array( _
@@ -776,9 +811,9 @@ Function pTypeExpr()
 					), Fn.mkTypeCtor _
 				)
 		
-		&apos; N ::= ParenS | BaseType | Ctor | TypeVar
+		&apos; N ::= BaseType | TypeVar | BracketS | ParenS | Ctor
 		pN = fixIndirection( pN, _
-			foldl1(pChoice, List(pBaseType, pTypeVar, pParenS, pCtor)) _
+			foldl1(pChoice, List(pBaseType, pTypeVar, pBracketS, pParenS, pCtor)) _
 		)
 			
 		result = pS
@@ -789,19 +824,25 @@ Function pTypeExpr()
 End Function
 
 Function pBaseType()
-	Static result As Object
-	If isNull(result) Then
-		result = foldl1(pChoice, _
-						map(pStr, List(&quot;Any&quot;, &quot;Bool&quot;, &quot;Char&quot;, &quot;Str&quot;, &quot;Int&quot;, &quot;Long&quot;)) _
+	Static out As Object
+	If isNull(out) Then
+		out = pInd
+		out = fixIndirection(out, foldl1(pChoice, _
+				map(pStr, List(&quot;Any&quot;, &quot;Bool&quot;, &quot;Char&quot;, &quot;Str&quot;, &quot;Int&quot;, &quot;Long&quot;)) _
 		)
-		&apos;msgbox(toString(result))
+		&apos;msgbox(toString(out))
 	End If
-	pBaseType = result
+	pBaseType = out
 End Function
 
 Function pTypeVar()
-	pTypeVar = pBind(pAlphaLower, compose(pReturn, mkTypeVar))
-&apos;	pTypeVar = pSeq(Array(pAlphaLower), mkTypeVar)
+	Static out As Object
+	If isNull(out) Then
+		out = pInd
+		out = fixIndirection(out, pBind(pAlphaLower, compose(pReturn, mkTypeVar)))
+	&apos;	out = fixIndirection(out, pSeq(Array(pAlphaLower), mkTypeVar))
+	End If
+	pTypeVar = out
 End Function
 
 Function pTypeCtor()
@@ -842,20 +883,29 @@ Function maybeMakeArrowType(i, o)
 	End If
 End Function
 
-Function mkTypeCtor(ctorName As String, typeArgs As Object)
-	Dim result As String
-	result = &quot;(&quot; &amp; ctorName
-	If isNil(typeArgs) Then
-		result = result &amp; &quot; [])&quot;
+Function mkTypeCtor(Optional ctorName As String, Optional typeArgs As Object)
+	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.mkTypeCtor : End If
+	Dim result As Variant
+	If isMissing(typeArgs) Then
+		If isMissing(ctorName) Then
+			result = oFn
+		Else
+			result = apply(oFn, ctorName)
+		End If
 	Else
-		Dim toStr As Object
-		&apos;  \acc a.concat acc (concat &quot;, &quot; a)
-		&apos;= \acc a.(swap concat) (concat &quot;, &quot; a) acc
-		&apos;= swap \a acc.(swap concat) (concat &quot;, &quot; a) acc
-		&apos;= swap \a.(swap concat) (concat &quot;, &quot; a)
-		&apos;= swap ((swap concat) ° (concat &quot;, &quot;))
-		toStr = swap(compose(swap(concat) , concat(&quot;, &quot;)))
-		result = result &amp; &quot; [&quot; &amp; foldl1(toStr, typeArgs) &amp; &quot;])&quot;
+		result = &quot;(&quot; &amp; ctorName
+		If isNil(typeArgs) Then
+			result = result &amp; &quot; [])&quot;
+		Else
+			Dim toStr As Object
+			&apos;  \acc a.concat acc (concat &quot;, &quot; a)
+			&apos;= \acc a.(swap concat) (concat &quot;, &quot; a) acc
+			&apos;= swap \a acc.(swap concat) (concat &quot;, &quot; a) acc
+			&apos;= swap \a.(swap concat) (concat &quot;, &quot; a)
+			&apos;= swap ((swap concat) ° (concat &quot;, &quot;))
+			toStr = swap(compose(swap(concat) , concat(&quot;, &quot;)))
+			result = result &amp; &quot; [&quot; &amp; foldl1(toStr, typeArgs) &amp; &quot;])&quot;
+		End If
 	End If
 	mkTypeCtor = result
 End Function
@@ -871,6 +921,7 @@ Function lookupParser(pName As String) As Parser
 		Case &quot;pDecDigit&quot;:	result = pDecDigit
 		Case &quot;pHexDigit&quot;:	result = pHexDigit
 		Case &quot;pHexNum&quot;:		result = pHexNum
+		Case &quot;pHexLit&quot;:		result = pHexLit
 		Case &quot;pTypeExpr&quot;:	result = pTypeExpr
 		Case Else
 			croak(&quot;unknown parser &quot; &amp; pName)
@@ -2138,6 +2189,29 @@ Function test_Parser_TypeExpr()
 	&apos; type of pBind:
 	assert_parses(p, &quot;Parser a -&gt; (a -&gt; Parser b) -&gt; Parser b&quot;, _
 					 &quot;(-&gt; (Parser [&apos;a]) (-&gt; (-&gt; &apos;a (Parser [&apos;b])) (Parser [&apos;b])))&quot;, 40).x			
+
+	&apos; [] (List) type variations:
+	refute_parses(p, &quot;[]&quot;).x
+	refute_parses(p, &quot;[a b]&quot;).x
+	refute_parses(p, &quot;[a, b]&quot;).x
+	assert_parses(p, &quot;[a]&quot;, 	&quot;(List [&apos;a])&quot;, 4).x
+	assert_parses(p, &quot;([(a)])&quot;, &quot;(List [&apos;a])&quot;, 8).x
+	assert_parses(p, &quot;([[a]])&quot;, &quot;(List [(List [&apos;a])])&quot;, 8).x
+	assert_parses(p, &quot;[[(a)]]&quot;, &quot;(List [(List [&apos;a])])&quot;, 8).x
+	assert_parses(p, &quot;[[[a]]]&quot;, &quot;(List [(List [(List [&apos;a])])])&quot;, 8).x
+	assert_parses(p, &quot;[a-&gt;b]&quot;,  &quot;(List [(-&gt; &apos;a &apos;b)])&quot;, 7).x
+	
+	&apos;isNil:
+	assert_parses(p, &quot;[a] -&gt; Bool&quot;, &quot;(-&gt; (List [&apos;a]) Bool)&quot;, 12).x
+	&apos;cons:
+	assert_parses(p, &quot;a -&gt; [a] -&gt; [a]&quot;, &quot;(-&gt; &apos;a (-&gt; (List [&apos;a]) (List [&apos;a])))&quot;, 16).x
+	
+	&apos; (,) tuple type variations:
+	assert_parses(p, &quot;()&quot;, 		&quot;(Unit [])&quot;, 3).x
+	refute_parses(p, &quot;( )&quot;).x
+	assert_parses(p, &quot;(())&quot;, 	&quot;(Unit [])&quot;, 5).x
+	assert_parses(p, &quot;[()]&quot;, 	&quot;(List [(Unit [])])&quot;, 5).x
+	refute_parses(p, &quot;([])&quot;).x
 		 
 	Dim fns As Object, f As Object, fName As String, typStr As String
 	fns = fnObjs
