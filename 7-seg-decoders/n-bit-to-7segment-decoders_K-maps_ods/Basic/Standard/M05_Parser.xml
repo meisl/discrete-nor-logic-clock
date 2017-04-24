@@ -12,6 +12,8 @@ Type Parser
 	st0 As Variant
 	st1 As Variant
 	st2 As Variant
+	st3 As Variant
+	st4 As Variant
 	str As String
 End Type
 
@@ -117,7 +119,7 @@ Function _TParser_toString( _
 		Case &quot;skip&quot;
 			result = &quot;(skip &quot; &amp; _TParser_toString(p.st, k, indent, False, rules) &amp; &quot;)&quot;
 		Case &quot;many1&quot;
-			If p.st.tp = &quot;choice&quot; Then
+			If (p.st.tp) = &quot;choice&quot; Or (p.st.tp = &quot;bind&quot;) Then
 				result = &quot;(&quot; &amp; _TParser_toString(p.st, k, indent &amp; &quot; &quot;, False, rules) &amp; &quot;)&quot;
 			Else
 				result = _TParser_toString(p.st, k, indent, False, rules)
@@ -131,7 +133,7 @@ Function _TParser_toString( _
 				&apos; it has shape p +++ return Empty
 				&apos; so it&apos;s effectively &quot;zero-or-one&quot; p, which can be written as &quot;p?&quot;
 				
-				If altL.tp = &quot;choice&quot; Then
+				If (altL.tp = &quot;choice&quot;) Or (altL.tp = &quot;bind&quot;) Then
 					result = &quot;(&quot; &amp; _TParser_toString(altL, k, indent &amp; &quot; &quot;, False, rules) &amp; &quot;)&quot;
 				Else
 					result = _TParser_toString(altL, k, indent, False, rules)
@@ -139,7 +141,7 @@ Function _TParser_toString( _
 				result = result &amp; &quot;?&quot;
 			ElseIf isPMany(p) Then
 				&apos; it has shape many1 p +++ return nil
-				If altL.st.tp = &quot;choice&quot; Then
+				If (altL.st.tp = &quot;choice&quot;) Or (altL.st.tp = &quot;bind&quot;) Then
 					result = &quot;(&quot; &amp; _TParser_toString(altL.st, k, indent &amp; &quot; &quot;, False, rules) &amp; &quot;)&quot;
 				Else
 					result = _TParser_toString(altL.st, k, indent, False, rules)
@@ -269,18 +271,42 @@ End Function
 &apos; to give the overall result Parser b that f returns
 Function pBind(Optional p As Parser, Optional f As Object)
 	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.pBind : End If
+	Dim result As Variant
 	If isMissing(f) Then
 		If isMissing(p) Then
-			pBind = oFn
+			result = oFn
 		Else
 			&apos; TODO: pBind: check if p is proper Parser
-			pBind = apply(oFn, p)
+			result = apply(oFn, p)
 		End If
 	Else
 		bindStats(p, f)
 		&apos; TODO: pBind: check if f is proper function
-		pBind = mkParser(&quot;bind&quot;, Array(p, f))
+		result = mkParser(&quot;bind&quot;, Array(p, f))
+		result.st0 = p
+		result.st1 = f
+		If isKsomething(f) Then
+			Dim v As Object
+			v = car(partialArgs(f)) &apos; peel off K	
+			If isKreturn(f) Then
+				result.st2 = 2
+				Dim inner As String
+				inner = toString(v)
+				result.st3 = v.st &apos; peel off pReturn
+			Else
+				result.st2 = 1
+				result.st3 = v	&apos; the subsequent parser
+			End If
+		ElseIf isBreturn(f) Then
+			Dim g As Object
+			g = car(partialArgs(f))		&apos; get out B&apos;s 2nd arg (they&apos;re in reverse!)
+			result.st2 = 3
+			result.st3 = g	&apos; g produces the overall result value of the bind
+		Else
+			result.st2 = 0
+		End If
 	End If
+	pBind = result
 End Function
 
 Function isKsomething(f As Object) As Boolean
@@ -619,7 +645,7 @@ Function pDecDigit()
 		&apos;pDecDigit = result
 		&apos;Exit Function
 
-		&apos;&apos;not really paying off (yet):
+		&apos;&apos;this is in fact paying off:
 		Dim f as Object
 		&apos;Set f = compose(add(-Asc(&quot;0&quot;)), Fn.asc)
 		&apos;MsgBox(TFn_toString(f))
@@ -774,8 +800,8 @@ Function pBaseType()
 End Function
 
 Function pTypeVar()
-&apos;	pTypeVar = pBind(pAlphaLower, compose(pReturn, mkTypeVar))
-	pTypeVar = pSeq(Array(pAlphaLower), mkTypeVar)
+	pTypeVar = pBind(pAlphaLower, compose(pReturn, mkTypeVar))
+&apos;	pTypeVar = pSeq(Array(pAlphaLower), mkTypeVar)
 End Function
 
 Function pTypeCtor()
@@ -941,18 +967,71 @@ _applyP_choiceL:
 				result = p.st
 			End If
 		Case &quot;bind&quot;	&apos; tail-recursive
+			On p.st2 Goto _applyP_bind_K, _applyP_bind_K_return, _applyP_bind_B_return
+_applyP_bind_general:			
 			&apos;ATTENTION: when applying the parser (bind&apos;s 1st arg)
 			&apos;           we MUST NOT propagate down isUnderSkip
 			&apos;           because the fn (bind&apos;s 2nd arg) might need it
-			result = _applyP(p.st(0), s, pos, endPos, False)
+			result = _applyP(p.st0, s, pos, endPos, False)
 			If endPos &lt; 0 Then : Exit Function : End If
-			&apos;HOWEVER: when applying the parser produced by the fn
-			&apos;         we must do this under the isUnderSkip:
-			&apos;result = _applyP(apply1(p.st(1), result), s, endPos, endPos, isUnderSkip)
-			p = apply1(p.st(1), result)
+			&apos;HOWEVER: when applying the parser *produced* by the fn
+			&apos;         we *must* do this under the isUnderSkip:
+			&apos;result = _applyP(apply1(p.st1, result), s, endPos, endPos, isUnderSkip)
 			pos = endPos
+			p = apply1(p.st1, result)
 			If isUnderSkip Then : result = Empty : End If
 			Goto _applyP_begin
+_applyP_bind_K:
+			&apos; We know that the function (bind&apos;s 2nd arg) ignores
+			&apos; the parsers result value, so we can savely apply it 
+			&apos; &quot;under-skip&quot;, and ignore the result value:
+			_applyP(p.st0, s, pos, endPos, True)
+			If endPos &lt; 0 Then : Exit Function : End If
+			&apos; Since at construction we peeled off the K, we have the
+			&apos; subsequent parser stored directly in .st3:
+			pos = endPos
+			p = p.st3
+			If isUnderSkip Then : result = Empty : End If
+			Goto _applyP_begin
+_applyP_bind_K_return:
+			&apos; We know that the function (bind&apos;s 2nd arg) will always
+			&apos; produce a constant pReturn(x), so we can savely apply 
+			&apos; the parser (bind&apos;s 1st arg) &quot;under-skip&quot;, 
+			&apos; and ignore the result value:
+			_applyP(p.st0, s, pos, endPos, True)
+			If endPos &lt; 0 Then : Exit Function : End If
+			&apos; Since at construction we peeled off the K and the pReturn,
+			&apos; we have the result value stored directly in .st3:
+			If isUnderSkip Then 
+				result = Empty 
+			Else
+				result = p.st3
+			End If
+			&apos; and we&apos;re finished in this call (still have to set _applyP)
+			Goto _applyP_parseSuccess
+_applyP_bind_B_return:
+			&apos; We know that the function (bind&apos;s 2nd arg) will always
+			&apos; produce a pReturn(x), where x is produced by an inner 
+			&apos; function (which we have stored directly .st3)
+			&apos; Therefore we can directly apply this function to the 
+			&apos; parser&apos;s result (bind&apos;s 1st arg) in order to get the 
+			&apos; overall result value.
+			&apos; However, we need not apply this function at all if we&apos;re
+			&apos; &quot;under-skip&quot;, so in that case the parser can be applied
+			&apos; &quot;under-skip&quot; as well:
+			If isUnderSkip Then
+				_applyP(p.st0, s, pos, endPos, True)
+				&apos; result not needed, endPos set by inner parser
+				Exit Function
+			Else
+				result = _applyP(p.st0, s, pos, endPos, False)
+			End If
+			If endPos &lt; 0 Then : Exit Function : End If
+			&apos; Since at construction we peeled off the B and the pReturn,
+			&apos; we have the inner function stored directly in .st3:
+			result = apply1(p.st3, result)
+			&apos; and we&apos;re finished in this call (still have to set _applyP)
+			Goto _applyP_parseSuccess
 		Case &quot;seq&quot;
 			innerParsers = p.st(0)
 			If isUnderSkip Then
@@ -1035,6 +1114,7 @@ _applyP_choiceL:
 	&apos;If isUnderSkip And Not(isParseFailure(result)) Then
 	&apos;	assertEqual(result(0), Empty).x
 	&apos;End If
+_applyP_parseSuccess:
 	_applyP = result
 	Exit Function
 _applyP_parseFailure:
@@ -1059,16 +1139,22 @@ Function _applyP_stats( _
 			applyP_return = applyP_return + 1
 		Case &quot;bind&quot;	&apos; tail-recursive
 			applyP_bind = applyP_bind + 1
-			If isKsomething(p.st(1)) Then
+			If isKsomething(p.st1) Then
 				applyP_bind_K_x = applyP_bind_K_x + 1
-				If isKreturn(p.st(1)) Then
+				If isKreturn(p.st1) Then
 					applyP_bind_K_return = applyP_bind_K_return + 1
+					assertEqual(p.st2, 2).x
+				Else
+					assertEqual(p.st2, 1).x
 				End If
-			ElseIf isBsomething(p.st(1)) Then
+			ElseIf isBsomething(p.st1) Then
 				applyP_bind_B_f_g = applyP_bind_B_f_g + 1
-				If isBreturn(p.st(1)) Then
+				If isBreturn(p.st1) Then
 					applyP_bind_B_return_g = applyP_bind_B_return_g + 1
+					assertEqual(p.st2, 3).x
 				End If
+			Else
+				assertEqual(p.st2, 0).x
 			End If
 		Case &quot;seq&quot;
 			applyP_seq = applyP_seq + 1
