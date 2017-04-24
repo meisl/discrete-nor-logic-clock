@@ -87,12 +87,12 @@ Function _TParser_toString( _
 		result = p.str
 	Else : Select Case p.tp
 		Case &quot;ind&quot;
-			If isNull(p.st) Then &apos; yet uninitialized indirection
-				result = &quot;(ind &quot; &amp; p.id &amp; &quot; Nothing)&quot;
-			ElseIf isString(p.st1) Then &apos; seen it before
-				result = p.st1 &apos; contains a name like P123
+			If isNull(p.st0) Then &apos; yet uninitialized indirection
+				result = &quot;(ind &quot; &amp; p.st1 &amp; &quot; Nothing)&quot;
+			ElseIf p.st2 Then &apos; seen it before
+				result = p.st1 &apos; contains a name like Rule_123
 			Else &apos; initialized but not seen before
-				p.st1 = &quot;P&quot; &amp; p.st.id
+				p.st2 = True	&apos; set the &quot;visited&quot;-mark
 				result = p.st1 &amp; &quot; ::= &quot;
 				&apos; In the new rule, start over fresh indent and var counter
 				indent = Space(Len(result))
@@ -100,8 +100,8 @@ Function _TParser_toString( _
 				j = 0
 				result = result &amp; _TParser_toString(p.st, j, indent, True, rules)
 				rules = cons(result, rules)
-				result = p.st1
-				p.st1 = Nothing
+				result = p.st1	&apos; just return the name
+				p.st2 = False	&apos; delete &quot;visited&quot;-mark
 			End If
 		Case &quot;sat&quot;
 			result = &quot;(sat &quot;
@@ -587,8 +587,18 @@ End Function
 &apos; pInd: for building recursive parsers; returns a dummy Parser instance
 &apos; which serves as an indirection to another Parser. This pointer later 
 &apos; has to set calling fixIndirection with the dummy and the actual instance
-Function pInd()
-	pInd = mkParser(&quot;ind&quot;, Nothing)
+Function pInd(ByVal name As String)
+	Static n As Integer
+	Dim result As Variant
+	If name = &quot;&quot; Then
+		name = &quot;Rule&quot;
+	End If
+	result = mkParser(&quot;ind&quot;, Nothing)
+	result.st0 = Nothing
+	n = n + 1
+	result.st1 = name &amp; &quot;_&quot; &amp; n
+	result.st2 = False
+	pInd = result
 End Function
 
 Function fixIndirection(dummy As Parser, target As Parser)
@@ -599,6 +609,7 @@ Function fixIndirection(dummy As Parser, target As Parser)
 		croak(&quot;fixIndirection: cannot set target &quot; &amp; target.id &amp; &quot; - already points to &quot; &amp; dummy.st.id)
 	End If
 	dummy.st = target
+	dummy.st0 = target
 	fixIndirection = dummy
 End Function
 
@@ -636,7 +647,7 @@ End Function
 Function pBinDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pInd
+		result = pInd(&quot;BinDigit&quot;)
 		result = fixIndirection(result, pChoice(_
 			pBind(pStr(&quot;0&quot;), fstArg(pReturn(0))), _
 			pBind(pStr(&quot;1&quot;), fstArg(pReturn(1)))_
@@ -650,7 +661,7 @@ End Function
 Function pDecDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pInd
+		result = pInd(&quot;DecDigit&quot;)
 		result = fixIndirection(result, foldl1(pChoice, _
 			List(pBinDigit, _
 				 pBind(pStr(&quot;2&quot;), fstArg(pReturn(2))), _
@@ -749,15 +760,15 @@ Function pTypeExpr()
 	If isNull(result) Then
 		Dim pRight As Object
 		Dim pS As Object
-		Dim pBracketS As Object
+		Dim pListType As Object
 		Dim pParenS As Object
 		Dim pTypeArg As Object
 		Dim pCtor As Object
 		Dim pN As Object
 		Dim recDummy As Object
 		
-		pS = pInd
-		pN = pInd
+		pS = pInd(&quot;TypeExpr&quot;)
+		pN = pInd(&quot;NonArrow&quot;)
 
 		&apos; Right ::= &quot;-&gt;&quot; S
 		&apos; pRight = do _ &lt;- (str &quot;-&gt;&quot;)
@@ -780,24 +791,26 @@ Function pTypeExpr()
 				  	 ), Fn.maybeMakeArrowType _
 			  )	)
 		
-		&apos; BracketS ::= &quot;[&quot; S &quot;]&quot;
-		&apos;pBracketS = pSeq(Array(pSkip(pStr(&quot;[&quot;)), _
+		&apos; ListType ::= &quot;[&quot; S &quot;]&quot;
+		pListType = pInd(&quot;ListType&quot;)
+		&apos;pListType = fixIndirection(pListType, pSeq(Array(pSkip(pStr(&quot;[&quot;)), _
 		&apos;					 pS, _
 		&apos;				     pSkip(pStr(&quot;]&quot;)) _
 		&apos;			   ), compose(mkTypeCtor(&quot;List&quot;), swap(cons, nil)) _
-		&apos;			 )
+		&apos;			 ))
 
-		pBracketS = pSeq(Array(pSkip(pStr(&quot;[&quot;)), _
+		pListType = fixIndirection(pListType, pSeq(Array(pSkip(pStr(&quot;[&quot;)), _
 							 pSeq(Array(pS, pReturn(nil)), cons), _
 						     pSkip(pStr(&quot;]&quot;)) _
 					   ), mkTypeCtor(&quot;List&quot;) _
-					)
+					))
 
 		&apos; ParenS ::= &quot;(&quot; S? &quot;)&quot;
-		pParenS = pSeq(Array(pSkip(pStr(&quot;(&quot;)), _
+		pParenS = pInd(&quot;ParensTyEx&quot;)
+		pParenS = fixIndirection(pParenS, pSeq(Array(pSkip(pStr(&quot;(&quot;)), _
 					 pChoice(pS, pReturn(mkTypeCtor(&quot;Unit&quot;, nil))), _
 				     pSkip(pStr(&quot;)&quot;)) _
-				  ), id)
+				  ), id))
 		
 		&apos; TypeArg ::= ws+ N
 		&apos;pTypeArg = pSeq(Array(pSkip(pMany1(pWhite)), pN), id)
@@ -811,9 +824,9 @@ Function pTypeExpr()
 					), Fn.mkTypeCtor _
 				)
 		
-		&apos; N ::= BaseType | TypeVar | BracketS | ParenS | Ctor
+		&apos; N ::= BaseType | TypeVar | ListType | ParenS | Ctor
 		pN = fixIndirection( pN, _
-			foldl1(pChoice, List(pBaseType, pTypeVar, pBracketS, pParenS, pCtor)) _
+			foldl1(pChoice, List(pBaseType, pTypeVar, pListType, pParenS, pCtor)) _
 		)
 			
 		result = pS
@@ -826,7 +839,7 @@ End Function
 Function pBaseType()
 	Static out As Object
 	If isNull(out) Then
-		out = pInd
+		out = pInd(&quot;BaseType&quot;)
 		out = fixIndirection(out, foldl1(pChoice, _
 				map(pStr, List(&quot;Any&quot;, &quot;Bool&quot;, &quot;Char&quot;, &quot;Str&quot;, &quot;Int&quot;, &quot;Long&quot;)) _
 		)
@@ -838,7 +851,7 @@ End Function
 Function pTypeVar()
 	Static out As Object
 	If isNull(out) Then
-		out = pInd
+		out = pInd(&quot;TypeVar&quot;)
 		out = fixIndirection(out, pBind(pAlphaLower, compose(pReturn, mkTypeVar)))
 	&apos;	out = fixIndirection(out, pSeq(Array(pAlphaLower), mkTypeVar))
 	End If
@@ -1150,7 +1163,7 @@ _applyP_bind_B_return:
 		Case &quot;fail&quot;
 			Goto _applyP_parseFailure
 		Case &quot;ind&quot;	&apos; tail-recursive
-			p = p.st
+			p = p.st0
 			Goto _applyP_begin
 &apos;			result = _applyP(p.st, s, pos, endPos, isUnderSkip)
 		Case &quot;end&quot;
@@ -1219,6 +1232,13 @@ Function _applyP_stats( _
 			applyP_fail = applyP_fail + 1
 		Case &quot;ind&quot;	&apos; tail-recursive
 			applyP_ind = applyP_ind + 1
+			If isNull(p.st0) Then
+				assertEqual(p.st(0), p.st0).x
+			Else
+				assertEqual(typeOf(p.st(0)), typeOf(p.st0)).x
+				assertEqual(typeOf(p.st0), typeOf(pFail)).x
+				assertEqual(p.st0.id, p.st(0).id).x
+			End If
 		Case &quot;end&quot;
 			applyP_end = applyP_end + 1
 	End Select
@@ -1779,54 +1799,54 @@ End Function
 
 Function test_Parser_indirect()
 	Dim p As Parser, q As Parser, r As Parser
-	r = pInd
+	r = pInd(&quot;Something&quot;)
 	&apos;Note: most of the parsers we create here don&apos;t actually make sense
 	&apos;      the important thing for testing is their structure
 	
-	p = pInd : q = pInd
+	p = pInd(&quot;&quot;) : q = pInd(&quot;&quot;)
 	assertEqual(p.id = q.id, False).x
 	
-	p = pInd : q = pReturn(&quot;foo&quot;)
+	p = pInd(&quot;&quot;) : q = pReturn(&quot;foo&quot;)
 	p = fixIndirection(p, q)
 	assertEqual(p.tp, r.tp).x		&apos; p points to q
 	assertEqual(p.st.id, q.id).x
 	
-	p = pInd : q = pFail
+	p = pInd(&quot;&quot;) : q = pFail
 	p = fixIndirection(p, q)
 	assertEqual(p.tp, r.tp).x		&apos; p points to q
 	assertEqual(p.st.id, q.id).x
 	
-	p = pInd : q = pItem
+	p = pInd(&quot;&quot;) : q = pItem
 	p = fixIndirection(p, q)
 	assertEqual(p.tp, r.tp).x		&apos; p points to q
 	assertEqual(p.st.id, q.id).x
 	
-	p = pInd : q = pStr(&quot;bar&quot;)
+	p = pInd(&quot;&quot;) : q = pStr(&quot;bar&quot;)
 	p = fixIndirection(p, q)
 	assertEqual(p.tp, r.tp).x		&apos; p points to q
 	assertEqual(p.st.id, q.id).x
 	
-	p = pInd : q = pSat(compose(inRange(5, 7), Fn.asc))
+	p = pInd(&quot;&quot;) : q = pSat(compose(inRange(5, 7), Fn.asc))
 	p = fixIndirection(p, q)
 	assertEqual(p.tp, r.tp).x		&apos; p points to q
 	assertEqual(p.st.id, q.id).x
 	
-	p = pInd : q = pSkip(pItem)
+	p = pInd(&quot;&quot;) : q = pSkip(pItem)
 	p = fixIndirection(p, q)
 	assertEqual(p.tp, r.tp).x		&apos; p points to q
 	assertEqual(p.st.id, q.id).x
 	
-	p = pInd : q = pSkip(pStr(&quot;foo&quot;))
+	p = pInd(&quot;&quot;) : q = pSkip(pStr(&quot;foo&quot;))
 	p = fixIndirection(p, q)
 	assertEqual(p.tp, r.tp).x		&apos; p points to q
 	assertEqual(p.st.id, q.id).x
 	
-	p = pInd : q = pSkip(p)
+	p = pInd(&quot;&quot;) : q = pSkip(p)
 	p = fixIndirection(p, q)
 	assertEqual(p.tp, r.tp).x		&apos; p points to q
 	assertEqual(p.st.id, q.id).x
 	
-	p = pInd : q = pChoice(pStr(&quot;foo&quot;), p)
+	p = pInd(&quot;&quot;) : q = pChoice(pStr(&quot;foo&quot;), p)
 	p = fixIndirection(p, q)
 	assertEqual(p.tp, r.tp).x		&apos; p points to q
 	assertEqual(p.st.id, q.id).x
@@ -1846,22 +1866,22 @@ Function test_Parser_indirect()
 	assertEqual(alt2P.id, p.id).x &apos; there is the recursion!
 
 
-	p = pInd : q = pZeroOrOne(p)
+	p = pInd(&quot;&quot;) : q = pZeroOrOne(p)
 	p = fixIndirection(p, q)
 	assertEqual(p.tp, r.tp).x		&apos; p points to q
 	assertEqual(p.st.id, q.id).x
 
-	p = pInd : q = pMany1(p)
+	p = pInd(&quot;&quot;) : q = pMany1(p)
 	p = fixIndirection(p, q)
 	assertEqual(p.tp, r.tp).x		&apos; p points to q
 	assertEqual(p.st.id, q.id).x
 
-	p = pInd : q = pMany(p)
+	p = pInd(&quot;&quot;) : q = pMany(p)
 	p = fixIndirection(p, q)
 	assertEqual(p.tp, r.tp).x		&apos; p points to q
 	assertEqual(p.st.id, q.id).x
 
-	p = pInd : q = pChoice( pStr(&quot;x&quot;), pSeq(Array(pSkip(pStr(&quot;(&quot;)), p, pSkip(pStr(&quot;)&quot;))), id) )
+	p = pInd(&quot;&quot;) : q = pChoice( pStr(&quot;x&quot;), pSeq(Array(pSkip(pStr(&quot;(&quot;)), p, pSkip(pStr(&quot;)&quot;))), id) )
 	p = fixIndirection(p, q)
 	assertEqual(p.tp, r.tp).x		&apos; p points to q
 	assertEqual(p.st.id, q.id).x
@@ -2509,13 +2529,13 @@ Function test_Parser_toString()
 	assert_toStr(pSkip(pMany(pItem)),				&quot;(skip item*)&quot;).x
 
 	Dim p As Object, q As Object
-	p = pInd
+	p = pInd(&quot;&quot;)
 	assert_toStr(p,	&quot;(ind Nothing)&quot;).x
 	q = pItem
 	p = fixIndirection(p, q)
 	assert_toStr(p,	&quot;(ind P&quot; &amp; q.id &amp; &quot; ::= &quot; &amp; toString(q) &amp; &quot;)&quot;).x
 
-	p = pInd
+	p = pInd(&quot;&quot;)
 	p = fixIndirection(p, pChoice(pStr(&quot;x&quot;), pSeq(Array(pSkip(pStr(&quot;(&quot;)), p, pSkip(pStr(&quot;)&quot;))), id))
 &apos;	assert_toStr(p,	&quot;(str &apos;x&apos;) +++ ?????? )&quot;).x
 	
