@@ -53,6 +53,7 @@ Type TFnObjs
 	mkTypeVar			As Object
 	maybeMakeArrowType	As Object
 	mkTypeCtor			As Object
+	mkTupleType			As Object
 End Type
 
 
@@ -117,6 +118,7 @@ Function Fn
 		result.mkTypeVar		  = lookupFn(&quot;mkTypeVar&quot;)
 		result.maybeMakeArrowType = lookupFn(&quot;maybeMakeArrowType&quot;)
 		result.mkTypeCtor		  = lookupFn(&quot;mkTypeCtor&quot;)
+		result.mkTupleType		  = lookupFn(&quot;mkTupleType&quot;)
 	End If
 	Fn = result
 End Function
@@ -172,7 +174,7 @@ Function TFn_toString(ByVal f)
 				croak(&quot;TFn_toString: compose partially applied to just 1 arg&quot;)
 			End If
 		Else
-			result = &quot;(&quot; &amp; n &amp; &quot;_&quot; &amp; r
+			result = &quot;(&quot; &amp; n &apos;&amp; &quot;_&quot; &amp; r
 			While Not(isNil(t))
 				h = car(t)
 				t = cdr(t)
@@ -185,7 +187,7 @@ Function TFn_toString(ByVal f)
 			result = result &amp; &quot;)&quot;
 		End If
 	Else
-		result = n &amp; &quot;_&quot; &amp; r
+		result = n &apos;&amp; &quot;_&quot; &amp; r
 	End If
 	TFn_toString = result
 End Function
@@ -242,7 +244,8 @@ Function fnObjs()
 			newFn(&quot;pChoice&quot;,			2, &quot;Parser a -&gt; Parser a -&gt; Parser a&quot;), _
 			newFn(&quot;mkTypeVar&quot;,			1, &quot;Char -&gt; Str&quot;), _
 			newFn(&quot;maybeMakeArrowType&quot;,	2, &quot;Typ -&gt; Maybe Typ -&gt; Typ&quot;), _
-			newFn(&quot;mkTypeCtor&quot;,			2, &quot;Str -&gt; List Typ -&gt; Typ&quot;)_
+			newFn(&quot;mkTypeCtor&quot;,			2, &quot;Str -&gt; [Typ] -&gt; Typ&quot;), _
+			newFn(&quot;mkTupleType&quot;,		2, &quot;Typ -&gt; [Typ] -&gt; Typ&quot;)_
 	))
 	End If
 	fnObjs = result
@@ -417,6 +420,7 @@ applyLast_of_two:
 		Case &quot;pChoice&quot;:		result = pChoice(	a0, a1)
 		Case &quot;maybeMakeArrowType&quot;: result = maybeMakeArrowType(a0, a1)
 		Case &quot;mkTypeCtor&quot;:	result = mkTypeCtor(a0, a1)
+		Case &quot;mkTupleType&quot;:	result = mkTupleType(a0, a1)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select

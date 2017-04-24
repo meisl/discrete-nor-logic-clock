@@ -54,6 +54,7 @@ End Sub
 
 &apos;==================================================================
 
+&apos; TODO: TParser_toString: seriously work out where to put parens and where not
 Function TParser_toString(Optional ByVal p As Variant)
 	Dim result As Variant
 	If isMissing(p) Then
@@ -148,16 +149,27 @@ Function _TParser_toString( _
 				End If
 				result = result &amp; &quot;*&quot;
 			Else
+				Dim altLStr As String, altRStr As String
 				If isNewLines Then
-					result = _TParser_toString(altL, k, indent, isNewLines, rules) _
+					altLStr = _TParser_toString(altL, k, indent, isNewLines, rules)
+					altRStr = _TParser_toString(altR, k, indent, isNewLines, rules)	
+					result = altLStr _
 						   &amp; chr(13) &amp; chr(10) _
 						   &amp; space(len(indent) - 2) _
 						   &amp; &quot;| &quot; _
-						   &amp; _TParser_toString(altR, k, indent, isNewLines, rules)
+						   &amp; altRStr
 				Else
-					result = _TParser_toString(altL, k, indent, isNewLines, rules) _
+					altLStr = _TParser_toString(altL, k, indent, isNewLines, rules)
+					altRStr = _TParser_toString(altR, k, indent, isNewLines, rules)
+					If altL.tp = &quot;bind&quot; Then
+						altLStr = &quot;(&quot; &amp; altLStr &amp; &quot;)&quot;
+					End If
+					If altR.tp = &quot;bind&quot; Then
+						altRStr = &quot;(&quot; &amp; altRStr &amp; &quot;)&quot;
+					End If
+					result = altLStr _
 						   &amp; &quot; | &quot; _
-						   &amp; _TParser_toString(altR, k, indent, isNewLines, rules)
+						   &amp; altRStr
 				End If
 			End If
 		Case &quot;bind&quot;
@@ -194,14 +206,26 @@ Function _TParser_toString( _
 			innerIndent = indent &amp; addIndent &amp; Space(Len(&quot;aX &lt;- &quot;))
 			For i = LBound(ps) To UBound(ps)
 				If isPSkip(ps(i)) Then
-					result = result &amp; &quot; _ &lt;- &quot; _
-									&amp; _TParser_toString(ps(i).st, k, innerIndent, False, rules)
+					If ps(i).st.tp = &quot;choice&quot; Then
+						isNewLines = True
+					Else
+						isNewLines = False
+					End If
+					result = result _
+						   &amp; &quot; _ &lt;- &quot; _
+						   &amp; _TParser_toString(ps(i).st, k, innerIndent, isNewLines, rules)
 				Else
+					If ps(i).tp = &quot;choice&quot; Then
+						isNewLines = True
+					Else
+						isNewLines = False
+					End If
 					result = result &amp; &quot;a&quot; &amp; k
 					args = args &amp; &quot; a&quot; &amp; k
 					k = k + 1
-					result = result &amp; &quot; &lt;- &quot; _
-									&amp; _TParser_toString(ps(i), k, innerIndent, False, rules)
+					result = result _
+						   &amp; &quot; &lt;- &quot; _
+						   &amp; _TParser_toString(ps(i), k, innerIndent, isNewLines, rules)
 				End If
 				result = result &amp; newLine
 				If i &lt; UBound(ps) Then
@@ -689,6 +713,7 @@ End Function
 Function pHexDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
+		result = pInd(&quot;HexDigit&quot;)
 &apos;		result = pChoice(pDecDigit,	pBind(pChoice(pStr(&quot;A&quot;), pStr(&quot;a&quot;)), fstArg(pReturn(10))) )
 &apos;		result = pChoice(result,	pBind(pChoice(pStr(&quot;B&quot;), pStr(&quot;b&quot;)), fstArg(pReturn(11))) )
 &apos;		result = pChoice(result,	pBind(pChoice(pStr(&quot;C&quot;), pStr(&quot;c&quot;)), fstArg(pReturn(12))) )
@@ -704,7 +729,7 @@ Function pHexDigit()
 		Set retUpperA = compose(pReturn, add(10-Asc(&quot;A&quot;)))
 		Set retLowerA = compose(pReturn, add(10-Asc(&quot;a&quot;)))
 		Set Kfail = fstArg(pFail)
-		result = pBind(pItem, compose( _
+		result = fixIndirection(result, pBind(pItem, compose( _
 			ite( inRange(Asc(&quot;0&quot;), Asc(&quot;9&quot;)), _
 				retZero, _
 				ite(inRange(Asc(&quot;A&quot;), Asc(&quot;F&quot;)), _
@@ -724,8 +749,12 @@ End Function
 Function pHexNum()
 	Static result As Object
 	If isNull(result) Then
-		&apos;foldl1 compose(plus, mul 16)
-		Set result = pSeq(Array(pMany1(pHexDigit)), apply(Fn.foldl1, compose(add, mul(16))))
+		result = fixIndirection(pInd(&quot;HexNum&quot;), _
+			pSeq(Array( _
+					pMany1(pHexDigit) _
+				), foldl1(compose(add, mul(16))) _
+			) _
+		)
 	End If
 	pHexNum = result
 End Function
@@ -733,7 +762,12 @@ End Function
 Function pHexLit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pSeq(Array(pSkip(pStr(&quot;0x&quot;)), pHexNum), id)
+		result = fixIndirection(pInd(&quot;HexLit&quot;), _
+			pSeq(Array( _
+				pSkip(pStr(&quot;0x&quot;)), _
+				pHexNum _
+			), id) _
+		)
 	End If
 	pHexLit = result
 End Function
@@ -783,35 +817,55 @@ Function pTypeExpr()
 		&apos;           _ &lt;- many white
 		&apos;         out &lt;- zeroOrOne pRight
 		&apos;      return (if (empty? out) in else (mkArrowType in out))
-		pS = fixIndirection(pS, _
-				pSeq(Array(pSkip(pMany(pWhite)), _
-						   pN, _
-						   pSkip(pMany(pWhite)), _
-						   pZeroOrOne(pRight) _
-				  	 ), Fn.maybeMakeArrowType _
-			  )	)
+		pS = fixIndirection(pS, pSeq(Array( _
+				pSkip(pMany(pWhite)), _
+				pN, _
+				pSkip(pMany(pWhite)), _
+				pZeroOrOne(pRight) _
+			), Fn.maybeMakeArrowType _
+		))
 		
 		&apos; ListType ::= &quot;[&quot; S &quot;]&quot;
-		pListType = pInd(&quot;ListType&quot;)
-		&apos;pListType = fixIndirection(pListType, pSeq(Array(pSkip(pStr(&quot;[&quot;)), _
-		&apos;					 pS, _
-		&apos;				     pSkip(pStr(&quot;]&quot;)) _
-		&apos;			   ), compose(mkTypeCtor(&quot;List&quot;), swap(cons, nil)) _
-		&apos;			 ))
-
-		pListType = fixIndirection(pListType, pSeq(Array(pSkip(pStr(&quot;[&quot;)), _
-							 pSeq(Array(pS, pReturn(nil)), cons), _
-						     pSkip(pStr(&quot;]&quot;)) _
-					   ), mkTypeCtor(&quot;List&quot;) _
-					))
+		pListType = fixIndirection(pInd(&quot;ListType&quot;), pSeq(Array( _
+				pSkip(pStr(&quot;[&quot;)), _
+				pSeq(Array(pS, pReturn(nil)), cons), _
+				pSkip(pStr(&quot;]&quot;)) _
+			), mkTypeCtor(&quot;List&quot;) _
+		))
 
 		&apos; ParenS ::= &quot;(&quot; S? &quot;)&quot;
-		pParenS = pInd(&quot;ParensTyEx&quot;)
-		pParenS = fixIndirection(pParenS, pSeq(Array(pSkip(pStr(&quot;(&quot;)), _
-					 pChoice(pS, pReturn(mkTypeCtor(&quot;Unit&quot;, nil))), _
-				     pSkip(pStr(&quot;)&quot;)) _
-				  ), id))
+		&apos; ParenS ::= &quot;(&quot; (S (&quot;,&quot; S)*)? &quot;)&quot; &apos; with tuple types
+		Dim pTyUnitSuffix As Object, pTySingleSuffix As Object, pTyTupleSuffix As Object
+		pTyUnitSuffix = fixIndirection(pInd(&quot;TyUnitSuffix&quot;), pBind( _
+			pStr(&quot;)&quot;), fstArg(pReturn(mkTypeCtor(&quot;Unit&quot;, nil))) _
+		))
+		pTySingleSuffix = fixIndirection(pInd(&quot;TySingleSuffix&quot;), pSeq(Array( _
+				pS, _
+				pSkip(pStr(&quot;)&quot;)) _
+			), id _
+		))
+		pTyTupleSuffix = fixIndirection(pInd(&quot;TyTupleSuffix&quot;), pSeq(Array( _
+				pS, _
+				pMany1(pSeq(Array( _
+						pSkip(pStr(&quot;,&quot;)), _
+						pS _
+					), id _
+				)), _
+				pSkip(pStr(&quot;)&quot;)) _
+			), Fn.mkTupleType _
+		))
 		
+		pParenS = pInd(&quot;ParensTyEx&quot;)
+		pParenS = fixIndirection(pParenS, pSeq(Array( _
+				pSkip(pStr(&quot;(&quot;)), _
+				foldl1(pChoice, List( _
+					pTyUnitSuffix, _
+					pTySingleSuffix, _
+					pTyTupleSuffix) _
+				) _
+			), id _
+		))
+				
 		&apos; TypeArg ::= ws+ N
 		&apos;pTypeArg = pSeq(Array(pSkip(pMany1(pWhite)), pN), id)
 		pTypeArg = pBind(pMany1(pWhite), fstArg(pN))
@@ -921,6 +975,31 @@ Function mkTypeCtor(Optional ctorName As String, Optional typeArgs As Object)
 		End If
 	End If
 	mkTypeCtor = result
+End Function
+
+Function mkTupleType(Optional x As Variant, Optional xs As Variant)
+	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.mkTupleType : End If
+	Dim result As Variant
+	If isMissing(xs) Then
+		If isMissing(x) Then
+			result = oFn
+		Else
+			result = apply(oFn, x)
+		End If
+	Else
+		result = &quot;(Tuple&quot; &amp; (length(xs) + 1)
+		Dim ts As Object
+		ts = map(Fn.toString, cons(x, xs))
+		Dim listJoin As Object
+		&apos;  \acc a.concat acc (concat &quot;, &quot; a)
+		&apos;= \acc a.(swap concat) (concat &quot;, &quot; a) acc
+		&apos;= swap \a acc.(swap concat) (concat &quot;, &quot; a) acc
+		&apos;= swap \a.(swap concat) (concat &quot;, &quot; a)
+		&apos;= swap ((swap concat) ° (concat &quot;, &quot;))
+		listJoin = swap(compose(swap(concat) , concat(&quot;, &quot;)))
+		result = result &amp; &quot; [&quot; &amp; foldl1(listJoin, ts) &amp; &quot;])&quot;
+	End If
+	mkTupleType = result
 End Function
 
 
@@ -2232,7 +2311,16 @@ Function test_Parser_TypeExpr()
 	assert_parses(p, &quot;(())&quot;, 	&quot;(Unit [])&quot;, 5).x
 	assert_parses(p, &quot;[()]&quot;, 	&quot;(List [(Unit [])])&quot;, 5).x
 	refute_parses(p, &quot;([])&quot;).x
-		 
+	
+	refute_parses(p, &quot;,&quot;).x
+	refute_parses(p, &quot;(,)&quot;).x
+	refute_parses(p, &quot;(a,)&quot;).x
+	refute_parses(p, &quot;(,b)&quot;).x
+	&apos; TODO: double toString on the inner types since we don&apos;t yet represent types as proper objects
+	assert_parses(p, &quot;(a,b)&quot;, &quot;(Tuple2 [&apos;&apos;a&apos;, &apos;&apos;b&apos;])&quot;, 6).x
+	assert_parses(p, &quot;(a ,b, c)&quot;, &quot;(Tuple3 [&apos;&apos;a&apos;, &apos;&apos;b&apos;, &apos;&apos;c&apos;])&quot;, 10).x
+	assert_parses(p, &quot;((a,b),c)&quot;, &quot;(Tuple2 [&apos;(Tuple2 [&apos;&apos;a&apos;, &apos;&apos;b&apos;])&apos;, &apos;&apos;c&apos;])&quot;, 10).x
+	 
 	Dim fns As Object, f As Object, fName As String, typStr As String
 	fns = fnObjs
 	While Not(isNil(fns))
