@@ -14,7 +14,7 @@ Type Parser
 End Type
 
 Public applyP_callCount As Integer
-Public _applyP_callCount As Integer
+Public _applyP_callCount(0 To 1) As Integer
 Public applyP_return As Integer
 Public applyP_fail As Integer
 Public applyP_item As Integer
@@ -433,31 +433,19 @@ End Function
 &apos; or (and only if p1 fails) if p2 succeeds, returns p2&apos;s result and pos.
 &apos; fails if both, p1 and p2 fail
 Function pChoice(Optional p1 As Parser, Optional p2 As Parser)
-	Dim oFn As Object
-	If isNull(oFn) Then
-		&apos;list1 = swap(cons, nil)
-		&apos;      = \y.(swap cons) nil y
-		&apos;      = \y.cons y nil
-		&apos;      :: a -&gt; [a]
-		&apos;list2 = (swap cons) ° list1 
-		&apos;      =   \y.(swap cons) list1 y
-		&apos;      =   \y.(swap cons) (\y.cons y nil) y
-		&apos;      =   \y.(swap cons) (cons y nil)
-		&apos;      = \x y.(swap cons) (cons y nil) x 
-		&apos;      = \x y.cons x (cons y nil)
-		&apos;      :: a -&gt; a -&gt; [a]
-		Set oFn = Fn.pChoice
-	End If
+	Dim oFn As Object :	If isNull(oFn) Then : oFn = Fn.pChoice : End If
+	Dim result As Object
 	If isMissing(p1) Then
-		pChoice = oFn
+		result = oFn
 	ElseIf isMissing(p2) Then
-		pChoice = apply(oFn, p1)
+		result = apply(oFn, p1)
 	Else
 		&apos; TODO: @pChoice: strip out always failing parsers
 		&apos; TODO: @pChoice: if p1 always succeeds strip out p2
 		&apos; linearize choice of choice:
-		If (p1.tp = &quot;choice&quot;) Then
-			pChoice = pChoice(p1.st(0), pChoice(p1.st(1), p2))
+		If (p1.tp = &quot;choice&quot;) Then &apos; if left-hand-side is a choice...
+			&apos;...then push its right alternative over to *our* right:
+			result = pChoice(p1.st(0), pChoice(p1.st(1), p2))
 		Else
 			If (p1.tp = &quot;ind&quot;) Then
 				If isNull(p1.st) Then
@@ -466,9 +454,16 @@ Function pChoice(Optional p1 As Parser, Optional p2 As Parser)
 					msgbox(&quot;pChoice!: &quot; &amp; toString(mkParser(&quot;choice&quot;, Array(p1, p2)))
 				End If
 			End If
-			pChoice = mkParser(&quot;choice&quot;, Array(p1, p2))
+			result = mkParser(&quot;choice&quot;, Array(p1, p2))
+			&apos; we use .st1 to count the total nr of alternatives:
+			If p2.tp = &quot;choice&quot; Then
+				result.st1 = p2.st1 + 1
+			Else
+				result.st1 = 2
+			End If
 		End If
 	End If
+	pChoice = result
 End Function
 
 &apos; pattern-matches p against &quot;q +++ return Empty&quot; where q any parser
@@ -881,7 +876,8 @@ Function _applyP( _
 	ByRef endPos As Integer, _
 	ByVal isUnderSkip As Boolean _
 ) As Variant
-	_applyP_callCount = _applyP_callCount + 1
+	_applyP_callCount(0) = _applyP_callCount(0) + 1
+	If isUnderSkip Then : _applyP_callCount(1) = _applyP_callCount(1) + 1 : End If
 	Dim result As Variant
 	Dim i As Integer
 	Dim innerParser As Parser
@@ -904,12 +900,18 @@ _applyP_begin:
 			If Not(isUnderSkip) Then
 				result = match
 			End If
-		Case &quot;choice&quot;	&apos; tail-recursive
+		Case &quot;choice&quot;	&apos; tail-recursive (in the 2nd alternative)
+_applyP_choiceL:
 			result = _applyP(p.st(0), s, pos, endPos, isUnderSkip)
 			If endPos &lt; 0 Then
 				&apos;result = _applyP(p.st(1), s, pos, endPos, isUnderSkip)
-				p = p.st(1)
-				Goto _applyP_begin
+				If p.st1 &gt; 2 Then	&apos; p.st1 = total nr alternatives
+					p = p.st(1)	&apos; 2nd alternative is a choice again
+					Goto _applyP_choiceL
+				Else	&apos; 2nd alt is NOT a choice
+					p = p.st(1)
+					Goto _applyP_begin
+				End If
 			End If
 		Case &quot;item&quot;
 			If pos &gt; Len(s) Then
@@ -1151,7 +1153,7 @@ end_of_Parser_tests:
 
 		msgbox(parserInstCount &amp; &quot; Parser instances&quot; _
 				&amp; chr(13) &amp; &quot;applyP_callCount: &quot; &amp; applyP_callCount _
-				&amp; chr(13) &amp; &quot;_applyP_callCount: &quot; &amp; _applyP_callCount _
+				&amp; chr(13) &amp; &quot;_applyP_callCount: &quot; &amp; _applyP_callCount(0) &amp; &quot;/&quot; &amp; _applyP_callCount(1) _
 				&amp; chr(13) &amp; &quot;applyP_str: &quot; &amp; applyP_str _
 				&amp; chr(13) &amp; &quot;applyP_choice: &quot; &amp; applyP_choice _
 				&amp; chr(13) &amp; &quot;applyP_item: &quot; &amp; applyP_item _
@@ -2006,7 +2008,7 @@ Function test_Parser_TypeExpr()
 	assert_parses(p, &quot;List (Maybe a) b&quot;,&quot;(List [(Maybe [&apos;a]), &apos;b])&quot;, 17).x
 	
 	refute_parses(p, &quot;-&gt;a&quot;).x
-	&apos;refute_parses(p, &quot;a-&gt;&quot;).x
+	&apos;refute_parses(p, &quot;a-&gt;&quot;).x	&apos; parses the a as a TypeVar, then stops
 
 	&apos; skips over trailing whitespace:
 	assert_parses(p, &quot;Bool   &quot;, 				&quot;Bool&quot;, 8).x
@@ -2020,9 +2022,23 @@ Function test_Parser_TypeExpr()
 	assert_parses(p, &quot; Int -&gt; Int           &quot;,	&quot;(-&gt; Int Int)&quot;, 23).x
 	assert_parses(p, &quot; Int  -&gt; Str -&gt;  Bool &quot;,	&quot;(-&gt; Int (-&gt; Str Bool))&quot;, 23).x
 
+	&apos; fn type variations:
+	assert_parses(p, &quot;((a) -&gt; ((b)))&quot;, &quot;(-&gt; &apos;a &apos;b)&quot;, 15).x
+	assert_parses(p, &quot; a -&gt; (b -&gt; c)&quot;, &quot;(-&gt; &apos;a (-&gt; &apos;b &apos;c))&quot;, 15).x
+	assert_parses(p, &quot; a -&gt;  b -&gt; c &quot;, &quot;(-&gt; &apos;a (-&gt; &apos;b &apos;c))&quot;, 15).x
+	assert_parses(p, &quot;(a -&gt; b) -&gt; c &quot;, &quot;(-&gt; (-&gt; &apos;a &apos;b) &apos;c)&quot;, 15).x
+	assert_parses(p, &quot;(a -&gt; (b)-&gt; c)&quot;, &quot;(-&gt; &apos;a (-&gt; &apos;b &apos;c))&quot;, 15).x
+
+	&apos; some real types:
 	assert_parses(p, getFnTypeStr(Fn.isNil), &quot;(-&gt; (List [&apos;a]) Bool)&quot;, 15).x
 	assert_parses(p, getFnTypeStr(Fn.flatten), &quot;(-&gt; (List [(List [&apos;a])]) (List [&apos;a]))&quot;, 22).x
-
+	&apos; type of fn compose:
+	assert_parses(p, &quot;(b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c&quot;, _
+					 &quot;(-&gt; (-&gt; &apos;b &apos;c) (-&gt; (-&gt; &apos;a &apos;b) (-&gt; &apos;a &apos;c)))&quot;, 31).x
+	&apos; type of pBind:
+	assert_parses(p, &quot;Parser a -&gt; (a -&gt; Parser b) -&gt; Parser b&quot;, _
+					 &quot;(-&gt; (Parser [&apos;a]) (-&gt; (-&gt; &apos;a (Parser [&apos;b])) (Parser [&apos;b])))&quot;, 40).x			
+		 
 	Dim fns As Object, f As Object, fName As String, typStr As String
 	fns = fnObjs
 	While Not(isNil(fns))
