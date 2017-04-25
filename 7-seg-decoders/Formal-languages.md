@@ -97,16 +97,17 @@ character sequences, enclosed in double quotes:
 ```
 This defines the language that consists of only one word, namely the one-character-sequence "x".
 
-Next comes *concatenation*, which is denoted simply by putting things next to each other:
+Next comes ***concatenation***, which is denoted simply by putting things next to each other:
 ```
   S ::= "x" T
   T ::= "y"
 ```
-This one defines the singleton (one-element-set) language of the sequence "xy". We could have as well written:
+This one defines the singleton (one-element-set) language of the sequence "xy". We could as well have written:
 ```
   S ::= "xy"
 ```
 Here we can already see that in general there are many possible grammars for a single language.
+
 Anyways, before introducing the next concept, let's see what we can do with what we have right now.
 Consider
 ```
@@ -114,8 +115,50 @@ Consider
 ```
 This is a proper grammar, and it does define a language. How many words does the language contain? What - if any - are those words like? [^2]
 
+Next comes ***alternation***, or ***choice***, which lists alternatives and is denoted by putting a `|` in between:
+```
+  S ::= "x" | "y"
+```
+That's the two-word language containing "x" and "y", and nothing else.
+From now on we'll use a set-like notation to talk about languages: `{'"x", "y"}` will stand for the language
+containing the words "x" and "y", exactly.
+
+At this point - with both, concatenation and alternation - we need some means for disambiguating.
+For example, what should we take the following grammar to define:
+```
+  S ::= "x" | "y" "z"
+```
+Is it `{"xz", "yz"}` or rather `{"x", "yz"}`?
+
+**Please:** do read the previous sentence one more time! And once more. Convince yourself that both are reasonable choices - and that there are no other reasonable interpretations!
+
+We will use parentheses `(` and `)` for disambiguation, and adopt some convention of "precedence" which will allow
+for leaving off some of the parentheses for the sake of readability.
+So, fully parenthesized,
+```
+  S ::= ("x" | "y") "z"
+```
+would define `{"xz", "yz"}` and
+```
+  S ::= "x" | ("y" "z")
+```
+would define `{"xy", "xz"}`. We'll take the latter as the default, so
+```
+  S ::= "x" | "y" "z"
+```
+will be short for
+```
+  S ::= "x" | ("y" "z")
+```
+In other words: ***concatentation binds more strongly than alternation***.
+
+
+
+
+
+
 ---
 [^1]: Well, I just "curried" the problem... (sorry for the rather nerdy joke, just couldn't resist)
 
-[^2]: The language contains exactly one word, namely the infinite sequence of "x"s
+[^2]: The language contains exactly one word, namely the infinite sequence of "x"s. Not so hard, actually. But what about this slight variation: `S ::= S "x"`? ... ;)
 
