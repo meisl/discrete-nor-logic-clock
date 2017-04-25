@@ -86,11 +86,35 @@ We'll use the symbol `::=` to denote this "attaching" action, so:
   F ::= ...
 ```
 is one grammar with three rules, attaching names "S", "T" and "F" to ... well something.
-By convention we'll consider the "S" rule - or alternatively the first rule stated - as the start rule
+By convention we'll consider the "S" rule - or alternatively simply the first one - as the start rule.
 
+Now for the other side of the definitions. We'll allow rule names (left side of `::=`) there, which
+are called *nonterminals*, btw.
+However, more is needed to make things interesting. First we'll add *terminals* which will be just plain
+character sequences, enclosed in double quotes:
+```
+  S ::= "x"
+```
+This defines the language that consists of only one word, namely the one-character-sequence "x".
 
+Next comes *concatenation*, which is denoted simply by putting things next to each other:
+```
+  S ::= "x" T
+  T ::= "y"
+```
+This one defines the singleton (one-element-set) language of the sequence "xy". We could have as well written:
+```
+  S ::= "xy"
+```
+Here we can already see that in general there are many possible grammars for a single language.
+Anyways, before introducing the next concept, let's see what we can do with what we have right now.
+Consider
+```
+  S ::= "x" S
+```
+This is a proper grammar, and it does define a language. How many words does the language contain? What - if any - are those words like? [^2]
 
-  ___
-  [^1]: Well, I just "curried" the problem... (sorry for the rather nerdy joke, just couldn't resist)
-  
+---
+[^1]: Well, I just "curried" the problem... (sorry for the rather nerdy joke, just couldn't resist)
+[^2]: The language contains exactly one word, which is the infinite sequence of "x"s
 
