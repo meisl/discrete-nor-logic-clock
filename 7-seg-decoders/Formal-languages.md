@@ -126,7 +126,7 @@ That's the two-word language containing "x" and "y", and nothing else.
 From now on we'll use a set-like notation to talk about languages: `{'"x", "y"}` will stand for the language
 containing the words "x" and "y", exactly.
 
-At this point - with both, concatenation and alternation - we need some means for disambiguating.
+At this point - with both, concatenation and alternation - we need some means of ***disambiguation***.
 For example, what should we take the following grammar to define:
 ```
   S ::= "x" | "y" "z"
