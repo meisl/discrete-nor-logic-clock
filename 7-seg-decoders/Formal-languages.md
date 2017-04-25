@@ -136,7 +136,9 @@ For example, what should we take the following grammar to define:
 ```
 Is it `{"xz", "yz"}` or rather `{"x", "yz"}`?
 
-**Please:** do read the previous sentence one more time! And once more. Convince yourself that both are reasonable choices - and that there are no other reasonable interpretations!
+**Please:** do read the previous sentence one more time!
+And once more.
+Convince yourself that both options are equally reasonable - and that these two are the *only* reasonable interpretations!
 
 We will use parentheses `(` and `)` for disambiguation, and adopt some convention of "precedence" which will allow
 for leaving off some of the parentheses for the sake of readability.
