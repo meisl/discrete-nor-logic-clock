@@ -160,6 +160,10 @@ will be short for
 ```
 In other words: ***concatentation binds more strongly than alternation***.
 
+[put ex: balanced parentheses]
+[? mention that balanced parentheses is beyond regular]
+
+
 
 ### 5.2 Grammars: Multiplicity
 
