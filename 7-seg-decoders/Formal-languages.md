@@ -97,6 +97,9 @@ character sequences, enclosed in double quotes:
 ```
 This defines the language that consists of only one word, namely the one-character-sequence "x".
 
+
+### 5.1 Grammars: Concatenation, Alternation and Disambiguation
+
 Next comes ***concatenation***, which is denoted simply by putting things next to each other:
 ```
   S ::= "x" T
@@ -153,8 +156,16 @@ will be short for
 In other words: ***concatentation binds more strongly than alternation***.
 
 
+### 5.2 Grammars: Multiplicity
+
+... intro `?`, `*` and `+`
+
+In other words: ***multiplicity operators bind more strongly than concatenation and alternation***.
 
 
+### 5.3 Grammars: Character classes
+
+... intro `[abc]`, and `[a-z]`
 
 
 ---
