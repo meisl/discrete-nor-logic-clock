@@ -88,8 +88,8 @@ We'll use the symbol `::=` to denote this "attaching" action, so:
 is one grammar with three rules, attaching names "S", "T" and "F" to ... well something.
 By convention we'll consider the "S" rule - or alternatively simply the first one - as the start rule.
 
-Now for the other side of the definitions. We'll allow rule names (left side of `::=`) there, which
-are called *nonterminals*, btw.
+Now for the other side of the definitions. We'll allow rule names (left side of `::=`), or *nonterminals*
+on the right side.
 However, more is needed to make things interesting. First we'll add *terminals* which will be just plain
 character sequences, enclosed in double quotes:
 ```
