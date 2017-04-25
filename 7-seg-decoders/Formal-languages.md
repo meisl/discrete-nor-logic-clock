@@ -54,11 +54,11 @@ There are two things to note here:
 Since a language is nothing but a set, couldn't we just name all the elements?
 
 Well, we can - **if:**
-+ the language is finite (and small, to be practible)
-+ AND: every word in the language is finite (and small... you get it)
++ the language is finite (and somewhat small, to be practible)
++ AND: every word in the language is finite (and somewhat small... you get it)
 
 These two restrictions already give a hint that the class of languages we can (practically) define in this way
-is rather small - and not very interesting.
+is rather limited - and actually not very interesting.
 Additionally: this approach does not provide any means of classifying parts of words whatsoever.
 
 Again, as you may have recognized by now, I'm trying to push you towards sub-dividing problems, or separating concerns.
