@@ -2,6 +2,8 @@
 
 ## 1. What's a formal language?
 
+[maybe put the rest into scope, ie say that it's not complete, nor ISO, nor pure EBNF, ...]
+
 A *formal* language differs from a *natural* language like English in quite some ways:
 + it is a mathematical construct, precisely defined; not spoken
 + it is in fact set of *words*, where the term *word* has a precise meaning: a sequence of characters,
