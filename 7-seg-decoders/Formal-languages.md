@@ -66,7 +66,7 @@ The ones I'm aiming for here are:
 + feasability: how to deal with non-finiteness?
 + sheer practicality: even if theoretically possible, is it worth the effort?!
 + last, not least - *does it make sense?*
-  That is: identify what it is that we want to express, break it down into parts - and **make these parse *explicit***
+  That is: identify what it is that we want to express, break it down into parts - and **make these parts *explicit***
 
 We'll start with addressing the last point, and add more as we go.
 
