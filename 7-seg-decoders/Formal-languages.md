@@ -45,7 +45,7 @@ In case of a No, what has been built up so far can be used to produce (hopefully
 The structured representation is called "AST", Abstract Syntax Tree.
 
 There are two things to note here:
-+ the AST, as being structured, can be viewed as a small step towards semantics.
++ the AST, as being structured, can be viewed as a small step towards semantics already.
   It can in fact be argued that the distinction we've made is somewhat arbitrary, and even that fusing together
   syntactic and semantic analysis is advantageous. For now, however, we'll keep them separate and focus on syntax.
 + the phrase **specific to a language** (or at least me emphasizing it): by putting it in I have effectively turned
