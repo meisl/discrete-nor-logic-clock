@@ -116,5 +116,6 @@ This is a proper grammar, and it does define a language. How many words does the
 
 ---
 [^1]: Well, I just "curried" the problem... (sorry for the rather nerdy joke, just couldn't resist)
-[^2]: The language contains exactly one word, which is the infinite sequence of "x"s
+
+[^2]: The language contains exactly one word, namely the infinite sequence of "x"s
 
