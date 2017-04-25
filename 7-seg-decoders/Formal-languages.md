@@ -21,7 +21,7 @@ Well, any computer program (source code) is *a word of a certain language*, so..
 
 Note that it's *one* word, not many.
 
-Of course there is source code that is not syntactically correct - but then it's just not "in the language".
+Of course there exists source code that is not syntactically correct - but then that's simply not "in the language".
 Now there are programs that *are* syntactically correct but which the compiler still keeps complaining about.
 These then are in the language, but the compiler is not able to attach a *meaning* to them (or isn't sure which to attach).
 This is called *semantic* incorrectness / incompleteness / ambiguity - and a separate problem.
