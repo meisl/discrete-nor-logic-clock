@@ -121,7 +121,7 @@ By convention we'll consider the "S" rule - or alternatively simply the first on
 
 ### 2.1. Terminals and escaping
 
-Now for the other side of the definitions. We'll allow rule names which we had on the left-hand-side (lhs) of `::=`, or *nonterminals* on the right-hand-side (rhs) as well.
+Now for the other side of the definitions. We'll allow rule names which we had on the left-hand-side (lhs) of `::=`, or *nonterminals* also on the right-hand-side (rhs).
 However, more is needed to make things interesting. First we'll add *terminals* which will be just plain character sequences, enclosed in double quotes:
 ```
   S ::= "x"
@@ -677,6 +677,9 @@ So now `PCList` follows the same pattern as double quotes above: one or more of 
 
 TODO: character ranges
 
+
+---
+Footnotes
 
 [^1]: Well, I just "curried" the problem... (sorry for the rather nerdy joke, just couldn't resist)
 
