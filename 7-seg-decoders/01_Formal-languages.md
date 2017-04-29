@@ -584,7 +584,7 @@ So, with everthing together, here's the final grammar for Logic expressions:
   T ::= F ("*" W* T)?
   F ::= C | I | N | "(" S ")"
   C ::= [01]
-  I ::= ([a-z] | [A-Z])+
+  I ::= [A-Za-z]+
   N ::= "!" W* F
   W ::= [ \t]
 ```
@@ -603,15 +603,21 @@ All other rules get names starting with an upper-case letter.
 
 Won't enforce these conventions for object-level grammars, just use them for the meta-grammar.
 
-### 3.2. A grammar is a list of rules
+### 3.2. A grammar's just a list of rules
+
+The very first rule in the grammar for grammars is just to fix the start rule. Next come definitions for whitespace `ws` and a newline `nl`. The latter is trying to be liberal about all that mess with Windows vs Unix vs Mac style newlines, while in any instance matching exactly one.
+`LineSep` then combines the two to "eat up" any preceeding as subsequent whitespace, but still require the derivation to continue on an actual new line.
+
+`Grammar` finally does the "heavy lifting": it requires at least one `Rule`, and each of them must start on a line of its own.
 ```
-       ws ::= [ \t]
-       nl ::= "\n"
-    ident ::= [A-Za-z]+
-     mult ::= [*?+]
-     
-  
-    Grammar ::= StartRule (nl+ Rule)*
+          S ::= Grammar
+
+         ws ::= [ \t]
+         nl ::= "\r" "\n"?
+              | "\n" "\r"?
+    LineSep ::= (ws* nl ws*)
+
+    Grammar ::= StartRule (LineSep+ Rule)*
   StartRule ::= Rule
 ```
 The extra `StartRule` rule may look bogus, but it makes explicit that every grammar has one special rule: the start rule.
@@ -619,64 +625,114 @@ The extra `StartRule` rule may look bogus, but it makes explicit that every gram
 
 ### 3.3. The rule for rules
 
-Due to concatenation having precedence over alternation we can state that a rule's right-hand-side (rhs) is generally an alternation of concatenations. This includes alternations with just one alternative, as well as concatenations of just one element.
+`mult` simply defines the set of (symbols for) multiplicity operators. `ident` determines what rule names must look like - and we're quite liberal there: they must start with either an underscore `"_"` or a letter (case doesn't matter). After that may come more letters, more underscores, and additionally digits `[0-9]` and dashes `"-"`.
 
-Regarding precedence we observe that alternation and concation are for grammars what are addition `"+"` and `"*"` for logic expressions. So we will adapt the pattern with right-recursion from there.
+Now for the `Rule` rule itself: since concatenation has precedence over alternation we can make the following general statement:
+<br>**A rule's rhs is an alternation of concatenations.** This includes alternations with just one alternative, as well as concatenations of just one element.
 
-But first we have express that a rule has lhs (`ident`), `"::="` and rhs (`Alt` for alternation, corresponds to `S` in logic expressions).
+Doesn't that remind you of something? Yes, it's just like "sum-of-products". And indeed: alternation and concation are for grammars what addition `"+"` and `"*"` are for logic expressions. So we will just adapt the pattern with right-recursion from there.
+`Alt` stands for alternation and `Con` for concatenation. The `LineSep?` in `Alt` allows for putting additional alternatives on the next line, as we have been doing routinely.
+```        .
+      mult ::= [*?+]
+     ident ::= [_A-Za-z][\-0-9_A-Za-z]+
+
+      Rule ::= ws* ident ws* "::=" Alt
+       Alt ::= ws* Con ws* (LineSep? "|" Alt)?
+       Con ::= Atom mult? (ws+ Con)?
+      Atom ::= "(" Alt ")"
+             | Terminal
+             | CClass
 ```
-           Rule ::= ws* ident ws* "::=" Alt
-		    Alt ::= ws* Con ws* ("|" Alt)?
-            Con ::= Atom mult? (ws+ Con)?
-           Atom ::= "(" Alt ")"
-                  | Terminal
-                  | CClass
-```
-Let's have a closer look at the `Con` rule ("concatenation"). It corresponds to the `T` rule from logic expressions, but in contrast to multiplication we do not have any symbol for the concatenation operator. That's not a big problem, we just leave it out. The only thing to change is that we now must require at least one preceding `ws` before the recursive `Con` s.t. it's properly separated from what comes before it.
+Let's have a closer look at the `Con` rule. It corresponds to the `T` rule from logic expressions, but in contrast to multiplication we do not have any symbol for the concatenation operator. That's not a big problem, we just leave it out. The only thing to change is that we now must require at least one preceding `ws` before the recursive `Con` s.t. it's properly separated from what comes before it.
 
 Another difference is that the optional `mult` is postfix, rather than prefix as unary negation `"!"` in logic expressions.
 
-The name "Atom" may seem strange since the very first alternative of `Atom` is a concatenation of three! However, at this point we're done with the two main concepts of alternation and concatenation, so with regard to *them* everything from here on is indeed indivisible.
+[TODO: what about eg `*+` ? (they're not allowed)]
 
-`Atom` corresponds to `F` so it is here where we cover parentheses. Similarly, `Terminal` corresponds to `C` but it's a bit more complicated, and even more so are character classes, `CClass`.
+The name "Atom" may seem strange since the very first alternative of `Atom` is a concatenation of three! However, at this point we're done with the two main concepts of alternation and concatenation, so w.r.t. *them* everything from here on is indeed indivisible.
+
+`Atom` corresponds to `F`, so it is here where we cover parentheses. Similarly, `Terminal` corresponds to `C` but it's a bit more complicated, and even more so are character classes, `CClass`.
 
 ### 3.4. The rule for terminals
 
 Well, they have double quotes `"` around them. The simplest way to  write these as terminals (themselves) is a single-char character class: `["]`.
 What's in between is a bit more complicated:
 ```
-  Terminal ::= ["] (escQ | [-"\\])+ ["]
-      escQ ::= "\\" [nrt\\]
+       escQ ::= "\\" [nrt\\"]
+
+   Terminal ::= ["] (escQ | [-"\\])+ ["]
 ```
 Here we formally define the **escaping mechanism for double quotes**, just as we did in plain English in [2.1 Terminals and escaping](#21-terminals-and-escaping).
 
-`"\""` is an object-level `"` and `"\\"` is an object-level `\`. `"\n"`, `"\r"` and `"\t"` denote NEWLINE, RETURN and TAB, respectively. So that's `escQ` ("escape quotes").
+An escape sequence `escQ` ("escape quotes") is a single `\` (denoted by `"\\"`) followed by
 
-Besides those escape sequences we want to allow *anything but* (unescaped) `"` and `\`. For this we use the **negative character class** `[-"\\]` which says exactly that: *anything but*...
-Note that inside a character class - negative or positive - there is no need to require `"` to be escaped, but `\` still needs to be escaped since we'll use again for the escaping mechanism for character classes.
+  - `n`, `r`, `t` s.t. in the object grammar `"\n"`, `"\r"` and `"\t"` will denote NEWLINE, RETURN and TAB, respectively
+  - `\` (denoted by `\\` in the character class) s.t. in the object grammar `"\\"` will denote a single object-level `\`
+  - `"` s.t. in the object grammar `"\""` will denote a single object-level `"`
+
+You may at first find all this talk about "object grammar" etc. mind-boggling, but once you've realized that "meta/object" is a *relation* it becomes actually quite simple:
+Let's call our grammar of grammars G. It defines what grammars must look like. For example the grammar of logic expressions, call it H. H consists of symbols like `::=`, `|` etc., and G says how those symbols may be combined. In other words: G defines the syntax of H, or H is the object-grammar of G.
+<br>So: **the object-level of G is the meta-level of H**, they're *identical*.
+<br>But of course H itself has its own object-level, namely the language *it* talks about. This is the object-level that is meant by "in the object grammar ... some object-level x".
+
+Now here comes the twist: **G and H may as well be identical!** That's perfectly fine. G simply can talk about itself, why not?
+
+
+Ok, back to `Terminal`: besides an escape sequence we also want to allow *anything but* (unescaped) `"` and `\`. For this we use the **negative character class** `[-"\\]` which says exactly that: *anything but*...
+<br>Note that inside a character class - negative or positive - there is no need to require `"` to be escaped. However, `\` still must be escaped since we'll be using it for the escaping mechanism for character classes as well.
 
 
 ### 3.5. The rule for character classes
 
-The simplest character class to define is dot: `"."`. All others are enclosed by `[` and `]` and may either be negative or positive, indicated by presence, or non-presence of a `-` right after the opening `[`, resp. (`NCList` or `PCList`, just like negation `"!"` in logic expressions).
+The simplest character class to define is dot: `"."`. All others are enclosed by `[` and `]` and may either be negative or positive, indicated by the presence, or non-presence of a `-` right after the opening `[`, resp. (`NCList` or `PCList`, just like negation `"!"` in logic expressions).
 ```
-  CClass ::= "." | ("[" (NCList | PCList) "]")
-  NCList ::= "-" PCList
-  PCList ::= (escC | [-\[\-\]\\])+
-  CRange ::= PCList "-" PCList (PCList | CRange)+
-    escC ::= "\\" [nrt\[\-\]\\"]
+       escC ::= "\\" [nrt\[\-\]\\"]
+
+     CClass ::= "." | ("[" (NCList | PCList) "]")
+     NCList ::= "-" PCList
+     PCList ::= (CCItem ("-" CCItem)?)+
+     CCItem ::= escC | [-\[\-\]\\]
 ```
-Again we need an ***escaping mechanism***, now ***for character classes***. Escape sequences are defined by `escC`; as usual they consist of one (!) `\` (denoted by `"\\"`), followed by
+Again we need an ***escaping mechanism***, now ***for character classes***. Escape sequences are defined by `escC`; as usual they consist of one `\` followed by
 
  - `n`, `r`, `t` for unprintable characters
  - single `\` - denoted by `\\` inside char class - for the backslash itself
  - "trouble-makers" w.r.t. character class notation, namely `[`, `-` and `]`
- - finally `"` which we actually don't need to require escaping but by adding it here we can *allow* it to be escaped. It is so common to escape `"` when the object level is meant, so by simply allowing it even if not strictly necessary just makes people happier.
+ - finally `"` which, as we said, need not be required to be escaped but by adding it here we can just *allow* this. It's so common to escape `"` when the object level is meant, so by simply allowing it even if not strictly necessary just makes people happier.
 
-So now `PCList` follows the same pattern as double quotes above: one or more of either an escape sequence `escC` or *anything but* the "trouble makers".
+So `CCItem` follows the same pattern as double quotes above: either an escape sequence `escC` or *anything but* the "trouble makers".
 
-TODO: character ranges
+Finally `PCList` defines how `CCItem`s may be combined inside `[` and `]`. There may one or more (`+`) of the following: either a single `CCItem`, or two separated by a `-`.
 
+### 3.6. Closing the loop
+
+With a bit of rearrangement, here's the whole altogether:
+```
+          S ::= Grammar
+
+         ws ::= [ \t]
+         nl ::= "\r" "\n"?
+              | "\n" "\r"?
+    LineSep ::= (ws* nl ws*)
+       mult ::= [*?+]
+      ident ::= [_A-Za-z][\-0-9_A-Za-z]+
+       escQ ::= "\\" [nrt\\"]
+       escC ::= "\\" [nrt\[\-\]\\"]
+
+    Grammar ::= StartRule (LineSep+ Rule)*
+  StartRule ::= Rule
+       Rule ::= ws* ident ws* "::=" Alt
+        Alt ::= ws* Con ws* (LineSep? "|" Alt)?
+        Con ::= Atom mult? (ws+ Con)?
+       Atom ::= "(" Alt ")"
+              | Terminal
+              | CClass
+   Terminal ::= ["] (escQ | [-"\\])+ ["]
+     CClass ::= "." | ("[" (NCList | PCList) "]")
+     NCList ::= "-" PCList
+     PCList ::= (CCItem ("-" CCItem)?)+
+     CCItem ::= escC | [-\[\-\]\\]
+```
 
 ---
 Footnotes
