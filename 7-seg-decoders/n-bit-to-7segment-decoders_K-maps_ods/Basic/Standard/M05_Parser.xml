@@ -2592,6 +2592,7 @@ Function test_Parser_toString()
 	f = TParser_toString
 	assertEqual(isFn(f), True).x
 	assertEqual(arity(f),   1).x
+	assertEqual(apply(f, pFail), &quot;fail&quot;).x
 	
 	MsgBox(toString(pTypeExpr))
 	

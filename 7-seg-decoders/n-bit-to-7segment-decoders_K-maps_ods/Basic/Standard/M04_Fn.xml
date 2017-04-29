@@ -54,6 +54,8 @@ Type TFnObjs
 	maybeMakeArrowType	As Object
 	mkTypeCtor			As Object
 	mkTupleType			As Object
+	
+	TASN_toString		As Object
 End Type
 
 
@@ -119,6 +121,8 @@ Function Fn
 		result.maybeMakeArrowType = lookupFn(&quot;maybeMakeArrowType&quot;)
 		result.mkTypeCtor		  = lookupFn(&quot;mkTypeCtor&quot;)
 		result.mkTupleType		  = lookupFn(&quot;mkTupleType&quot;)
+
+		result.TASN_toString = lookupFn(&quot;TASN_toString&quot;)
 	End If
 	Fn = result
 End Function
@@ -245,7 +249,9 @@ Function fnObjs()
 			newFn(&quot;mkTypeVar&quot;,			1, &quot;Char -&gt; Str&quot;), _
 			newFn(&quot;maybeMakeArrowType&quot;,	2, &quot;Typ -&gt; Maybe Typ -&gt; Typ&quot;), _
 			newFn(&quot;mkTypeCtor&quot;,			2, &quot;Str -&gt; [Typ] -&gt; Typ&quot;), _
-			newFn(&quot;mkTupleType&quot;,		2, &quot;Typ -&gt; [Typ] -&gt; Typ&quot;)_
+			newFn(&quot;mkTupleType&quot;,		2, &quot;Typ -&gt; [Typ] -&gt; Typ&quot;), _
+			_
+			newFn(&quot;TASN_toString&quot;,	1) _
 	))
 	End If
 	fnObjs = result
@@ -394,6 +400,9 @@ applyLast_of_one:
 		Case &quot;pStr&quot;: 		result = pStr(		a0)
 		Case &quot;pReturn&quot;:		result = pReturn(	a0)
 		Case &quot;mkTypeVar&quot;:	result = mkTypeVar(	a0)
+		Case &quot;TList_toString&quot;:		result = TList_toString(	a0)
+		Case &quot;TParser_toString&quot;:	result = TParser_toString(	a0)
+		Case &quot;TASN_toString&quot;:		result = TASN_toString(		a0)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select
@@ -480,8 +489,6 @@ Function applyBuiltinRev(fn As Object, ByVal reverseArgs As Object)
 		Case &quot;arityF&quot;:				result = arityF(			a(0)				)
 		Case &quot;existsF&quot;:				result = existsF(			a(0)				)
 		Case &quot;applyToList&quot;:			result = applyToList(		a(0), a(1)			)
-		Case &quot;TList_toString&quot;:		result = TList_toString(	a(0)				)
-		Case &quot;TParser_toString&quot;:	result = TParser_toString(	a(0)				)
 		Case &quot;TList_equ&quot;:			result = TList_equ(			a(0), a(1)			)
 		Case Else
 			croak(&quot;applyBuiltinRev: unknown function &apos;&quot; &amp; getFnName(fn) &amp; &quot;&apos;&quot;)

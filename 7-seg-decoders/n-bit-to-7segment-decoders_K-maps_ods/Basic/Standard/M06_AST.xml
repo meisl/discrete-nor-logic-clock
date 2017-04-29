@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="M06_AST" script:language="StarBasic">REM  *****  BASIC  *****
+Option Explicit
+
+
+Type TASN &apos; &quot;Abstract Syntax Node&quot;
+	tyname As String
+	label As Variant
+	value As Variant
+	children As Object
+End Type
+
+
+Sub Main
+	test_AST()
+End Sub
+
+
+Function mkASN(label, value, children As Object)
+	Dim result As New TASN
+	result.tyname = &quot;TASN&quot;
+	result.label = label
+	result.value = value
+	If Not(typeOf(children) = typeOf(nil)) Then
+		croak(&quot;mkASN: invalid list of children &quot; &amp; toString(children))
+	End If
+	result.children = children
+	mkAsn = result
+End Function
+
+Function mkDeriv(s As String, cs As Object)
+	If isNil(cs) Then
+		mkDeriv = mkASN(Empty, s, cs)
+	Else
+		mkDeriv = mkASN(s, Empty, cs)
+	End If
+End Function
+
+Function TASN_toString(Optional n As Object)
+	Dim result As Variant
+	If isMissing(n) Then
+		result = Fn.TASN_toString
+	Else
+		result = _TASN_toString(n, &quot;&quot;, &quot;&quot;)
+	End If
+	TASN_toString = result
+End Function
+
+Function _TASN_toString( _
+	n As Object, _
+	ByVal prefixN As String, _
+	ByVal prefixC As String _
+) As String
+	Dim result As String, lbl As Variant, val As Variant
+	result = prefixN
+	lbl = asnLabel(n)
+	val = asnValue(n)
+	If isEmpty(lbl) Then
+		If isEmpty(val) Then
+			result = prefixN &amp; &quot;:&quot;
+			prefixC = prefixC &amp; &quot; &quot;
+		Else
+			val = toString(val)
+			result = prefixN &amp; val
+			prefixC = prefixC &amp; Space(Len(val) - 1)
+		End If
+	Else
+		If Not(isString(lbl)) Then
+			lbl = toString(lbl)
+		End If
+		If isEmpty(val) Then
+			result = prefixN &amp; lbl
+			prefixC = prefixC &amp; Space(Len(lbl) - 1)
+		Else
+			result = prefixN &amp; lbl &amp; &quot;:&quot; &amp; toString(val)
+			prefixC = prefixC &amp; Space(Len(lbl))
+		End If
+	End If
+	If Not(asnIsLeaf(n)) Then
+		Dim k As Integer, i As Integer
+		k = asnChildCount(n) - 1
+		For i = 0 To k
+			If (i = k) Then &apos; last child
+				result = result _
+					   &amp; chr(13) &amp; chr(10) _
+					   &amp; _TASN_toString( _
+					   		asnChild(n, i), _
+							prefixC &amp; &quot;└─&quot; , _
+							prefixC &amp; &quot;  &quot; _
+						 )
+			Else
+				result = result _
+					   &amp; chr(13) &amp; chr(10) _
+					   &amp; _TASN_toString( _
+					   		asnChild(n, i), _
+							prefixC &amp; &quot;├─&quot; , _
+							prefixC &amp; &quot;│ &quot; _
+						 )
+			End If
+		Next i
+	End If
+	_TASN_toString = result
+End Function
+
+Function asnLabel(n As Object)
+	asnLabel = n.label
+End Function
+
+Function asnValue(n As Object)
+	asnValue = n.value
+End Function
+
+Function asnChildren(n As Object)
+	asnChildren = n.children
+End Function
+
+Function asnIsLeaf(n As Object) As Boolean
+	asnIsLeaf = isNil(asnChildren(n))
+End Function
+
+Function asnChildCount(n As Object) As Integer
+	asnChildCount = length(asnChildren(n))
+End Function
+
+Function asnChild(n As Object, ByVal i As Integer)
+	Dim result As Variant, cs As Object, len As Integer
+	If (i &lt; 0) Then
+		croak(&quot;asnChild: invalid child index &quot; &amp; i)
+	End If
+	cs = asnChildren(n)
+	len = length(cs)
+	If (i &gt;= len) Then
+		If len = 0 Then
+			croak(&quot;asnChild: invalid child index &quot; &amp; i &amp; &quot; - has none&quot;)
+		Else
+			croak(&quot;asnChild: invalid child index &quot; &amp; i &amp; &quot; - has only &quot; &amp; len)
+		End If
+	Else
+		While i &gt; 0
+			cs = cdr(cs)
+			i = i - 1
+		Wend
+		result = car(cs)
+	End If
+	asnChild = result
+End Function
+
+&apos;= tests ======================================================================
+
+Function test_AST()
+	Dim n0 As Object
+	n0 = mkASN(&quot;foo&quot;, &quot;bar&quot;, nil)
+	
+	assertEqual(typeOf(n0), &quot;Object/TASN&quot;).x
+	assertEqual(length(asnChildren(n0)), 0).x
+	assertEqual(asnChildCount(n0), 0).x
+	assertEqual(asnIsLeaf(n0), True).x
+	assertEqual(toString(n0), &quot;foo:&apos;bar&apos;&quot;).x
+
+	Dim n1 As Object
+	n1 = mkASN(Empty, &quot;bar&quot;, nil)
+	assertEqual(asnChildCount(n1), 0).x
+	assertEqual(asnIsLeaf(n1), True).x
+	assertEqual(toString(n1), &quot;&apos;bar&apos;&quot;).x
+
+	Dim n2 As Object
+	n2 = mkASN(&quot;foo&quot;, Empty, nil)
+	assertEqual(asnChildCount(n2), 0).x
+	assertEqual(asnIsLeaf(n2), True).x
+	assertEqual(toString(n2), &quot;foo&quot;).x
+
+	Dim n3 As Object
+	n3 = mkASN(Empty, Empty, nil)
+	assertEqual(asnChildCount(n3), 0).x
+	assertEqual(asnIsLeaf(n3), True).x
+	assertEqual(toString(n3), &quot;:&quot;).x
+
+	Dim n4 As Object, c0 As Object
+	n4 = mkASN(&quot;S&quot;, Empty, List(n1))
+	assertEqual(asnChildCount(n4), 1).x
+	assertEqual(asnIsLeaf(n4), False).x
+	c0 = asnChild(n4, 0)
+	assertEqual(asnLabel(c0), asnLabel(n1)).x
+	assertEqual(asnValue(c0), asnValue(n1)).x
+	assertEqual(asnChildCount(c0), asnChildCount(n1)).x
+	
+	&apos;assertEqual(toString(n4), &quot;:&quot;).x
+	
+	Dim s As String
+	n0 = mkDeriv(&quot;A&quot;, nil)
+	n0 = mkDeriv(&quot;I&quot;, List(n0))
+	n0 = mkDeriv(&quot;F&quot;, List(n0))
+	n0 = mkDeriv(&quot;T&quot;, List(n0))
+	
+	n1 = mkDeriv(&quot;+&quot;, nil)
+	
+	n2 = mkDeriv(&quot;B&quot;, nil)
+	n2 = mkDeriv(&quot;I&quot;, List(n2))
+	n2 = mkDeriv(&quot;F&quot;, List(n2))
+	
+	n3 = mkDeriv(&quot;*&quot;, nil)
+	
+	n4 = mkDeriv(&quot;C&quot;, nil)
+	n4 = mkDeriv(&quot;I&quot;, List(n4))
+	n4 = mkDeriv(&quot;F&quot;, List(n4))
+	n4 = mkDeriv(&quot;T&quot;, List(n4))
+	
+	n4 = mkDeriv(&quot;T&quot;, List(n2, n3, n4))
+	n4 = mkDeriv(&quot;S&quot;, List(n4))
+
+	n4 = mkDeriv(&quot;S&quot;, List(n0, n1, n4))
+	
+	s = toString(n4)
+	test_AST = s
+End Function
+</script:module>

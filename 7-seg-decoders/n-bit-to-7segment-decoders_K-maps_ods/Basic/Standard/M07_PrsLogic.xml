@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="M07_PrsLogic" script:language="StarBasic">REM  *****  BASIC  *****
+Option Explicit
+
+
+Sub Main
+	test_PrsLogic()
+End Sub
+
+Function mkConst(value As Boolean)
+	mkConst = mkASN(&quot;C&quot;, value, nil)
+End Function
+
+Function mkVar(varName As String)
+	mkVar = mkASN(&quot;I&quot;, varName, nil)
+End Function
+
+Function mkUnaryOp(opName As String, child As Object)
+	Dim result As Object
+	result = mkASN(&quot;op1&quot;, opName, cons(child, nil))
+	mkUnaryOp = result
+End Function
+
+Function mkBinaryOp(opName As String, left As Object, right As Object)
+  Dim result As Object
+  result = mkASN(&quot;op2&quot;, opName, cons(left, cons(right, nil))
+  
+  mkBinaryOp = result
+End Function
+
+&apos;= tests ======================================================================
+
+Function test_PrsLogic()
+	test_PrsLogic_mkConst()
+	test_PrsLogic_mkVar()
+	test_PrsLogic_mkUnaryOp()
+	test_PrsLogic_mkBinaryOp()
+	test_PrsLogic_toString()
+End Function
+
+Function test_PrsLogic_mkConst()
+	Dim n As Object
+
+	n = mkConst(True)
+	assertEqual(asnIsLeaf(n), True).x
+	assertEqual(asnLabel(n), &quot;C&quot;).x
+	assertEqual(asnValue(n), True).x
+
+	n = mkConst(False)
+	assertEqual(asnIsLeaf(n), True).x
+	assertEqual(asnLabel(n), &quot;C&quot;).x
+	assertEqual(asnValue(n), False).x
+End Function
+
+Function test_PrsLogic_mkVar()
+	Dim n As Object
+
+	n = mkVar(&quot;a&quot;)
+	assertEqual(asnIsLeaf(n), True).x
+	assertEqual(asnLabel(n), &quot;I&quot;).x
+	assertEqual(asnValue(n), &quot;a&quot;).x
+
+	n = mkVar(&quot;b&quot;)
+	assertEqual(asnIsLeaf(n), True).x
+	assertEqual(asnLabel(n), &quot;I&quot;).x
+	assertEqual(asnValue(n), &quot;b&quot;).x
+End Function
+
+Function test_PrsLogic_mkUnaryOp()
+	Dim v As Object, n As Object, u As Object
+	v = mkVar(&quot;A&quot;)
+	n = mkUnaryOp(&quot;!&quot;, v)
+
+	assertEqual(asnIsLeaf(n), False).x
+	assertEqual(asnLabel(n), &quot;op1&quot;).x
+	assertEqual(asnValue(n), &quot;!&quot;).x
+	assertEqual(asnChildCount(n), 1).x
+
+	u = car(asnChildren(n))
+	assertEqual(asnIsLeaf(u), asnIsLeaf(v)).x 
+	assertEqual(asnLabel(u), asnLabel(v)).x 
+	assertEqual(asnValue(u), asnValue(v)).x 
+
+	u = asnChild(n, 0)
+	assertEqual(asnIsLeaf(u), asnIsLeaf(v)).x 
+	assertEqual(asnLabel(u), asnLabel(v)).x 
+	assertEqual(asnValue(u), asnValue(v)).x 
+End Function
+
+Function test_PrsLogic_mkBinaryOp()
+	Dim a As Object, b As Object, n As Object, u As Object
+	a = mkVar(&quot;A&quot;)
+	b = mkVar(&quot;B&quot;)
+	n = mkBinaryOp(&quot;+&quot;, a, b)
+
+	assertEqual(asnIsLeaf(n), False).x
+	assertEqual(asnLabel(n), &quot;op2&quot;).x
+	assertEqual(asnValue(n), &quot;+&quot;).x
+	assertEqual(asnChildCount(n), 2).x
+	
+	u = asnChild(n, 0)
+	assertEqual(asnIsLeaf(u), asnIsLeaf(a)).x 
+	assertEqual(asnLabel(u), asnLabel(a)).x 
+	assertEqual(asnValue(u), asnValue(a)).x 
+
+	u = asnChild(n, 1)
+	assertEqual(asnIsLeaf(u), asnIsLeaf(b)).x 
+	assertEqual(asnLabel(u), asnLabel(b)).x 
+	assertEqual(asnValue(u), asnValue(b)).x 
+End Function
+
+Function test_PrsLogic_toString()
+	Dim a As Object, b As Object, c As Object
+	Dim k As Object, n As Object, p As Object, t As Object, q As Object
+	Dim s As String
+	a = mkVar(&quot;A&quot;)
+	b = mkVar(&quot;B&quot;)
+	c = mkVar(&quot;C&quot;)
+	k = mkConst(False)
+	n = mkUnaryOp(&quot;!&quot;, k)
+	t = mkBinaryOp(&quot;*&quot;, b, c)
+	p = mkBinaryOp(&quot;+&quot;, t, a)
+	q = mkBinaryOp(&quot;*&quot;, n, p)
+	
+	s = toString(q)
+	
+	test_PrsLogic_toString = s
+End Function
+</script:module>
