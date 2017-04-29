@@ -23,11 +23,14 @@ Type TFnObjs
 	add			As Object
 	mul			As Object
 	isString	As Object
+	isEmpty		As Object
 	toString	As Object
 	concat		As Object
 	readHex		As Object
 	equ			As Object
 	inRange		As Object
+	
+	applyToList	As Object
 
 	isNil		As Object
 	cons		As Object
@@ -36,6 +39,7 @@ Type TFnObjs
 	cdr			As Object
 	cadr		As Object
 	caddr		As Object
+	map			As Object
 	foldl		As Object
 	foldr		As Object
 	foldl1		As Object
@@ -56,6 +60,8 @@ Type TFnObjs
 	mkTupleType			As Object
 	
 	TASN_toString		As Object
+	mkDtTerminal		As Object
+	mkDtNonterminal		As Object
 End Type
 
 
@@ -90,11 +96,14 @@ Function Fn
 		result.add 		= lookupFn(&quot;add&quot;)
 		result.mul 		= lookupFn(&quot;mul&quot;)
 		result.isString	= lookupFn(&quot;isString&quot;)
+		result.isEmpty	= lookupFn(&quot;isEmpty&quot;)
 		result.toString = lookupFn(&quot;toString&quot;)
 		result.concat	= lookupFn(&quot;concat&quot;)
 		result.readHex	= lookupFn(&quot;readHex&quot;)
 		result.equ		= lookupFn(&quot;equ&quot;)
 		result.inRange	= lookupFn(&quot;inRange&quot;)
+		
+		result.applyToList = lookupFn(&quot;applyToList&quot;)
 
 		result.isNil	= lookupFn(&quot;isNil&quot;)
 		result.cons		= lookupFn(&quot;cons&quot;)
@@ -103,6 +112,7 @@ Function Fn
 		result.cdr 		= lookupFn(&quot;cdr&quot;)
 		result.cadr 	= lookupFn(&quot;cadr&quot;)
 		result.caddr 	= lookupFn(&quot;caddr&quot;)
+		result.map		= lookupFn(&quot;map&quot;)
 		result.foldl	= lookupFn(&quot;foldl&quot;)
 		result.foldr	= lookupFn(&quot;foldr&quot;)
 		result.foldl1	= lookupFn(&quot;foldl1&quot;)
@@ -122,7 +132,9 @@ Function Fn
 		result.mkTypeCtor		  = lookupFn(&quot;mkTypeCtor&quot;)
 		result.mkTupleType		  = lookupFn(&quot;mkTupleType&quot;)
 
-		result.TASN_toString = lookupFn(&quot;TASN_toString&quot;)
+		result.TASN_toString 	= lookupFn(&quot;TASN_toString&quot;)
+		result.mkDtTerminal  	= lookupFn(&quot;mkDtTerminal&quot;)
+		result.mkDtNonterminal  = lookupFn(&quot;mkDtNonterminal&quot;)
 	End If
 	Fn = result
 End Function
@@ -200,8 +212,9 @@ Function fnObjs()
 	Static result As Object
 	If IsNull(result) Then
 		result = toList(Array(_
-			newFn(&quot;isString&quot;,		1, &quot;a -&gt; Bool&quot;), _
-			newFn(&quot;toString&quot;,		1, &quot;a -&gt; Str&quot;), _
+			newFn(&quot;isString&quot;,		1, &quot;Any -&gt; Bool&quot;), _
+			newFn(&quot;isEmpty&quot;,		1, &quot;Any -&gt; Bool&quot;), _
+			newFn(&quot;toString&quot;,		1, &quot;Any -&gt; Str&quot;), _
 			newFn(&quot;id&quot;,				1, &quot;a -&gt; a&quot;), _
 			newFn(&quot;fstArg&quot;,			2, &quot;a -&gt; b -&gt; a&quot;), _
 			newFn(&quot;sndArg&quot;,			2, &quot;a -&gt; b -&gt; b&quot;), _
@@ -223,13 +236,14 @@ Function fnObjs()
 			_
 			newFn(&quot;TList_toString&quot;,	1), _
 			newFn(&quot;TList_equ&quot;,		2), _
-			newFn(&quot;isNil&quot;,			1, &quot;List a -&gt; Bool&quot;), _
+			newFn(&quot;isNil&quot;,			1, &quot;[a] -&gt; Bool&quot;), _
 			newFn(&quot;cons&quot;,			2, &quot;a -&gt; [a] -&gt; [a]&quot;), _
 			newFn(&quot;length&quot;,			1), _
 			newFn(&quot;car&quot;,			1), _
 			newFn(&quot;cdr&quot;,			1), _
 			newFn(&quot;cadr&quot;,			1), _
 			newFn(&quot;caddr&quot;,			1), _
+			newFn(&quot;map&quot;,			2, &quot;(a -&gt; b) -&gt; [a] -&gt; [b]&quot;), _
 			newFn(&quot;foldl&quot;,			3), _
 			newFn(&quot;foldr&quot;,			3), _
 			newFn(&quot;foldl1&quot;,			2), _
@@ -251,7 +265,9 @@ Function fnObjs()
 			newFn(&quot;mkTypeCtor&quot;,			2, &quot;Str -&gt; [Typ] -&gt; Typ&quot;), _
 			newFn(&quot;mkTupleType&quot;,		2, &quot;Typ -&gt; [Typ] -&gt; Typ&quot;), _
 			_
-			newFn(&quot;TASN_toString&quot;,	1) _
+			newFn(&quot;TASN_toString&quot;,		1, &quot;ASN -&gt; Str&quot;), _
+			newFn(&quot;mkDtTerminal&quot;,		1, &quot;Str -&gt; ASN&quot;), _
+			newFn(&quot;mkDtNonterminal&quot;,	2, &quot;Str -&gt; [ASN] -&gt; ASN&quot;)  _
 	))
 	End If
 	fnObjs = result
@@ -386,6 +402,7 @@ applyLast_of_one:
 		Case &quot;asc&quot;:			result = Asc(		a0)
 		Case &quot;chr&quot;:			result = Chr(		a0)
 		Case &quot;isString&quot;:	result = isString(	a0)
+		Case &quot;isEmpty&quot;:		result = isEmpty(	a0)
 		Case &quot;toString&quot;:	result = toString(	a0)
 		Case &quot;readHex&quot;:		result = readHex(	a0)
 		Case &quot;isNil&quot;:		result = isNil(		a0)
@@ -403,6 +420,7 @@ applyLast_of_one:
 		Case &quot;TList_toString&quot;:		result = TList_toString(	a0)
 		Case &quot;TParser_toString&quot;:	result = TParser_toString(	a0)
 		Case &quot;TASN_toString&quot;:		result = TASN_toString(		a0)
+		Case &quot;mkDtTerminal&quot;:		result = mkDtTerminal(		a0)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select
@@ -417,19 +435,21 @@ applyLast_of_two:
 		Case &quot;add&quot;:			result = CLng(a0 + a1)
 		Case &quot;mul&quot;:			result = CLng(a0 * a1)
 		Case &quot;concat&quot;:		result = a0 &amp; a1
-		Case &quot;equ&quot;:			result = equ(		a0, a1)
-		Case &quot;cons&quot;:		result = cons(		a0, a1)
-		Case &quot;map&quot;:			result = map(		a0, a1)
-		Case &quot;filter&quot;:		result = filter(	a0, a1)
-		Case &quot;foldl1&quot;:		result = foldl1(	a0, a1)
-&apos;		Case &quot;foldr1&quot;:		result = foldr1(	a0, a1)
-		Case &quot;adjoin&quot;:		result = adjoin(	a0, a1)
-		Case &quot;mkParser&quot;:	result = mkParser(	a0, a1)
-		Case &quot;pBind&quot;:		result = pBind(		a0, a1)
-		Case &quot;pChoice&quot;:		result = pChoice(	a0, a1)
+		Case &quot;equ&quot;:			result = equ(			a0, a1)
+		Case &quot;applyToList&quot;:	result = applyToList(	a0, a1)
+		Case &quot;cons&quot;:		result = cons(			a0, a1)
+		Case &quot;map&quot;:			result = map(			a0, a1)
+		Case &quot;filter&quot;:		result = filter(		a0, a1)
+		Case &quot;foldl1&quot;:		result = foldl1(		a0, a1)
+&apos;		Case &quot;foldr1&quot;:		result = foldr1(		a0, a1)
+		Case &quot;adjoin&quot;:		result = adjoin(		a0, a1)
+		Case &quot;mkParser&quot;:	result = mkParser(		a0, a1)
+		Case &quot;pBind&quot;:		result = pBind(			a0, a1)
+		Case &quot;pChoice&quot;:		result = pChoice(		a0, a1)
 		Case &quot;maybeMakeArrowType&quot;: result = maybeMakeArrowType(a0, a1)
-		Case &quot;mkTypeCtor&quot;:	result = mkTypeCtor(a0, a1)
-		Case &quot;mkTupleType&quot;:	result = mkTupleType(a0, a1)
+		Case &quot;mkTypeCtor&quot;:	result = mkTypeCtor(	a0, a1)
+		Case &quot;mkTupleType&quot;:	result = mkTupleType(	a0, a1)
+		Case &quot;mkDtNonterminal&quot;:	result = mkDtNonterminal(a0, a1)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select
@@ -488,7 +508,6 @@ Function applyBuiltinRev(fn As Object, ByVal reverseArgs As Object)
 	Select Case getFnName(fn)
 		Case &quot;arityF&quot;:				result = arityF(			a(0)				)
 		Case &quot;existsF&quot;:				result = existsF(			a(0)				)
-		Case &quot;applyToList&quot;:			result = applyToList(		a(0), a(1)			)
 		Case &quot;TList_equ&quot;:			result = TList_equ(			a(0), a(1)			)
 		Case Else
 			croak(&quot;applyBuiltinRev: unknown function &apos;&quot; &amp; getFnName(fn) &amp; &quot;&apos;&quot;)
@@ -496,16 +515,24 @@ Function applyBuiltinRev(fn As Object, ByVal reverseArgs As Object)
 	applyBuiltinRev = result
 End Function
 
-Function applyToList(ByVal fn As Variant, ByVal args As Object)
+Function applyToList(Optional ByVal f As Variant, Optional ByVal args As Object)
+	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.applyToList : End If
 	Dim result As Variant
-	fn = asFn(fn, &quot;applyToList: invalid 1st arg&quot;)
-	If isNil(args) Then
+	If isMissing(args) Then
+		If isMissing(f) Then
+			result = oFn
+		Else
+			f = asFn(f, &quot;applyToList: invalid 1st arg&quot;)
+			result = apply1(oFn, f)
+		End If
+	ElseIf isNil(args) Then
 		Dim fstr As String
-		fstr = toString(fn)
+		fstr = toString(f)
 		croak(&quot;applyToList: empty args list for &quot; &amp; chr(13) &amp; fstr)
 	Else
 		&apos; applyToList = foldl apply1 f args
-		result = fn
+		f = asFn(f, &quot;applyToList: invalid 1st arg&quot;)
+		result = f
 		While Not(isNil(args))
 			result = apply1(result, car(args))
 			args = cdr(args)

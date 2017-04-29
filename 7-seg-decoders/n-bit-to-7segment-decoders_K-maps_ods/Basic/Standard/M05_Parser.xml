@@ -605,7 +605,13 @@ End Function
 Function pSeq(ps As Array, ByVal f As Variant)
 	&apos;TODO: pSeq: check if ps is proper Array of Parsers
 	f = asFn(f, &quot;pSeq: invalid 2nd arg &quot; &amp; toString(f))
-	pSeq = mkParser(&quot;seq&quot;, Array(ps, f))
+	pSeq = pSeqL(ps, applyToList(f))
+End Function
+
+Function pSeqL(ps As Array, ByVal f As Variant)
+	&apos;TODO: pSeqL: check if ps is proper Array of Parsers
+	f = asFn(f, &quot;pSeqL: invalid 2nd arg &quot; &amp; toString(f))
+	pSeqL = mkParser(&quot;seq&quot;, Array(ps, f))
 End Function
 
 &apos; pInd: for building recursive parsers; returns a dummy Parser instance
@@ -1195,7 +1201,7 @@ _applyP_bind_B_return:
 						lst = cons(result, lst)
 					End If
 				Next
-				result = applyToList(p.st(1), reverse(lst))
+				result = apply(p.st(1), reverse(lst))
 			End If
 		Case &quot;skip&quot;	&apos; tail-recursive
 			p = p.st
@@ -2280,8 +2286,10 @@ Function test_Parser_TypeExpr()
 	assert_parses(p, &quot;(a -&gt; (b)-&gt; c)&quot;, &quot;(-&gt; &apos;a (-&gt; &apos;b &apos;c))&quot;, 15).x
 
 	&apos; some real types:
-	assert_parses(p, getFnTypeStr(Fn.isNil), &quot;(-&gt; (List [&apos;a]) Bool)&quot;, 15).x
-	assert_parses(p, getFnTypeStr(Fn.flatten), &quot;(-&gt; (List [(List [&apos;a])]) (List [&apos;a]))&quot;, 22).x
+	&apos; type of fn isNil:
+	assert_parses(p, &quot;[a] -&gt; Bool&quot;, &quot;(-&gt; (List [&apos;a]) Bool)&quot;, 12).x
+	&apos; type of fn flatten:
+	assert_parses(p, &quot;[[a]] -&gt; [a]&quot;, &quot;(-&gt; (List [(List [&apos;a])]) (List [&apos;a]))&quot;, 13).x
 	&apos; type of fn compose:
 	assert_parses(p, &quot;(b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c&quot;, _
 					 &quot;(-&gt; (-&gt; &apos;b &apos;c) (-&gt; (-&gt; &apos;a &apos;b) (-&gt; &apos;a &apos;c)))&quot;, 31).x

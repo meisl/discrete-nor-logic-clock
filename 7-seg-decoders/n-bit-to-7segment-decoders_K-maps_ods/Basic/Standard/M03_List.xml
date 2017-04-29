@@ -99,14 +99,20 @@ Function caddr(xs As TList)
 	caddr = cadr(cdr(xs))
 End Function
 
-Function map(fn As Variant, xs As Variant)
-	Dim result As TList
-	If isNil(xs) Then
-		result = nil
-	ElseIf isArray(xs) Then
-		result = map(fn, toList(xs))
+Function map(Optional f As Variant, Optional xs As Object)
+	Dim result As Variant
+	If isMissing(f) Then
+		result = Fn.map
+	ElseIf isMissing(xs) Then
+		result = apply(Fn.map, f)
 	Else
-		result = cons(apply(fn, xs.head), map(fn, xs.tail))
+		If isNil(xs) Then
+			result = nil
+		ElseIf isArray(xs) Then
+			result = map(f, toList(xs))
+		Else
+			result = cons(apply(f, xs.head), map(f, xs.tail))
+		End If
 	End If
 	map = result
 End Function

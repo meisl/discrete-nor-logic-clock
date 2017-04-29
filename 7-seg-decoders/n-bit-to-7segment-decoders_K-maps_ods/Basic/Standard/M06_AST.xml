@@ -29,14 +29,6 @@ Function mkASN(label, value, children As Object)
 	mkAsn = result
 End Function
 
-Function mkDeriv(s As String, cs As Object)
-	If isNil(cs) Then
-		mkDeriv = mkASN(Empty, s, cs)
-	Else
-		mkDeriv = mkASN(s, Empty, cs)
-	End If
-End Function
-
 Function TASN_toString(Optional n As Object)
 	Dim result As Variant
 	If isMissing(n) Then
@@ -45,6 +37,31 @@ Function TASN_toString(Optional n As Object)
 		result = _TASN_toString(n, &quot;&quot;, &quot;&quot;)
 	End If
 	TASN_toString = result
+End Function
+
+Function mkDtTerminal(Optional s As String)
+	If isMissing(s) Then
+		mkDtTerminal = Fn.mkDtTerminal
+	Else
+		mkDtTerminal = mkASN(Empty, s, nil)
+	End If
+End Function
+	
+Function mkDtNonterminal( _
+	Optional ruleName As String, _
+	Optional children As Object _
+)
+	Dim result As Variant
+	If isMissing(ruleName) Then
+		result = Fn.mkDtNonterminal
+	ElseIf isMissing(children) Then
+		result = apply(Fn.mkDtNonterminal, ruleName)
+	ElseIf isNil(children) Then
+		croak(&quot;mkDtNonterminal: nil not valid as list of children&quot;)
+	Else
+		result = mkASN(ruleName, Empty, children)
+	End If
+	mkDtNonterminal = result
 End Function
 
 Function _TASN_toString( _
@@ -58,23 +75,31 @@ Function _TASN_toString( _
 	val = asnValue(n)
 	If isEmpty(lbl) Then
 		If isEmpty(val) Then
-			result = prefixN &amp; &quot;:&quot;
-			prefixC = prefixC &amp; &quot; &quot;
+			result = prefixN &amp; &quot;─:&quot;
+			prefixC = prefixC &amp; &quot;  &quot;
 		Else
-			val = toString(val)
-			result = prefixN &amp; val
-			prefixC = prefixC &amp; Space(Len(val) - 1)
+			If isString(val) Then
+				If val = &quot;&quot; Then
+					val = &quot;ε&quot;
+				Else
+					val = toString(val)
+				End If
+			Else
+				val = toString(val)
+			End If
+			result = prefixN &amp; &quot;─&quot; &amp; val
+			prefixC = prefixC &amp; Space(Len(val))
 		End If
 	Else
 		If Not(isString(lbl)) Then
 			lbl = toString(lbl)
 		End If
 		If isEmpty(val) Then
-			result = prefixN &amp; lbl
-			prefixC = prefixC &amp; Space(Len(lbl) - 1)
-		Else
-			result = prefixN &amp; lbl &amp; &quot;:&quot; &amp; toString(val)
+			result = prefixN &amp; &quot;─&quot; &amp; lbl
 			prefixC = prefixC &amp; Space(Len(lbl))
+		Else
+			result = prefixN &amp; &quot;─&quot; &amp; lbl &amp; &quot;:&quot; &amp; toString(val)
+			prefixC = prefixC &amp; Space(Len(lbl) + 1)
 		End If
 	End If
 	If Not(asnIsLeaf(n)) Then
@@ -86,16 +111,16 @@ Function _TASN_toString( _
 					   &amp; chr(13) &amp; chr(10) _
 					   &amp; _TASN_toString( _
 					   		asnChild(n, i), _
-							prefixC &amp; &quot;└─&quot; , _
-							prefixC &amp; &quot;  &quot; _
+							prefixC &amp; &quot;└&quot; , _
+							prefixC &amp; &quot; &quot; _
 						 )
 			Else
 				result = result _
 					   &amp; chr(13) &amp; chr(10) _
 					   &amp; _TASN_toString( _
 					   		asnChild(n, i), _
-							prefixC &amp; &quot;├─&quot; , _
-							prefixC &amp; &quot;│ &quot; _
+							prefixC &amp; &quot;├&quot; , _
+							prefixC &amp; &quot;│&quot; _
 						 )
 			End If
 		Next i
@@ -146,9 +171,28 @@ Function asnChild(n As Object, ByVal i As Integer)
 	asnChild = result
 End Function
 
+Function pStr_dt(s As String)
+	pStr_dt = pBind(pStr(s), compose(pReturn, mkDtTerminal))
+End Function
+
+Function pMany_dt(p As Object)
+	pMany_dt = pBind(pMany(p), compose(pReturn, _
+		ite(isNil, _
+			fstArg(mkDtNonterminal(&quot;*&quot;, List(mkDtTerminal(&quot;&quot;)))), _
+			compose( _
+				mkDtNonterminal(&quot;*&quot;), _
+				map(ite(isString, mkDtTerminal, id) _
+			) _
+		) _
+	))
+End Function
+
 &apos;= tests ======================================================================
 
 Function test_AST()
+	test_AST_pStr_dt()
+	test_AST_pMany_dt()
+
 	Dim n0 As Object
 	n0 = mkASN(&quot;foo&quot;, &quot;bar&quot;, nil)
 	
@@ -156,25 +200,25 @@ Function test_AST()
 	assertEqual(length(asnChildren(n0)), 0).x
 	assertEqual(asnChildCount(n0), 0).x
 	assertEqual(asnIsLeaf(n0), True).x
-	assertEqual(toString(n0), &quot;foo:&apos;bar&apos;&quot;).x
+	assertEqual(toString(n0), &quot;─foo:&apos;bar&apos;&quot;).x
 
 	Dim n1 As Object
 	n1 = mkASN(Empty, &quot;bar&quot;, nil)
 	assertEqual(asnChildCount(n1), 0).x
 	assertEqual(asnIsLeaf(n1), True).x
-	assertEqual(toString(n1), &quot;&apos;bar&apos;&quot;).x
+	assertEqual(toString(n1), &quot;─&apos;bar&apos;&quot;).x
 
 	Dim n2 As Object
 	n2 = mkASN(&quot;foo&quot;, Empty, nil)
 	assertEqual(asnChildCount(n2), 0).x
 	assertEqual(asnIsLeaf(n2), True).x
-	assertEqual(toString(n2), &quot;foo&quot;).x
+	assertEqual(toString(n2), &quot;─foo&quot;).x
 
 	Dim n3 As Object
 	n3 = mkASN(Empty, Empty, nil)
 	assertEqual(asnChildCount(n3), 0).x
 	assertEqual(asnIsLeaf(n3), True).x
-	assertEqual(toString(n3), &quot;:&quot;).x
+	assertEqual(toString(n3), &quot;─:&quot;).x
 
 	Dim n4 As Object, c0 As Object
 	n4 = mkASN(&quot;S&quot;, Empty, List(n1))
@@ -188,30 +232,95 @@ Function test_AST()
 	&apos;assertEqual(toString(n4), &quot;:&quot;).x
 	
 	Dim s As String
-	n0 = mkDeriv(&quot;A&quot;, nil)
-	n0 = mkDeriv(&quot;I&quot;, List(n0))
-	n0 = mkDeriv(&quot;F&quot;, List(n0))
-	n0 = mkDeriv(&quot;T&quot;, List(n0))
+	n0 = mkDtTerminal(&quot;A&quot;)
+	n0 = mkDtNonterminal(&quot;I&quot;, List(n0))
+	n0 = mkDtNonterminal(&quot;F&quot;, List(n0))
+	n0 = mkDtNonterminal(&quot;T&quot;, List(n0))
 	
-	n1 = mkDeriv(&quot;+&quot;, nil)
+	n1 = mkDtTerminal(&quot;+&quot;)
 	
-	n2 = mkDeriv(&quot;B&quot;, nil)
-	n2 = mkDeriv(&quot;I&quot;, List(n2))
-	n2 = mkDeriv(&quot;F&quot;, List(n2))
+	n2 = mkDtTerminal(&quot;B&quot;)
+	n2 = mkDtNonterminal(&quot;I&quot;, List(n2))
+	n2 = mkDtNonterminal(&quot;F&quot;, List(n2))
 	
-	n3 = mkDeriv(&quot;*&quot;, nil)
+	n3 = mkDtTerminal(&quot;*&quot;)
 	
-	n4 = mkDeriv(&quot;C&quot;, nil)
-	n4 = mkDeriv(&quot;I&quot;, List(n4))
-	n4 = mkDeriv(&quot;F&quot;, List(n4))
-	n4 = mkDeriv(&quot;T&quot;, List(n4))
+	n4 = mkDtTerminal(&quot;C&quot;)
+	n4 = mkDtNonterminal(&quot;I&quot;, List(n4))
+	n4 = mkDtNonterminal(&quot;F&quot;, List(n4))
+	n4 = mkDtNonterminal(&quot;T&quot;, List(n4))
 	
-	n4 = mkDeriv(&quot;T&quot;, List(n2, n3, n4))
-	n4 = mkDeriv(&quot;S&quot;, List(n4))
+	n4 = mkDtNonterminal(&quot;T&quot;, List(n2, n3, n4))
+	n4 = mkDtNonterminal(&quot;S&quot;, List(n4))
 
-	n4 = mkDeriv(&quot;S&quot;, List(n0, n1, n4))
+	n4 = mkDtNonterminal(&quot;S&quot;, List(n0, n1, n4))
 	
 	s = toString(n4)
 	test_AST = s
 End Function
+
+Function test_AST_pStr_dt()
+	Dim p As Object, r As Variant, x As Object
+	p = pStr_dt(&quot;z&quot;)
+	x = mkDtTerminal(&quot;z&quot;)
+	refute_parses(p, Array(&quot;&quot;, &quot;cba&quot;, &quot;x&quot;, &quot;y&quot;)).x
+	assert_parses(p, &quot;z&quot;, x, 2).x
+	&apos; really reads only as many chars as pStr does:
+	assert_parses(p, &quot;zz&quot;, x, 2).x
+	assert_parses(p, &quot;zy&quot;, x, 2).x
+
+		
+	p = pStr_dt(&quot;abc&quot;)
+	x = mkDtTerminal(&quot;abc&quot;)
+	refute_parses(p, Array(&quot;&quot;, &quot;y&quot;, &quot;cba&quot;)).x
+	assert_parses(p, &quot;abc&quot;, x, 4).x
+	&apos; really reads only as many chars as pStr does:
+	assert_parses(p, &quot;abcabc&quot;, x, 4).x
+	assert_parses(p, &quot;abcxyz&quot;, x, 4).x
+End Function
+
+Function test_AST_pMany_dt()
+	Dim p As Object, r As Variant, x As Object
+	Dim termEps As Object, termZ As Object, termZY As Object
+	termEps = mkDtTerminal(&quot;&quot;)
+	termZ   = mkDtTerminal(&quot;z&quot;)
+	termZY	= mkDtTerminal(&quot;zy&quot;)
+	
+	p = pMany_dt(pStr(&quot;z&quot;))
+	x = mkDtNonterminal(&quot;*&quot;, List(termEps))
+	assert_parses(p, &quot;&quot;, x, 1).x
+	assert_parses(p, &quot;x&quot;, x, 1).x
+	assert_parses(p, &quot;xy&quot;, x, 1).x
+	assert_parses(p, &quot;xyz&quot;, x, 1).x
+
+	x = mkDtNonterminal(&quot;*&quot;, List(termZ))
+	assert_parses(p, &quot;z&quot;, x, 2).x
+	assert_parses(p, &quot;zx&quot;, x, 2).x
+
+	x = mkDtNonterminal(&quot;*&quot;, List(termZ, termZ))
+	assert_parses(p, &quot;zz&quot;, x, 3).x
+	assert_parses(p, &quot;zza&quot;, x, 3).x
+
+	p = pMany_dt(pStr(&quot;zy&quot;))
+	x = mkDtNonterminal(&quot;*&quot;, List(termEps))
+	assert_parses(p, &quot;&quot;, x, 1).x
+	assert_parses(p, &quot;x&quot;, x, 1).x
+	assert_parses(p, &quot;xy&quot;, x, 1).x
+	assert_parses(p, &quot;z&quot;, x, 1).x
+	assert_parses(p, &quot;xzy&quot;, x, 1).x
+	
+	x = mkDtNonterminal(&quot;*&quot;, List(termZY))
+	assert_parses(p, &quot;zy&quot;, x, 3).x
+	assert_parses(p, &quot;zyX&quot;, x, 3).x
+	assert_parses(p, &quot;zyXzy&quot;, x, 3).x
+	
+	x = mkDtNonterminal(&quot;*&quot;, List(termZY, termZY))
+	assert_parses(p, &quot;zyzy&quot;, x, 5).x
+	assert_parses(p, &quot;zyzyX&quot;, x, 5).x
+	
+	x = mkDtNonterminal(&quot;*&quot;, List(termZY, termZY, termZY))
+	assert_parses(p, &quot;zyzyzy&quot;, x, 7).x
+	assert_parses(p, &quot;zyzyzyX&quot;, x, 7).x
+End Function
+
 </script:module>

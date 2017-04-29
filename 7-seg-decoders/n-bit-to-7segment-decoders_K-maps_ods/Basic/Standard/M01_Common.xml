@@ -167,7 +167,8 @@ Function toString(ByVal v As Variant) As String
 		Case &quot;String&quot;
 			Dim t As String
 			t = v &amp; &quot;&quot;
-			t = Join(Split(t, chr(13)), &quot;\n&quot;)
+			t = Join(Split(t, chr(13)), &quot;\n&quot;) &apos; TODO: fix toString \r vs \n
+			t = Join(Split(t, chr(10)), &quot;\r&quot;) &apos; TODO: fix toString \r vs \n
 			t = Join(Split(t, chr(9)), &quot;\t&quot;)
 			result = &quot;&apos;&quot; &amp; t &amp; &quot;&apos;&quot;
 		Case &quot;Empty&quot;

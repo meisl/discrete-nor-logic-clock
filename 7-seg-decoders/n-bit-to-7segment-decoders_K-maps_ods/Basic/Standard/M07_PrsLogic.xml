@@ -29,6 +29,54 @@ Function mkBinaryOp(opName As String, left As Object, right As Object)
   mkBinaryOp = result
 End Function
 
+&apos;    R ::= T X* U
+&apos;~&gt;  R ::= T Y
+&apos;    Y ::= U | X Y
+
+Function pLogic_dt()
+	Static result As Object
+	If isNull(result) Then
+		Dim pW As Object, pN As Object, pI As Object, pC As Object
+		Dim pF As Object, pT As Object, pS As Object
+		pS = pInd(&quot;S&quot;)
+		pT = pInd(&quot;T&quot;)
+		pF = pInd(&quot;F&quot;)
+		pW = pBind(pChoice( _
+				pStr_dt(&quot; &quot;), _
+				pStr_dt(chr(10)), _
+				pStr_dt(chr(13)), _
+				pStr_dt(chr(9)) _
+			), compose(compose(pReturn, mkDtNonterminal(&quot;W&quot;)), swap(cons, nil)) _
+		)
+		pC = pChoice( _
+			pStr_dt(&quot;0&quot;), _
+			pStr_dt(&quot;1&quot;) _
+		)
+		pN = pSeqL(Array( _
+				pStr_dt(&quot;!&quot;), _
+				pMany_dt(pW), _
+				pC _
+			), mkDtNonterminal(&quot;N&quot;) _
+		)
+		
+		result = pN
+
+		
+&apos;		pS = fixIndirection(pS, pSeq(Array( _
+&apos;				pSkip(pMany(pWhite)), _
+&apos;				pT
+&apos;				pSkip(pMany(pWhite)), _
+&apos;				pOneOrZero(pSeq(Array(, _
+&apos;						pSkip(pStr(&quot;+&quot;)),
+&apos;						pS
+&apos;					), id_
+&apos;				))
+&apos;		  	), _
+&apos;		))
+	End If
+	pLogic_dt = result
+End Function
+
 &apos;= tests ======================================================================
 
 Function test_PrsLogic()
@@ -36,6 +84,7 @@ Function test_PrsLogic()
 	test_PrsLogic_mkVar()
 	test_PrsLogic_mkUnaryOp()
 	test_PrsLogic_mkBinaryOp()
+	test_PrsLogic_pLogic_dt()
 	test_PrsLogic_toString()
 End Function
 
@@ -108,6 +157,24 @@ Function test_PrsLogic_mkBinaryOp()
 	assertEqual(asnIsLeaf(u), asnIsLeaf(b)).x 
 	assertEqual(asnLabel(u), asnLabel(b)).x 
 	assertEqual(asnValue(u), asnValue(b)).x 
+End Function
+
+Function test_PrsLogic_pLogic_dt(Optional ByVal s As String)
+	Dim p As Object, r As Variant
+	p = pLogic_dt()
+	
+	If isMissing(s) Then
+		r = applyP(p, &quot;!0&quot;)
+		s = toString(r(0))
+	&apos;	assertEqual(s, &quot;aasdf&quot;).x
+	Else
+		r = applyP(p, s)
+		If isParseFailure(r) Then
+			test_PrsLogic_pLogic_dt = &quot;!ParseFailure!&quot;
+		Else
+			test_PrsLogic_pLogic_dt = toString(r(0))
+		End If
+	End If
 End Function
 
 Function test_PrsLogic_toString()
