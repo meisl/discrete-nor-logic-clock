@@ -224,7 +224,6 @@ If those parentheses were omitted, what remains would be
 "sum-of-products", or logic expressions
 in ["Disjunctive Normal Form" (DNF)](https://en.wikipedia.org/wiki/Disjunctive_normal_form).
 
-
 But remember: as of now such an interpretation is no more than a mental aid.
 The *actual* interpretation - which means processing an AST and transforming it into some output value - will be covered later on.
 Here's the grammar:
@@ -514,14 +513,14 @@ Well, sure it is. And the way to express it directly in a grammar is to use the 
 A similar operator is postfix `*` (again on the meta-level, not to be confused with the terminal `"*"`!). It stands for "any number of times, including zero". We will use it to allow arbitrary whitespace in the input words, just as a convenience. In the AST, however, whitespace will be omitted, as it bears no meaning at all. We consider the space character `" "` and the TAB character, denoted by `"\t"` as whitespace.
 ```
   S ::= W* T W* ("+" S)?
-  T ::= F ("*" W* T)?
+  T ::= W* F W* ("*" T)?
   F ::= C | I | N | "(" S ")"
   C ::= "0" | "1"
   I ::= "A" | "B" | "C" | "D"
-  N ::= "!" W* F
+  N ::= "!" F
   W ::= " " | "\t"
 ```
-So the new rule `W` matches one whitespace character, and is used twice in `S` and once in `N`.
+So the new rule `W` matches one whitespace character, and is used twice in `S` and twice in `N`. Where to put those "whitespace consumers" can be quite tricky, particularly if you want it to be most efficient while at the same time being maximally liberal w.r.t. whitespace occurring in the input string. Anyways, let me just say that here I did think about the effect, but not too much about efficiency.
 
 The last multiplicity operator is a variation of `*`:  `+` meaning "once-or-more". We'll be using it in conjunction with the character classes from the next section.
 
@@ -573,7 +572,7 @@ stand for
 ```
 
 Now this obviously assumes some order on the alphabet, say ASCII or Unicode.
-Also, since `...` isn't really defined the above isn't really a proper definition either. Anyways, I'm pretty sure you get it.
+Also, since `...` isn't really defined the above isn't really a proper definition either. I'm pretty sure you get the idea. By the end of the following section we will have given a precise definition for it, and all the rest.
 
 Finally there is one special character class, or range: the whole alphabet itself. That means really any character[^any-character] that there is, not just letters. We will denote this class by a single dot `.`, NOT surrounded by `[` and `]`. Note: `[.]` would match the object-level dot, just like `"."`, and nothing else.
 
@@ -581,11 +580,11 @@ So, with everthing together, here's the final grammar for Logic expressions:
 
 ```
   S ::= W* T W* ("+" S)?
-  T ::= F ("*" W* T)?
+  T ::= W* F W* ("*" T)?
   F ::= C | I | N | "(" S ")"
   C ::= [01]
   I ::= [A-Za-z]+
-  N ::= "!" W* F
+  N ::= "!" F
   W ::= [ \t]
 ```
 
@@ -733,6 +732,12 @@ With a bit of rearrangement, here's the whole altogether:
      PCList ::= (CCItem ("-" CCItem)?)+
      CCItem ::= escC | [-\[\-\]\\]
 ```
+[TODO]
+
+We've come a long way ... ended up precisely defining the grammar formalism ***using this very same formalism***. Ain't that cool?
+
+Next chapter about functional parsers: will implement parsers for various grammars, and as the grand finale, a parser for grammars.
+
 
 ---
 Footnotes
