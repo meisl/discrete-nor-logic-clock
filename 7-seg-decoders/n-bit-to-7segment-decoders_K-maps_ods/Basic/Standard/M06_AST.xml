@@ -29,6 +29,10 @@ Function mkASN(label, value, children As Object)
 	mkAsn = result
 End Function
 
+Function isASN(x As Variant) As Boolean
+	isASN = (typeOf(x) = &quot;Object/TASN&quot;)
+End Function
+
 Function TASN_toString(Optional n As Object)
 	Dim result As Variant
 	If isMissing(n) Then
@@ -39,78 +43,28 @@ Function TASN_toString(Optional n As Object)
 	TASN_toString = result
 End Function
 
-Function mkDtTerminal(Optional s As String)
-	If isMissing(s) Then
-		mkDtTerminal = Fn.mkDtTerminal
-	Else
-		mkDtTerminal = mkASN(Empty, s, nil)
-	End If
-End Function
-	
-Function mkDtNonterminal( _
-	Optional ruleName As String, _
-	Optional children As Object _
-)
-	Dim result As Variant
-	If isMissing(ruleName) Then
-		result = Fn.mkDtNonterminal
-	ElseIf isMissing(children) Then
-		result = apply(Fn.mkDtNonterminal, ruleName)
-	ElseIf isNil(children) Then
-		croak(&quot;mkDtNonterminal: nil not valid as list of children&quot;)
-	Else
-		result = mkASN(ruleName, Empty, children)
-	End If
-	mkDtNonterminal = result
-End Function
-
 Function _TASN_toString( _
 	n As Object, _
 	ByVal prefixN As String, _
 	ByVal prefixC As String _
 ) As String
-	Dim result As String, lbl As Variant, val As Variant
-	result = prefixN
-	lbl = asnLabel(n)
-	val = asnValue(n)
-	If isEmpty(lbl) Then
-		If isEmpty(val) Then
-			result = prefixN &amp; &quot;─:&quot;
-			prefixC = prefixC &amp; &quot;  &quot;
-		Else
-			If isString(val) Then
-				If val = &quot;&quot; Then
-					val = &quot;ε&quot;
-				Else
-					val = toString(val)
-				End If
-			Else
-				val = toString(val)
-			End If
-			result = prefixN &amp; &quot;─&quot; &amp; val
-			prefixC = prefixC &amp; Space(Len(val))
-		End If
-	Else
-		If Not(isString(lbl)) Then
-			lbl = toString(lbl)
-		End If
-		If isEmpty(val) Then
-			result = prefixN &amp; &quot;─&quot; &amp; lbl
-			prefixC = prefixC &amp; Space(Len(lbl))
-		Else
-			result = prefixN &amp; &quot;─&quot; &amp; lbl &amp; &quot;:&quot; &amp; toString(val)
-			prefixC = prefixC &amp; Space(Len(lbl) + 1)
-		End If
-	End If
-	If Not(asnIsLeaf(n)) Then
-		Dim k As Integer, i As Integer
-		k = asnChildCount(n) - 1
+	Dim result As String
+	result = _TASN_toString_head(n)
+	Dim k As Integer, i As Integer
+	k = asnChildCount(n)
+	If k &gt; 0 Then
+		i = InStr(1, result, &quot;:&quot;)
+		If i = 0 Then : i = 1 : End If
+		prefixC = prefixC &amp; Space(i)
+		Dim child As Variant
+		k = k - 1
 		For i = 0 To k
+			child = asnChild(n, i)
 			If (i = k) Then &apos; last child
 				result = result _
 					   &amp; chr(13) &amp; chr(10) _
 					   &amp; _TASN_toString( _
-					   		asnChild(n, i), _
+					   		child, _
 							prefixC &amp; &quot;└&quot; , _
 							prefixC &amp; &quot; &quot; _
 						 )
@@ -118,14 +72,49 @@ Function _TASN_toString( _
 				result = result _
 					   &amp; chr(13) &amp; chr(10) _
 					   &amp; _TASN_toString( _
-					   		asnChild(n, i), _
+					   		child, _
 							prefixC &amp; &quot;├&quot; , _
 							prefixC &amp; &quot;│&quot; _
 						 )
 			End If
 		Next i
 	End If
+	result = prefixN &amp; &quot;─&quot; &amp; result
 	_TASN_toString = result
+End Function
+
+Function _TASN_toString_head(n As Object) As String
+	Dim result As String, lbl As Variant, val As Variant
+	lbl = asnLabel(n)
+	val = asnValue(n)
+	If isEmpty(val) Then
+		val = &quot;&quot;
+	ElseIf isString(val) Then
+		If (val = &quot;&quot;) Then
+			val = &quot;ε&quot;
+		Else
+			val = toString(val)
+		End If
+	Else
+		val = toString(val)
+	End If
+	If isEmpty(lbl) Then
+		If val = &quot;&quot; Then
+			result = &quot;:&quot;
+		Else
+			result = val
+		End If
+	Else
+		If Not(isString(lbl)) Then
+			lbl = toString(lbl)
+		End If
+		If val = &quot;&quot; Then
+			result = lbl
+		Else
+			result = lbl &amp; &quot;:&quot; &amp; val
+		End If
+	End If
+	_TASN_toString_head = result
 End Function
 
 Function asnLabel(n As Object)
@@ -171,26 +160,171 @@ Function asnChild(n As Object, ByVal i As Integer)
 	asnChild = result
 End Function
 
+Function mkDtTerminal(Optional value As String)
+	If isMissing(value) Then
+		mkDtTerminal = Fn.mkDtTerminal
+	Else
+		mkDtTerminal = mkASN(Empty, value, nil)
+	End If
+End Function
+
+Function mkDtCClass(Optional cclass As String, Optional value As String)
+	If isMissing(cclass) Then
+		mkDtCClass = Fn.mkDtCClass
+	ElseIf isMissing(value) Then
+		mkDtCClass = apply(Fn.mkDtCClass, cclass)
+	Else
+		mkDtCClass = mkASN(cclass, value, nil)
+	End If
+End Function
+	
+Function mkDtNonterminal( _
+	Optional ruleName As String, _
+	Optional children As Object _
+)
+	Dim result As Variant
+	If isMissing(ruleName) Then
+		result = Fn.mkDtNonterminal
+	ElseIf isMissing(children) Then
+		result = apply(Fn.mkDtNonterminal, ruleName)
+	ElseIf isNil(children) Then
+		croak(&quot;mkDtNonterminal: nil not valid as list of children&quot;)
+	Else
+		result = mkASN(ruleName, Empty, children)
+	End If
+	mkDtNonterminal = result
+End Function
+
+Function mkDtMult( _
+	Optional label As String, _
+	Optional children As Object _
+)
+	Dim result As Variant
+	If isMissing(label) Then
+		result = Fn.mkDtMult
+	ElseIf isMissing(children) Then
+		result = apply(Fn.mkDtMult, label)
+	Else
+		&apos;If isNil(children) Then
+		&apos;	result = mkASN(label, &quot;&quot;, nil)
+		&apos;Else
+			result = mkASN(label, Empty, children)
+		&apos;End If
+	End If
+	mkDtMult = result
+End Function
+
+Function toDerivationP(Optional p As Object)
+	If isMissing(p) Then
+		toDerivationP = Fn.toDerivationP
+		Exit Function
+	End If
+	Dim result As Variant, f As Object
+	Select Case p.tp
+		Case &quot;str&quot;
+			result = pBind(p, compose(pReturn, mkDtTerminal))
+		Case &quot;item&quot;
+			result = pBind(p, compose(pReturn, mkDtCClass(&quot;(.)&quot;)))
+			&apos;result = pSeq(Array(p), mkDtCClass(&quot;(.)&quot;))
+		Case &quot;choice&quot;
+			result = pChoice( _
+				toDerivationP(p.st0), _
+				toDerivationP(p.st1) _
+			)
+		Case &quot;seq&quot; &apos; only simple sequences supported here
+			f = p.st(1)
+			If (getFnName(f) = getFnName(Fn.id)) Then
+				result = pSeqL( _
+					map(Fn.toDerivationP, p.st(0)), _
+					id _
+				)			
+			&apos;ElseIf isApplyToListId(f) Then
+			Else
+				croak(&quot;toDerivationP/NYI: pSeq(..., &quot; _
+					 &amp; TFn_toString(p.st(1)) &amp; &quot;)&quot; _
+					 &amp; chr(13) &amp; chr(10) _
+					 &amp; toString(p)_
+				)
+			End If
+		Case &quot;ind&quot;
+			If p.st2 Then &apos; seen before
+				If isEmpty(p.st3) Then
+					croak(&quot;toDerivationP: replace &quot; &amp; p.st1 &amp; &quot;???&quot;)
+				End If
+				result = p.st3
+			ElseIf isNull(p.st0) Then
+				croak(&quot;toDerivationP/NYI: uninitialized indirection &quot; &amp; p.st1)
+			Else &apos; p.st0 returns a single ASN
+				p.st2 = True &apos; set the &quot;visited&quot;-mark
+				Dim name As String, q As Object
+				name = p.st1
+				q = pInd(name)
+				p.st3 = q
+				q = fixIndirection(q, pBind( _
+						toDerivationP(p.st0), _
+						compose(pReturn, compose( _
+							mkDtNonterminal(q.st1), _
+							ite(isList, _
+								id, _
+								swap(cons, nil) _
+							) _
+						)) _
+				))
+				&apos;q = fixIndirection(q, pSeq( _
+				&apos;		Array(toDerivationP(p.st0)), _
+				&apos;		compose( _
+				&apos;			mkDtNonterminal(q.st1), _
+				&apos;			ite(isList, _
+				&apos;				id, _
+				&apos;				swap(cons, nil) _
+				&apos;			) _
+				&apos;		) _
+				&apos;))
+				p.st3 = Empty
+				p.st2 = False &apos; clear the &quot;visited&quot;-mark
+				
+				result = q
+			End If
+		Case Else
+			croak(&quot;toDerivationP: cannot handle .tp=&quot; &amp; toString(p.tp))
+	End Select
+	
+	toDerivationP = result
+End Function
+
 Function pStr_dt(s As String)
 	pStr_dt = pBind(pStr(s), compose(pReturn, mkDtTerminal))
 End Function
 
 Function pMany_dt(p As Object)
 	pMany_dt = pBind(pMany(p), compose(pReturn, _
-		ite(isNil, _
-			fstArg(mkDtNonterminal(&quot;*&quot;, List(mkDtTerminal(&quot;&quot;)))), _
-			compose( _
-				mkDtNonterminal(&quot;*&quot;), _
-				map(ite(isString, mkDtTerminal, id) _
-			) _
+		compose( _
+			mkDtMult(&quot;(*):W&quot;), _
+			id _
 		) _
 	))
+&apos;			map(ite(isString, compose(mkDtTerminal, concat(&quot;!!&quot;)), id) _
+&apos;			map(mkDtTerminal) _
+End Function
+
+Function pZeroOrOne_dt(p As Object)
+	Dim q As Object, f As Object
+	q = pZeroOrOne(p)
+	f = compose( _
+			mkDtMult(&quot;(?):(..|..)&quot;), _
+			ite(Fn.isEmpty, _
+				fstArg(nil), _
+				swap(cons, nil) _
+			) _
+		)
+	pZeroOrOne_dt = pBind(q, compose(pReturn, f))
 End Function
 
 &apos;= tests ======================================================================
 
 Function test_AST()
-	test_AST_pStr_dt()
+	test_AST_TASN_toString()
+	test_AST_toDerivationP()
 	test_AST_pMany_dt()
 
 	Dim n0 As Object
@@ -259,24 +393,132 @@ Function test_AST()
 	test_AST = s
 End Function
 
-Function test_AST_pStr_dt()
-	Dim p As Object, r As Variant, x As Object
-	p = pStr_dt(&quot;z&quot;)
-	x = mkDtTerminal(&quot;z&quot;)
-	refute_parses(p, Array(&quot;&quot;, &quot;cba&quot;, &quot;x&quot;, &quot;y&quot;)).x
-	assert_parses(p, &quot;z&quot;, x, 2).x
-	&apos; really reads only as many chars as pStr does:
-	assert_parses(p, &quot;zz&quot;, x, 2).x
-	assert_parses(p, &quot;zy&quot;, x, 2).x
+Function test_AST_TASN_toString()
+	Dim n As Object
+	n = mkASN(Empty, Empty, nil)
+	assertEqual(TASN_toString(n), &quot;─:&quot;).x
+	
+	n = mkASN(Empty, &quot;x&quot;, nil)
+	assertEqual(TASN_toString(n), &quot;─&apos;x&apos;&quot;).x
+	n =mkASN(Empty, &quot;&quot;, nil)
+	assertEqual(TASN_toString(n), &quot;─ε&quot;).x
+	n = mkASN(Empty, &quot;foobar&quot;, nil)
+	assertEqual(TASN_toString(n), &quot;─&apos;foobar&apos;&quot;).x
 
-		
-	p = pStr_dt(&quot;abc&quot;)
-	x = mkDtTerminal(&quot;abc&quot;)
-	refute_parses(p, Array(&quot;&quot;, &quot;y&quot;, &quot;cba&quot;)).x
-	assert_parses(p, &quot;abc&quot;, x, 4).x
+	n = mkASN(&quot;S&quot;, Empty, nil)
+	assertEqual(TASN_toString(n), &quot;─S&quot;).x
+	n = mkASN(&quot;Foo&quot;, Empty, nil)
+	assertEqual(TASN_toString(n), &quot;─Foo&quot;).x
+
+	n = mkASN(&quot;*&quot;, &quot;&quot;, nil)
+	assertEqual(TASN_toString(n), &quot;─*:ε&quot;).x
+	n = mkASN(&quot;+&quot;, &quot;&quot;, nil)
+	assertEqual(TASN_toString(n), &quot;─+:ε&quot;).x
+	n = mkASN(&quot;?&quot;, &quot;&quot;, nil)
+	assertEqual(TASN_toString(n), &quot;─?:ε&quot;).x
+
+	n = mkASN(&quot;*&quot;, &quot;W&quot;, nil)
+	assertEqual(TASN_toString(n), &quot;─*:&apos;W&apos;&quot;).x
+	n = mkASN(&quot;+&quot;, &quot;W&quot;, nil)
+	assertEqual(TASN_toString(n), &quot;─+:&apos;W&apos;&quot;).x
+	n = mkASN(&quot;?&quot;, &quot;W&quot;, nil)
+	assertEqual(TASN_toString(n), &quot;─?:&apos;W&apos;&quot;).x
+	
+	n = mkASN(&quot;W*&quot;, Empty, nil)
+	assertEqual(TASN_toString(n), &quot;─W*&quot;).x
+	n = mkASN(&quot;W+&quot;, Empty, nil)
+	assertEqual(TASN_toString(n), &quot;─W+&quot;).x
+	n = mkASN(&quot;W?&quot;, Empty, nil)
+	assertEqual(TASN_toString(n), &quot;─W?&quot;).x
+	
+End Function
+
+Function test_AST_toDerivationP()
+	Dim p As Object, q As Object, r As Variant, x As Object
+
+	p = pItem
+	q = toDerivationP(p)
+	refute_parses(q, &quot;&quot;).x
+	x = mkDtCClass(&quot;(.)&quot;, &quot;a&quot;)
+	assert_parses(q, &quot;a&quot;, x, 2).x
+	x = mkDtCClass(&quot;(.)&quot;, &quot;b&quot;)
+	assert_parses(q, &quot;bca&quot;, x, 2).x
+	x = mkDtCClass(&quot;(.)&quot;, &quot;c&quot;)
+	assert_parses(q, &quot;cabc&quot;, x, 2).x
+	x = mkDtCClass(&quot;(.)&quot;, &quot; &quot;)
+	assert_parses(q, &quot; xyzabc&quot;, x, 2).x
+	
+	p = pStr(&quot;z&quot;)
+	q = toDerivationP(p)
+	refute_parses(q, Array(&quot;&quot;, &quot;cba&quot;, &quot;x&quot;, &quot;y&quot;)).x
+	x = mkDtTerminal(&quot;z&quot;)
+	assert_parses(q, &quot;z&quot;, x, 2).x
 	&apos; really reads only as many chars as pStr does:
-	assert_parses(p, &quot;abcabc&quot;, x, 4).x
-	assert_parses(p, &quot;abcxyz&quot;, x, 4).x
+	assert_parses(q, &quot;zz&quot;, x, 2).x
+	assert_parses(q, &quot;zy&quot;, x, 2).x
+
+	p = pStr(&quot;abc&quot;)
+	q = toDerivationP(p)
+	refute_parses(q, Array(&quot;&quot;, &quot;y&quot;, &quot;cba&quot;)).x
+	x = mkDtTerminal(&quot;abc&quot;)
+	assert_parses(q, &quot;abc&quot;, x, 4).x
+	&apos; really reads only as many chars as pStr does:
+	assert_parses(q, &quot;abcabc&quot;, x, 4).x
+	assert_parses(q, &quot;abcxyz&quot;, x, 4).x
+
+	p = pChoice(pStr(&quot;0&quot;), pStr(&quot;1&quot;))
+	q = toDerivationP(p)
+	refute_parses(q, Array(&quot;&quot;, &quot;y&quot;, &quot;cba&quot;)).x
+	x = mkDtTerminal(&quot;0&quot;)
+	assert_parses(q, &quot;0&quot;, x, 2).x
+	x = mkDtTerminal(&quot;1&quot;)
+	assert_parses(q, &quot;1&quot;, x, 2).x
+
+	p = pSeqL(Array(pItem), id)
+	q = toDerivationP(p)
+	refute_parses(q, &quot;&quot;).x
+	x = List(mkDtCClass(&quot;(.)&quot;, &quot;x&quot;))
+	assert_parses(q, &quot;x&quot;, x, 2).x
+	assert_parses(q, &quot;x1&quot;, x, 2).x
+	x = List(mkDtCClass(&quot;(.)&quot;, &quot;y&quot;))
+	assert_parses(q, &quot;y1abc&quot;, x, 2).x
+
+	p = pSeqL(Array(pItem, pStr(&quot;1&quot;)), id)
+	q = toDerivationP(p)
+	refute_parses(q, &quot;&quot;, &quot;x0&quot;, &quot; a&quot;).x
+	x = List(mkDtCClass(&quot;(.)&quot;, &quot;x&quot;), mkDtTerminal(&quot;1&quot;))
+	assert_parses(q, &quot;x1&quot;, x, 3).x
+	x = List(mkDtCClass(&quot;(.)&quot;, &quot;y&quot;), mkDtTerminal(&quot;1&quot;))
+	assert_parses(q, &quot;y1abc&quot;, x, 3).x
+
+	p = pSeqL(Array(pStr(&quot;0&quot;), pItem, pStr(&quot;1&quot;)), id)
+	q = toDerivationP(p)
+	refute_parses(q, &quot;&quot;, &quot;0&quot;, &quot;0a&quot;, &quot;xa1&quot;).x
+	x = List(mkDtTerminal(&quot;0&quot;), mkDtCClass(&quot;(.)&quot;, &quot;a&quot;), mkDtTerminal(&quot;1&quot;))
+	assert_parses(q, &quot;0a1&quot;, x, 4).x
+	x = List(mkDtTerminal(&quot;0&quot;), mkDtCClass(&quot;(.)&quot;, &quot;b&quot;), mkDtTerminal(&quot;1&quot;))
+	assert_parses(q, &quot;0b1xyz&quot;, x, 4).x
+	
+	p = pInd(&quot;Foo&quot;)
+	p = fixIndirection(p, pItem)
+	q = toDerivationP(p)
+	refute_parses(q, &quot;&quot;).x
+	x = mkDtNonterminal(q.st1, List(mkDtCClass(&quot;(.)&quot;, &quot;a&quot;)))
+	assert_parses(q, &quot;a&quot;, x, 2).x
+	x = mkDtNonterminal(q.st1, List(mkDtCClass(&quot;(.)&quot;, &quot;b&quot;)))
+	assert_parses(q, &quot;b&quot;, x, 2).x
+	assert_parses(q, &quot;bb&quot;, x, 2).x
+	assert_parses(q, &quot;bc&quot;, x, 2).x
+		
+	p = pInd(&quot;Bar&quot;)
+	p = fixIndirection(p, pSeqL(Array(pItem, pStr(&quot;1&quot;)), id)
+	q = toDerivationP(p)
+	msgbox(toString(p) &amp; chr(13) &amp; chr(13) &amp; toString(q))
+	refute_parses(q, &quot;&quot;, &quot;a&quot;, &quot;aa&quot;, &quot;a0&quot;, &quot;b&quot;, &quot;b1&quot;).x
+	x = mkDtNonterminal(q.st1, List(mkDtCClass(&quot;(.)&quot;, &quot;a&quot;), mkDtTerminal(&quot;1&quot;)))
+	msgbox(toString(x))
+	assert_parses(q, &quot;a1&quot;, x, 3).x
+	assert_parses(q, &quot;a1b&quot;, x, 3).x
 End Function
 
 Function test_AST_pMany_dt()
@@ -286,14 +528,16 @@ Function test_AST_pMany_dt()
 	termZ   = mkDtTerminal(&quot;z&quot;)
 	termZY	= mkDtTerminal(&quot;zy&quot;)
 	
-	p = pMany_dt(pStr(&quot;z&quot;))
-	x = mkDtNonterminal(&quot;*&quot;, List(termEps))
+	p = pMany_dt(pStr_dt(&quot;z&quot;))
+	x = mkDtMult(&quot;*&quot;, nil)
 	assert_parses(p, &quot;&quot;, x, 1).x
 	assert_parses(p, &quot;x&quot;, x, 1).x
 	assert_parses(p, &quot;xy&quot;, x, 1).x
 	assert_parses(p, &quot;xyz&quot;, x, 1).x
 
 	x = mkDtNonterminal(&quot;*&quot;, List(termZ))
+	r = applyP(p, &quot;z&quot;)
+	r = TASN_toString(r(0))
 	assert_parses(p, &quot;z&quot;, x, 2).x
 	assert_parses(p, &quot;zx&quot;, x, 2).x
 
@@ -301,8 +545,8 @@ Function test_AST_pMany_dt()
 	assert_parses(p, &quot;zz&quot;, x, 3).x
 	assert_parses(p, &quot;zza&quot;, x, 3).x
 
-	p = pMany_dt(pStr(&quot;zy&quot;))
-	x = mkDtNonterminal(&quot;*&quot;, List(termEps))
+	p = pMany_dt(pStr_dt(&quot;zy&quot;))
+	x = mkDtMult(&quot;*&quot;, nil)
 	assert_parses(p, &quot;&quot;, x, 1).x
 	assert_parses(p, &quot;x&quot;, x, 1).x
 	assert_parses(p, &quot;xy&quot;, x, 1).x

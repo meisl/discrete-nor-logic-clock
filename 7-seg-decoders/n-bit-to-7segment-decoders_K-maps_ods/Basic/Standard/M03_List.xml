@@ -50,6 +50,14 @@ Function nil() As TList
 	nil = result
 End Function
 
+Function isList(Optional x As Variant)
+	If isMissing(x) Then
+		isList = Fn.isList
+	Else
+		isList = (typeOf(x) = typeOf(nil))
+	End If
+End Function
+
 Function isNil(Optional xs As TList)
 	If isMissing(xs) Then : isNil = Fn.isNil : Else
 		isNil = (xs.len = 0)
@@ -106,10 +114,10 @@ Function map(Optional f As Variant, Optional xs As Object)
 	ElseIf isMissing(xs) Then
 		result = apply(Fn.map, f)
 	Else
-		If isNil(xs) Then
+		If isArray(xs) Then
+			result = toArray(map(f, toList(xs)))
+		ElseIf isNil(xs) Then
 			result = nil
-		ElseIf isArray(xs) Then
-			result = map(f, toList(xs))
 		Else
 			result = cons(apply(f, xs.head), map(f, xs.tail))
 		End If
@@ -294,6 +302,7 @@ End Function
 &apos;= tests ============================================================
 
 Function test_List()
+	test_List_isList()
 	test_List_isNil_and_cons()
 	test_List_length()
 	test_List_fnApp()
@@ -310,6 +319,26 @@ Function test_List()
 	test_List_flatten()
 	test_List_reverse()
 	test_List_equ()
+End Function
+
+Function test_List_isList()
+	assertEqual(isList(Empty), 			False).x
+	assertEqual(isList(Nothing), 		False).x
+	assertEqual(isList(False),			False).x
+	assertEqual(isList(True),			False).x
+	assertEqual(isList(&quot;&quot;), 			False).x
+	assertEqual(isList(&quot;foobar&quot;), 		False).x
+	assertEqual(isList(0),				False).x
+	assertEqual(isList(1),				False).x
+	assertEqual(isList(-1),				False).x
+	assertEqual(isList(3.1415),			False).x
+	assertEqual(isList(Array()),		False).x
+	assertEqual(isList(Array(1)),		False).x
+	assertEqual(isList(Array(1, &quot;x&quot;)),	False).x
+	assertEqual(isList(Fn.id),			False).x
+
+	assertEqual(isList(nil),			True).x
+	assertEqual(isList(cons(nil, nil)),	True).x
 End Function
 
 Function test_List_isNil_and_cons()

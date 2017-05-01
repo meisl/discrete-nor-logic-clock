@@ -32,6 +32,7 @@ Type TFnObjs
 	
 	applyToList	As Object
 
+	isList		As Object
 	isNil		As Object
 	cons		As Object
 	length		As Object
@@ -61,7 +62,10 @@ Type TFnObjs
 	
 	TASN_toString		As Object
 	mkDtTerminal		As Object
+	mkDtCClass			As Object
 	mkDtNonterminal		As Object
+	mkDtMult			As Object
+	toDerivationP		As Object
 End Type
 
 
@@ -105,6 +109,7 @@ Function Fn
 		
 		result.applyToList = lookupFn(&quot;applyToList&quot;)
 
+		result.isList	= lookupFn(&quot;isList&quot;)
 		result.isNil	= lookupFn(&quot;isNil&quot;)
 		result.cons		= lookupFn(&quot;cons&quot;)
 		result.length	= lookupFn(&quot;length&quot;)
@@ -133,8 +138,11 @@ Function Fn
 		result.mkTupleType		  = lookupFn(&quot;mkTupleType&quot;)
 
 		result.TASN_toString 	= lookupFn(&quot;TASN_toString&quot;)
-		result.mkDtTerminal  	= lookupFn(&quot;mkDtTerminal&quot;)
+		result.mkDtTerminal		= lookupFn(&quot;mkDtTerminal&quot;)
+		result.mkDtCClass		= lookupFn(&quot;mkDtCClass&quot;)
 		result.mkDtNonterminal  = lookupFn(&quot;mkDtNonterminal&quot;)
+		result.mkDtMult  		= lookupFn(&quot;mkDtMult&quot;)
+		result.toDerivationP	= lookupFn(&quot;toDerivationP&quot;)
 	End If
 	Fn = result
 End Function
@@ -236,6 +244,7 @@ Function fnObjs()
 			_
 			newFn(&quot;TList_toString&quot;,	1), _
 			newFn(&quot;TList_equ&quot;,		2), _
+			newFn(&quot;isList&quot;,			1, &quot;Any -&gt; Bool&quot;), _
 			newFn(&quot;isNil&quot;,			1, &quot;[a] -&gt; Bool&quot;), _
 			newFn(&quot;cons&quot;,			2, &quot;a -&gt; [a] -&gt; [a]&quot;), _
 			newFn(&quot;length&quot;,			1), _
@@ -267,7 +276,10 @@ Function fnObjs()
 			_
 			newFn(&quot;TASN_toString&quot;,		1, &quot;ASN -&gt; Str&quot;), _
 			newFn(&quot;mkDtTerminal&quot;,		1, &quot;Str -&gt; ASN&quot;), _
-			newFn(&quot;mkDtNonterminal&quot;,	2, &quot;Str -&gt; [ASN] -&gt; ASN&quot;)  _
+			newFn(&quot;mkDtCClass&quot;,			2, &quot;Str -&gt; Str -&gt; ASN&quot;), _
+			newFn(&quot;mkDtNonterminal&quot;,	2, &quot;Str -&gt; [ASN] -&gt; ASN&quot;), _
+			newFn(&quot;mkDtMult&quot;,			2, &quot;Str -&gt; [ASN] -&gt; ASN&quot;), _
+			newFn(&quot;toDerivationP&quot;, 		1, &quot;Parser Str -&gt; Parser ASN&quot;) _
 	))
 	End If
 	fnObjs = result
@@ -405,6 +417,7 @@ applyLast_of_one:
 		Case &quot;isEmpty&quot;:		result = isEmpty(	a0)
 		Case &quot;toString&quot;:	result = toString(	a0)
 		Case &quot;readHex&quot;:		result = readHex(	a0)
+		Case &quot;isList&quot;:		result = isList(	a0)
 		Case &quot;isNil&quot;:		result = isNil(		a0)
 		Case &quot;length&quot;:		result = length(	a0)
 		Case &quot;car&quot;:			result = car(		a0)
@@ -421,6 +434,7 @@ applyLast_of_one:
 		Case &quot;TParser_toString&quot;:	result = TParser_toString(	a0)
 		Case &quot;TASN_toString&quot;:		result = TASN_toString(		a0)
 		Case &quot;mkDtTerminal&quot;:		result = mkDtTerminal(		a0)
+		Case &quot;toDerivationP&quot;:		result = toDerivationP(		a0)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select
@@ -449,7 +463,9 @@ applyLast_of_two:
 		Case &quot;maybeMakeArrowType&quot;: result = maybeMakeArrowType(a0, a1)
 		Case &quot;mkTypeCtor&quot;:	result = mkTypeCtor(	a0, a1)
 		Case &quot;mkTupleType&quot;:	result = mkTupleType(	a0, a1)
-		Case &quot;mkDtNonterminal&quot;:	result = mkDtNonterminal(a0, a1)
+		Case &quot;mkDtCClass&quot;:	result = mkDtCClass(	a0, a1)
+		Case &quot;mkDtNonterminal&quot;:	result = mkDtNonterminal(	a0, a1)
+		Case &quot;mkDtMult&quot;:		result = mkDtMult(	a0, a1)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select
@@ -460,11 +476,11 @@ applyLast_of_three:
 	a1 = car(reverseArgs) &apos;fn.args(1)
 	a2 = arg
 	Select Case name
-		Case &quot;swap&quot;:	result = apply(a0, a2, a1)
-		Case &quot;compose&quot;:	result = apply(a0, apply(a1, a2))
-		Case &quot;inRange&quot;:	result = CBool( (a0 &lt;= a2) And (a2 &lt;= a1) )
-		Case &quot;foldl&quot;:	result = foldl(a0, a1, a2)
-		Case &quot;foldr&quot;:	result = foldr(a0, a1, a2)
+		Case &quot;swap&quot;:		result = apply(a0, a2, a1)
+		Case &quot;compose&quot;:		result = apply(a0, apply(a1, a2))
+		Case &quot;inRange&quot;:		result = CBool( (a0 &lt;= a2) And (a2 &lt;= a1) )
+		Case &quot;foldl&quot;:		result = foldl(		a0, a1, a2)
+		Case &quot;foldr&quot;:		result = foldr(		a0, a1, a2)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select
@@ -476,7 +492,12 @@ applyLast_of_four:
 	a2 = car(reverseArgs) &apos;fn.args(2)
 	a3 = arg
 	Select Case name
-		Case &quot;ite&quot;: If applyLast(a0, a3) Then : result = apply1(a1, a3) : Else : result = apply1(a2, a3) : End if
+		Case &quot;ite&quot;
+			If applyLast(a0, a3) Then
+				result = apply1(a1, a3)
+			Else
+				result = apply1(a2, a3)
+			End if
 		Case Else
 			Goto applyLast_doTheCall
 	End Select

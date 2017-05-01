@@ -99,10 +99,10 @@ Function _TParser_toString( _
 				indent = Space(Len(result))
 				Dim j As Integer
 				j = 0
-				result = result &amp; _TParser_toString(p.st, j, indent, True, rules)
+				result = result &amp; _TParser_toString(p.st0, j, indent, True, rules)
 				rules = cons(result, rules)
 				result = p.st1	&apos; just return the name
-				p.st2 = False	&apos; delete &quot;visited&quot;-mark
+				p.st2 = False	&apos; clear &quot;visited&quot;-mark
 			End If
 		Case &quot;sat&quot;
 			result = &quot;(sat &quot;
@@ -195,10 +195,11 @@ Function _TParser_toString( _
 			End If
 		Case &quot;seq&quot;
 			Dim ps As Variant, i As Integer
-			Dim fName As String, args As String
+			Dim fName As String, args As Object, argsStr As String
 			ps = p.st(0)
 			f  = p.st(1)
 			fName = getFnName(f)
+			args = nil
 			result = &quot;(do &quot;
 			Dim addIndent As String, newLine As String, innerIndent As String
 			addIndent = Space(Len(result))
@@ -221,7 +222,7 @@ Function _TParser_toString( _
 						isNewLines = False
 					End If
 					result = result &amp; &quot;a&quot; &amp; k
-					args = args &amp; &quot; a&quot; &amp; k
+					args = cons(&quot;a&quot; &amp; k, args)
 					k = k + 1
 					result = result _
 						   &amp; &quot; &lt;- &quot; _
@@ -233,13 +234,22 @@ Function _TParser_toString( _
 				End If
 			Next i
 			result = result &amp; &quot; return&quot;
-			If isPartialApp(f) Then
-				result = result &amp; &quot; (&quot; &amp; TFn_toString(f) &amp; args &amp; &quot;)&quot;
-			Else
-				If fName = &quot;id&quot; Then
-					result = result &amp; args
+			If isApplyToListSomething(f) Then
+				argsStr = &quot; &quot; &amp; Join(toArray(reverse(args)), &quot; &quot;)
+				If isApplyToListId(f) Then
+					result = result &amp; argsStr
 				Else
-					result = result &amp; &quot; (&quot; &amp; fName &amp; args &amp; &quot;)&quot;
+					result = result _
+						   &amp; &quot; (&quot; _
+						   &amp; TFn_toString(car(partialArgs(f))) &amp; argsStr _
+						   &amp; &quot;)&quot;
+				End If
+			Else
+				argsStr = &quot; [&quot; &amp; Join(toArray(reverse(args)), &quot;, &quot;) &amp; &quot;]&quot;
+				If fName = getFnName(Fn.id) Then
+					result = result &amp; argsStr
+				Else
+					result = result &amp; &quot; (&quot; &amp; TFn_toString(f) &amp; argsStr &amp; &quot;)&quot;
 				End If
 			End If
 			result = result &amp; newLine &amp; &quot;)&quot;
@@ -375,11 +385,25 @@ Function isBreturn(f As Object) As Boolean
 	If isBsomething(f) Then
 		Dim v As Object
 		v = cadr(partialArgs(f)) &apos; they&apos;re in reverse!
-		If getFnName(v) = getFnName(Fn.pReturn) Then
-			result = True
-		End If
+		result = (getFnName(v) = getFnName(Fn.pReturn))
 	End If
 	isBreturn = result
+End Function
+
+Function isApplyToListSomething(f As Object) As Boolean
+	isApplyToListSomething = (getFnName(f) = getFnName(Fn.applyToList)) _
+		And (arity(f) = 1)
+End Function
+
+Function isApplyToListId(f As Object) As Boolean
+	Dim result As Boolean
+	result = False
+	If isApplyToListSomething(f) Then
+		Dim g As Object
+		g = car(partialArgs(f))
+		result = (getFnName(g) = getFnName(Fn.id))
+	End If
+	isApplyToListId = result
 End Function
 
 Function bindFns(Optional f As Object)
@@ -1331,8 +1355,6 @@ End Function
 
 &apos;= tests ======================================================================
 
-Global refute_parses_pass As Object
-
 Function [-----------------------------]()
 End Function
 
@@ -1340,7 +1362,6 @@ Function test_Parser(Optional what)
 &apos;	what = &quot;primitives&quot;
 	Dim failure As String
 	failure = toString(parseFailure)
-	refute_parses_pass = assertEqual(failure, failure)
 	
 	Dim result As Variant
 	Dim ticksPerSec As Long
@@ -1377,7 +1398,7 @@ Function test_Parser(Optional what)
 	End If
 	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;special&quot;) Then
 		test_Parser_indirect()
-		&apos;test_Parser_toString()
+		test_Parser_toString()
 	End If
 	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;numbers&quot;) Then
 		test_Parser_binDigit()
@@ -1436,6 +1457,10 @@ End Function
 &apos;= test helpers ===============================================================
 
 Function refute_parses(p As Parser, ByVal ss As Variant)
+	Static refute_parses_pass As Object
+	If isNull(refute_parses_pass) Then
+		refute_parses_pass = assertEqual(parseFailure, parseFailure)
+	End If
 	Dim actual As Variant, testResult As Variant
 	Dim actualS As String, expectedS As String
 	If isArray(ss) Then
@@ -2596,13 +2621,68 @@ Function assert_toStr(p As Object, expected As String)
 End Function
 
 Function test_Parser_toString()
-	Dim f As Object
+	Dim f As Object, p As Object, q As Object
 	f = TParser_toString
 	assertEqual(isFn(f), True).x
 	assertEqual(arity(f),   1).x
 	assertEqual(apply(f, pFail), &quot;fail&quot;).x
-	
-	MsgBox(toString(pTypeExpr))
+
+	&apos; pSeqL(..., id)
+	p = pSeqL(Array(pItem), id)
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot; return [a0]&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;)&quot;).x
+	p = pSeqL(Array(pItem, pItem), id)
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;    a1 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot; return [a0, a1]&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;)&quot;).x
+	p = pSeqL(Array(pItem, pStr(&quot;x&quot;), pItem), id)
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;    a1 &lt;- (str &apos;x&apos;)&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;    a2 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot; return [a0, a1, a2]&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;)&quot;).x
+	p = pSeqL(Array(pItem, pSkip(pStr(&quot;x&quot;)), pItem), id)
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;     _ &lt;- (str &apos;x&apos;)&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;    a1 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot; return [a0, a1]&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;)&quot;).x
+
+	&apos; pSeqL(..., reverse)
+	p = pSeqL(Array(pItem), reverse)
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot; return (reverse [a0])&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;)&quot;).x
+	p = pSeqL(Array(pItem, pStr(&quot;x&quot;), pItem), reverse)
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;    a1 &lt;- (str &apos;x&apos;)&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;    a2 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot; return (reverse [a0, a1, a2])&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;)&quot;).x
+	p = pSeqL(Array(pItem, pSkip(pStr(&quot;x&quot;)), pItem), reverse)
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;     _ &lt;- (str &apos;x&apos;)&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;    a1 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot; return (reverse [a0, a1])&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;)&quot;).x
+
+	&apos; pSeq(..., id) &apos; NOT pSeqL!
+	p = pSeq(Array(pItem), id)
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot; return a0&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;)&quot;).x
+	p = pSeq(Array(pItem, pSkip(pItem)), id)
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;     _ &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot; return a0&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;)&quot;).x
+	p = pSeq(Array(pSkip(pItem), pItem), id)
+	assert_toStr(p, &quot;(do  _ &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;    a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot; return a0&quot; &amp; chr(13) &amp; chr(10) _
+				  &amp; &quot;)&quot;).x
 	
 	assert_toStr(pFail, 							&quot;fail&quot;).x
 	assert_toStr(pReturn(7), 						&quot;(return 7)&quot;).x
@@ -2611,8 +2691,12 @@ Function test_Parser_toString()
 	assert_toStr(pStr(&quot;a&quot;),							&quot;(str &apos;a&apos;)&quot;).x
 	assert_toStr(pSkip(pItem), 						&quot;(skip item)&quot;).x
 	assert_toStr(pSkip(pStr(&quot;a&quot;)),					&quot;(skip (str &apos;a&apos;))&quot;).x
-	assert_toStr(pChoice(pStr(&quot;a&quot;), pStr(&quot;b&quot;)),		&quot;((str &apos;a&apos;) +++ (str &apos;b&apos;))&quot;).x
-	assert_toStr(pChoice(pStr(&quot;b&quot;), pStr(&quot;a&quot;)),		&quot;((str &apos;b&apos;) +++ (str &apos;a&apos;))&quot;).x
+	assert_toStr(pChoice(pStr(&quot;a&quot;), pStr(&quot;b&quot;)),		&quot;(str &apos;a&apos;) | (str &apos;b&apos;)&quot;).x
+	assert_toStr(pChoice(pStr(&quot;b&quot;), pStr(&quot;a&quot;)),		&quot;(str &apos;b&apos;) | (str &apos;a&apos;)&quot;).x
+	assert_toStr(pChoice(pChoice(pStr(&quot;a&quot;), pStr(&quot;b&quot;)),	pStr(&quot;c&quot;)), _
+		&quot;(str &apos;a&apos;) | (str &apos;b&apos;) | (str &apos;c&apos;)&quot;).x
+	assert_toStr(pChoice(pStr(&quot;a&quot;), pChoice(pStr(&quot;b&quot;), pStr(&quot;c&quot;))), _
+		&quot;(str &apos;a&apos;) | (str &apos;b&apos;) | (str &apos;c&apos;)&quot;).x
 	assert_toStr(pZeroOrOne(pStr(&quot;a&quot;)),				&quot;(str &apos;a&apos;)?&quot;).x
 	&apos; double p?? is the same as p?:
 	assert_toStr(pZeroOrOne(pZeroOrOne(pStr(&quot;a&quot;))),	&quot;(str &apos;a&apos;)?&quot;).x
@@ -2625,7 +2709,8 @@ Function test_Parser_toString()
 	assert_toStr(pMany(pItem),						&quot;item*&quot;).x
 	assert_toStr(pSkip(pMany(pItem)),				&quot;(skip item*)&quot;).x
 
-	Dim p As Object, q As Object
+	MsgBox(toString(pTypeExpr))
+
 	p = pInd(&quot;&quot;)
 	assert_toStr(p,	&quot;(ind Nothing)&quot;).x
 	q = pItem
@@ -2636,6 +2721,7 @@ Function test_Parser_toString()
 	p = fixIndirection(p, pChoice(pStr(&quot;x&quot;), pSeq(Array(pSkip(pStr(&quot;(&quot;)), p, pSkip(pStr(&quot;)&quot;))), id))
 &apos;	assert_toStr(p,	&quot;(str &apos;x&apos;) +++ ?????? )&quot;).x
 	
+
 End Function
 
 Function test_Parser_hexNum()

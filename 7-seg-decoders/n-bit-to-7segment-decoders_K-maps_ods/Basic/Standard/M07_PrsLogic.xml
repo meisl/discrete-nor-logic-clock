@@ -41,25 +41,53 @@ Function pLogic_dt()
 		pS = pInd(&quot;S&quot;)
 		pT = pInd(&quot;T&quot;)
 		pF = pInd(&quot;F&quot;)
-		pW = pBind(pChoice( _
-				pStr_dt(&quot; &quot;), _
-				pStr_dt(chr(10)), _
-				pStr_dt(chr(13)), _
-				pStr_dt(chr(9)) _
-			), compose(compose(pReturn, mkDtNonterminal(&quot;W&quot;)), swap(cons, nil)) _
+		&apos; pC = ((pStr &quot;0&quot;) +++ (pStr &quot;1&quot;)) &gt;&gt;= return ° (mkDtNonterm &quot;C&quot;) ° (swap cons nil)
+		pC = fixIndirection(pInd(&quot;C&quot;), _
+			pChoice(pStr(&quot;0&quot;), pStr(&quot;1&quot;)) _
 		)
-		pC = pChoice( _
-			pStr_dt(&quot;0&quot;), _
-			pStr_dt(&quot;1&quot;) _
+		pC = toDerivationP(pC)
+		&apos;pC = pBind(foldl1(pChoice, List( _
+		&apos;		pStr_dt(&quot;0&quot;), _
+		&apos;		pStr_dt(&quot;1&quot;) _
+		&apos;	)), compose(compose(pReturn, mkDtNonterminal(&quot;C&quot;)), swap(cons, nil)) _
+		&apos;)
+		pI = pBind(foldl1(pChoice, List( _
+				pStr_dt(&quot;A&quot;), _
+				pStr_dt(&quot;B&quot;), _
+				pStr_dt(&quot;C&quot;), _
+				pStr_dt(&quot;D&quot;) _
+			)), compose(compose(pReturn, mkDtNonterminal(&quot;I&quot;)), swap(cons, nil)) _
+		)
+		pW = pBind(foldl1(pChoice, List( _
+				pStr_dt(&quot; &quot;), _
+				pStr_dt(chr(9)) _
+			)), compose(compose(pReturn, mkDtNonterminal(&quot;W&quot;)), swap(cons, nil)) _
 		)
 		pN = pSeqL(Array( _
 				pStr_dt(&quot;!&quot;), _
 				pMany_dt(pW), _
-				pC _
+				pF _
 			), mkDtNonterminal(&quot;N&quot;) _
 		)
-		
-		result = pN
+		pF = fixIndirection(pF, foldl1(pChoice, List( _
+			pC, pI, pN _
+		)))
+		pT = fixIndirection(pT, pSeqL(Array( _
+				pMany_dt(pW), _
+				pF, _
+				pMany_dt(pW), _
+				pZeroOrOne_dt( _
+					pSeqL(Array( _
+							pStr_dt(&quot;*&quot;), _
+							pMany_dt(pW), _
+							pT _
+						), _
+						mkDtNonterminal(&quot;(..)&quot;) _
+					)) _
+			 ), mkDtNonterminal(&quot;Term&quot;)) _
+		)
+		result = pT
+		&apos;msgbox(toString(pF))
 
 		
 &apos;		pS = fixIndirection(pS, pSeq(Array( _
