@@ -111,11 +111,24 @@ is one grammar with three rules, attaching names "S", "T" and "F" to ... well so
 So each of the three defines a certain language. But which of these should be considered the language defined by the grammar as a whole? We answer this question simply by picking one rule as the ***start rule***. By convention it's the "S" rule - or alternatively just the first one.
 
 
-### 2.1. Terminals and escaping
+### 2.1. Nonterminals
 
-Now for the other side of the definitions. We'll allow rule names which we had on the left-hand-side (lhs) of `::=`, or *nonterminals* also on the right-hand-side (rhs).
+Now for the other side of the definitions. We'll allow the rule names which we had on the left-hand-side (lhs) of `::=` on the right-hand-side (rhs), too. If they do occur on the rhs we will call them ***nonterminals***, rather than rule names. But still, a nonterminal refers to a rule, just like definitions may contain references to stuff defined elsewhere. Like so:
 
-However, more is needed to make things interesting. First we'll add *terminals* which will be just plain character sequences, enclosed in double quotes:
+```
+  S ::= T
+  T ::= ...
+```
+As for any grammar, the language defined is the language defined by its start rule, which is `S`. In this example this is just `T`, or whatever language is defined by rule `T`.
+
+Well, with only that we can't really build anything interesting. However, it already brings up this question: What about rules - except for the start rule - that never occur as a nonterminal on the rhs of any other rule?
+
+Obviously, such rules[^unused-rules] do not contribute to the definition of the *grammar's* language at all, so they could've as well been left out altogether. Likewise, any grammar with unused rules can be reduced to one without any such. So let's just assume from now on that any rule listed in a grammar is actually used.
+
+
+### 2.2. Terminals and escaping
+
+As we've seen, more than just nonterminals is needed on the rhs to make things interesting. First we'll add *terminals* which will be just plain character sequences, enclosed in double quotes:
 ```
   S ::= "x"
 ```
@@ -134,7 +147,7 @@ However, now we cannot denote the backslash character anymore! Well, why not app
 Another use of the escaping `\` is to denote *unprintable* characters like TAB, NEWLINE and RETURN. We'll do so by writing `"\t"`, `"\n"` and `"\r"`, respectively.
 
 
-### 2.2. Concatenation, Alternation and Grouping
+### 2.3. Concatenation, Alternation and Grouping
 
 Next comes ***concatenation***, which is denoted simply by putting things next to each other:
 ```
@@ -206,7 +219,7 @@ but using only one of them - rather than both in combination - has its downsides
 [TODO: hand-wavy argument about expressive power - proof?]
 
 
-### 2.3. Example: A grammar for logic expressions
+### 2.4. Example: A grammar for logic expressions
 
 We've now covered enough to look at our first actually useful example grammar.
 A rough characterization of what its language can be taken as would be
@@ -229,7 +242,7 @@ Here's the grammar:
   N ::= "!" F
 ```
 
-#### 2.3.1. Basic parts: non-terminals for structure, terminals for the alphabet
+#### 2.4.1. Basic parts: non-terminals for structure, terminals for the alphabet
 
 The nonterminals are chosen as to give some hint at their intended purpose:
 - `S`: "Start"
@@ -249,7 +262,7 @@ Looking at the terminals alone already tells us which characters can appear at a
 <br>In particular, there is no whitespace in the alphabet (so far), so for example "A + B" will definitely NOT be in the language, whereas "A+B" might be (and actually is).
 
 
-#### 2.3.2. Grouping revisited (1): object-level vs meta-level
+#### 2.4.2. Grouping revisited (1): object-level vs meta-level
 
 Regarding `"("` and `")"`, it is important to understand how they are different from `(` and `)`:
 the former are enclosed in double quotes, so they are terminals.
@@ -261,11 +274,11 @@ However, both, the object and the meta symbols, are used for pretty much the sam
 ***the object-level vs the meta-level***.
 
 
-#### 2.3.3. Grouping revisited (2): balanced parentheses
+#### 2.4.3. Grouping revisited (2): balanced parentheses
 
 Of course we expect parentheses to be balanced, ie.: every opening parenthesis must eventually be paired up with a closing one, and it should be unambiguous which to pair up with which.
 
-Above, under [2.2](#22-concatenation-alternation-and-grouping), when we introduced parentheses on the meta-level we didn't even mention that - and I think we actually hadn't to.
+Above, under [2.3](#23-concatenation-alternation-and-grouping), when we introduced parentheses on the meta-level we didn't even mention that - and I think we actually hadn't to.
 The concept of grouping - as well as the need for it - is just immediately evident. Likewise, putting symmetrical-looking symbols `(` and `)` around the intended groups just comes naturally[^3].
 
 However, now that we know how to tell apart object-level from meta-level, and have introduced object-level parentheses in our example grammar, we can no longer take *their* balancedness just for granted.
@@ -283,7 +296,7 @@ Such words definitely exist: the single constants `"0"` or `"1"` are examples, a
 <br>Note: this proof also covers all the *infinite* words (of which there are indeed some in the language). Well, in practice infinite words actually won't matter too much, but it's nice to know, isn't it?
 
 
-### 2.4. Derivations, ASTs and operator precedence
+### 2.5. Derivations, ASTs and operator precedence
 
 Putting aside parentheses for a moment, let's look at words with operators in them; for example `"A+B*C"`.
 
@@ -395,7 +408,7 @@ In the AST for any of its language's (sub-) words *without parentheses*
 
 
 
-### 2.5. Operator associativity
+### 2.6. Operator associativity
 
 Up until now we have only looked at words that contained any operator at most once. But what if there are more, like in `"A+B+C+D"`?
 Is it arbitrary which `"+"` to derive first? This question is very similar to that of operator precedence, only that it's now about the same operator occurring in multiple locations.
@@ -458,7 +471,7 @@ The same is true for `"*"` because its rule `T` has the very same structure as `
 [TODO: add solution AST]
 
 
-### 2.6. Multiplicity
+### 2.7. Multiplicity
 
 The `S` rule of our grammar for Logic expressions
 ```
@@ -499,7 +512,7 @@ Finally we need to state two conventions regarding `?`, `*` and `+`:
 - ***multiplicity operators bind more strongly than concatenation and alternation***
 
 
-### 2.7. Character classes
+### 2.8. Character classes
 There is one quirk left in our grammar of Logic expressions: we have only four different identifiers, and each is just a single letter. Again, we *could* studiously list all the letters of the (English) alphabet, and then again for lower case.
 Well, not only would that be a lot of letters, but also a lot of `|` and even more `"` (meta-)symbols. Let's instead introduce another abbreviation, and have circumfix `[` `]` around plain object-level symbols
 ```
@@ -628,7 +641,7 @@ What's in between is a bit more complicated:
 
    Terminal ::= ["] (escQ | [-"\\])+ ["]
 ```
-Here we formally define the **escaping mechanism for double quotes**, just as we did in plain English in [2.1 Terminals and escaping](#21-terminals-and-escaping).
+Here we formally define the **escaping mechanism for double quotes**, just as we did in plain English in [2.2 Terminals and escaping](#22-terminals-and-escaping).
 
 An escape sequence `escQ` ("escape quotes") is a single `\` (denoted by `"\\"`) followed by
 
@@ -710,6 +723,8 @@ Next chapter about functional parsers: will implement parsers for various gramma
 Footnotes
 
 [^1]: Well, I just "curried" the problem... (sorry for the rather nerdy joke, just couldn't resist)
+
+[^unused-rules]: "never-mentioned" is actually a bit too strict. Precisely it is "not *reachable* from the start rule"
 
 [^infinite-xs]: The language contains exactly one word, namely the infinite sequence of "x"s. Not so hard, actually. But what about this slight variation: `S ::= S "x"`? ... ;)
 
