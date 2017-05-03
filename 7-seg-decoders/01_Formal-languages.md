@@ -26,14 +26,12 @@ Table of contents
 A *formal* language differs from a *natural* language like English in quite some ways:
 
 - it is a mathematical construct, precisely defined; not spoken
-- it is in fact set of *words*, where the term *word* has a precise meaning: a sequence of characters,
-  possibly including whitespace like " " or the TAB or NEWLINE character
+- it is in fact set of *words*, where the term *word* has a precise meaning: a sequence of characters, possibly including whitespace like " " or the TAB or NEWLINE character
 - its words may be infinite (never-ending sequences)
 - it may or may not be infinite itself
 - it may or may not contain the empty sequence "", or "the empty word", also denoted as ε ("epsilon")
 
-From now on we'll take the "formal" as default, so just "language" will always mean formal language,
-and "word" will always mean sequence of characters, no more and no less.
+From now on we'll take the "formal" as default, so just "language" will always mean formal language, and "word" will always mean sequence of characters, no more and no less.
 
 ### 1.2. What's it good for?
 
@@ -53,13 +51,10 @@ Here we'll be concerned only with the syntax problem, or "word problem".
 The aforementioned word problem can be stated as: given a word and a language, is the word an element of the language?
 
 Well, the answer isn't so exciting as such, it'll just be either Yes or No.
-Things get more interesting when we ask *how* to get this answer. Obviously we want to do this in a systematic way,
-and do it mechanically. Most probably we also want to (later) attach some meaning to the given word, so it'll be
-helpful to extract some additional information about the word's structure.
+Things get more interesting when we ask *how* to get this answer. Obviously we want to do this in a systematic way, and do it mechanically. Most probably we also want to (later) attach some meaning to the given word, so it'll be helpful to extract some additional information about the word's structure.
 That in fact amounts to kind of a *proof* of the final Yes/No answer.
 
-In case of a Yes we will be able to build up some *structured* (= broken-up into classified parts) 
-internal representation which can then be processed further.
+In case of a Yes we will be able to build up some *structured* (= broken-up into classified parts) internal representation which can then be processed further.
 In case of a No, what has been built up so far can be used to produce (hopefully) helpful error messages.
 
 ---
@@ -70,13 +65,10 @@ A **parser** is a program *specific to a language* that turns an input word into
 There are two things to note here:
 
  - the AST, as being structured, can be viewed as a small step towards semantics already.
-  It can in fact be argued that the distinction we've made is somewhat arbitrary, and even that fusing together
-  syntactic and semantic analysis is advantageous. For now, however, we'll keep them separate and focus on syntax.
- - the phrase **specific to a language** (or at least me emphasizing it): by putting it in I have effectively turned
-  the original word problem, which had *two* inputs (a word and a language) into a one-input problem (a word only)[^1].
+  It can in fact be argued that the distinction we've made is somewhat arbitrary, and even that fusing together syntactic and semantic analysis is advantageous. For now, however, we'll keep them separate and focus on syntax.
+ - the phrase **specific to a language** (or at least me emphasizing it): by putting it in I have effectively turned the original word problem, which had *two* inputs (a word and a language) into a one-input problem (a word only)[^1].
 
-Well, breaking things up into sub-problems is perfectly reasonable. In this instance I hope to have motivated you to focus
-  on the following:
+Well, breaking things up into sub-problems is perfectly reasonable. In this instance I hope to have motivated you to focus on the following:
   
 ### 1.4. How to define a formal language?
 
@@ -87,12 +79,11 @@ Well, we can - **if:**
  - the language is finite (and somewhat small, to be practible)
  - AND: every word in the language is finite (and somewhat small... you get it)
 
-These two restrictions already give a hint that the class of languages we can (practically) define in this way
-is rather limited - and actually not very interesting.
+These two restrictions already give a hint that the class of languages we can (practically) define in this way is rather limited - and actually not very interesting.
 Additionally: this approach does not provide any means of classifying parts of words whatsoever.
 
-Again, as you may have recognized by now, I'm trying to push you towards sub-dividing problems, or separating concerns.
-The ones I'm aiming for here are:
+Again, as you may have recognized by now, I'm trying to push you towards sub-dividing problems, or separating concerns. The ones I'm aiming for here are:
+
 + feasability: how to deal with non-finiteness?
 + sheer practicality: even if theoretically possible, is it worth the effort?!
 + last, not least - *does it make sense?*
@@ -100,28 +91,30 @@ The ones I'm aiming for here are:
 
 We'll start with addressing the last point, and add more as we go.
 
-The formalism we will develop for defining languages is called a ***grammar***,
-and its basic compounds are ***rules***. 
-Each such rule represents a class in the classification we aim to make,
-and there needs to be one rule picked out to be the ***start rule***.
+The formalism we will develop for defining languages is called a ***grammar***, and its basic compounds are ***rules***. 
+Each such rule represents a class in the classification we aim to make, and as we'll see there needs to be one rule picked out to be the ***start rule***.
 
 ## 2. Grammars
 
-Actually, both grammars and rules are nothing but *definitions*: of languages (sets) and parts of languages (subsets of languages), respectively.
-But a definition as such is a rather simple concept: attach a *name* to some other thing.
-We'll use the symbol `::=` to denote this "attaching" action, so:
+Actually, both grammars and rules are nothing but *definitions*. A grammar is a definition of a language (set). And so is each rule from that grammar, where the set defined by the rule contains only words (character sequences) that are sub-words (parts of other sequences) of words defined by the whole grammar.
+
+Note that this is different from set-inclusion: the language defined by the grammar is NOT (necessarily) the union of the languages defined by the rules. Rather it's a relation between words in respective languages, and that is the relation of sequence ("grammar-word") to sub-sequence ("rule-word").
+
+But a definition - as such - is a rather simple concept: attach a *name* to some other thing. We'll use the symbol `::=` to denote this "attaching" action, so:
 ```
   S ::= ...
   T ::= ...
   F ::= ...
 ```
 is one grammar with three rules, attaching names "S", "T" and "F" to ... well something.
-By convention we'll consider the "S" rule - or alternatively simply the first one - as the start rule.
+
+So each of the three defines a certain language. But which of these should be considered the language defined by the grammar as a whole? We answer this question simply by picking one rule as the ***start rule***. By convention it's the "S" rule - or alternatively just the first one.
 
 
 ### 2.1. Terminals and escaping
 
 Now for the other side of the definitions. We'll allow rule names which we had on the left-hand-side (lhs) of `::=`, or *nonterminals* also on the right-hand-side (rhs).
+
 However, more is needed to make things interesting. First we'll add *terminals* which will be just plain character sequences, enclosed in double quotes:
 ```
   S ::= "x"
@@ -252,9 +245,8 @@ As for the terminals, there are
 - identifiers: `"A"` ... `"D"` as variables (variable *names*, to be precise)
 - parentheses: `"("` and `")"` for grouping
 
-Looking at the terminals alone already tells us which characters can appear at all in words of the language.
-This set of characters that can appear at all is called the ***alphabet of the language***.
-In particular, there is no whitespace in the alphabet, so for example "A + B" will definitely NOT be in the language, whereas "A+B" might be (and actually is).
+Looking at the terminals alone already tells us which characters can appear at all in words of the language. This set of characters is called the ***alphabet of the language***.
+<br>In particular, there is no whitespace in the alphabet (so far), so for example "A + B" will definitely NOT be in the language, whereas "A+B" might be (and actually is).
 
 
 #### 2.3.2. Grouping revisited (1): object-level vs meta-level
@@ -271,44 +263,24 @@ However, both, the object and the meta symbols, are used for pretty much the sam
 
 #### 2.3.3. Grouping revisited (2): balanced parentheses
 
-Of course we expect parentheses to be balanced, ie.: every opening parenthesis must eventually be paired up with a
-closing one, and it should be unambiguous which to pair up with which.
+Of course we expect parentheses to be balanced, ie.: every opening parenthesis must eventually be paired up with a closing one, and it should be unambiguous which to pair up with which.
 
-Above, under 5.2, when we introduced parentheses on the meta-level we didn't
-even mention that - and I think we actually hadn't to.
-The concept of grouping - as well as the need for it - is just immediately evident.
-Likewise, putting symmetrical-looking symbols `(` and `)` around the intended groups,
-just comes naturally[^3].
+Above, under [2.2](#22-concatenation-alternation-and-grouping), when we introduced parentheses on the meta-level we didn't even mention that - and I think we actually hadn't to.
+The concept of grouping - as well as the need for it - is just immediately evident. Likewise, putting symmetrical-looking symbols `(` and `)` around the intended groups just comes naturally[^3].
 
-However, now that we know how to tell apart object-level from meta-level,
-and have introduced object-level parentheses in our example grammar, we can no
-longer take *their* balancedness just for granted.
+However, now that we know how to tell apart object-level from meta-level, and have introduced object-level parentheses in our example grammar, we can no longer take *their* balancedness just for granted.
 
 So: how to prove that every word in the language of logic expressions has balanced parentheses?
 
-Well, the only way of matching a `"("` is by following the last alternative of the `F` rule, namely
-`"(" S ")"`. But this is a concatenation, so we must then also see an `S` and finally a `")"`.
-So the initial `"("` is indeed paired with the final `")"`, from which we get two things:
+Well, the only way of matching a `"("` is by following the last alternative of the `F` rule, namely `"(" S ")"`. But this is a concatenation, so we must then also see an `S` and finally a `")"`. So the initial `"("` is indeed paired with the final `")"`, from which we get two things:
 - a) the nr of opening parentheses equals the nr of closing ones
 - b) for every `"("`, the `")"` is *uniquely determined*
 
-Also: *If the inner `S` has balanced parentheses*, 
-then so has the whole thing matched by the last alternative of the `F` rule.
-Observe that `S` is the start rule, so what's in between `"("` and `")"` is also a word of the
-language - but a *smaller* one! This reasoning is top-down, since we went from a larger word to a
-smaller one.
-<br>
-Let's now take a bottom-up view, and start with a word in the language *that has no parentheses at all*.
-Such words definitely exist: the single constants `"0"` or `"1"` are examples, 
-as is a single identifier like "A".
-All such words have balanced parentheses in a trivial sense: namely none at all.
-
-But since all other words in the language (words that really do contain parentheses)
-can be built up *only* through the last alternative of  the `F` rule,
-these must have balanced parentheses, too!
-<br>
-Note: this proof also covers all the *infinite* words (of which there are indeed some in the language).
-Well, in practice infinite words actually won't matter too much, but it's nice to know, isn't it?
+Also: *If the inner `S` has balanced parentheses*, then so has the whole thing matched by the last alternative of the `F` rule. Observe that `S` is the start rule, so what's in between `"("` and `")"` is also a word of the language - but a *smaller* one! This reasoning is top-down, since we went from a larger word to a smaller one.
+<br>Let's now take a bottom-up view, and start with a word in the language *that has no parentheses at all*.
+Such words definitely exist: the single constants `"0"` or `"1"` are examples, as is a single identifier like "A". All such words have balanced parentheses in a trivial sense: namely none at all.
+<br>But since all other words in the language (words that really do contain parentheses) can be built up *only* through the last alternative of  the `F` rule, these must have balanced parentheses, too!
+<br>Note: this proof also covers all the *infinite* words (of which there are indeed some in the language). Well, in practice infinite words actually won't matter too much, but it's nice to know, isn't it?
 
 
 ### 2.4. Derivations, ASTs and operator precedence
@@ -316,13 +288,10 @@ Well, in practice infinite words actually won't matter too much, but it's nice t
 Putting aside parentheses for a moment, let's look at words with operators in them; for example `"A+B*C"`.
 
 
-Starting with the `S` rule, we first have to choose between the alternatives `T` or `T "+" S`. It cannot
-be just `T` because we have to match the `"+"` sometime, and the only rule to do so is `S`. 
-However, if we went down the `T` part of it, then the only way to get back to `S` is through `"("` and
-`")"` - but there are none in `"A+B*C"`.
+Starting with the `S` rule, we first have to choose between the alternatives `T` or `T "+" S`. It cannot be just `T` because we have to match the `"+"` sometime, and the only rule to do so is `S`. However, if we went down the `T` part of it, then the only way to get back to `S` is through `"("` and `")"` - but there are none in `"A+B*C"`.
 
-So, by following the `T "+" S` branch of `S` we are done with the `"+"` and left with two sub-problems,
-namely
+So, by following the `T "+" S` branch of `S` we are done with the `"+"` and left with two sub-problems, namely
+
 - derive `"A"`, starting at `T`
 - derive `"B*C"` starting at `S`
 
@@ -333,9 +302,7 @@ The reasoning for the other goes like this:
 - at `T`: must follow `F "*" S` because there are no parentheses
 - at which point we're left only with variable names, which should be clear by now
 
-All this reasoning, that is precisely describing which rules to follow s.t. a particular word is matched - is 
-called a ***derivation*** *of the word*. Apart from using plain English it can also be represented by
-a so-called ***derivation tree***:
+All this reasoning, that is precisely describing which rules to follow s.t. a particular word is matched - is called a ***derivation*** *of the word*. Apart from using plain English it can also be represented by a so-called ***derivation tree***:
 ```
 "A+B*C"
 ~> S
@@ -433,7 +400,7 @@ In the AST for any of its language's (sub-) words *without parentheses*
 Up until now we have only looked at words that contained any operator at most once. But what if there are more, like in `"A+B+C+D"`?
 Is it arbitrary which `"+"` to derive first? This question is very similar to that of operator precedence, only that it's now about the same operator occurring in multiple locations.
 
-But the grammar does impose a "convention" in this case, too. It forces us to derive *the left-most `"+"` first*. That is because the recursion back to `S` only appears on the right side of `"+"`, to the effect that the input word has to be split in a way s.t. there are no more `"+"` in the left sub-word. Otherwise this left sub-word wouldn't be derivable itself.
+But the grammar does impose a "convention" in this case, too. It forces us to derive *the left-most `"+"` first*. That is because the recursion back to `S` only appears on the right side of `"+"`, to the effect that the input word has to be split in such a way that there are no more `"+"` in the left sub-word. Otherwise this left sub-word wouldn't be derivable anymore.
 
 The resulting AST is a right-leaning chain of `"+"`s:
 ```
