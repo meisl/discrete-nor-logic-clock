@@ -214,110 +214,170 @@ Function mkDtMult( _
 	mkDtMult = result
 End Function
 
-Function toDerivationP(Optional p As Object)
+Function toDerivationP(Optional ByVal p As Object)
+	Dim result As Variant
 	If isMissing(p) Then
-		toDerivationP = Fn.toDerivationP
-		Exit Function
+		result = Fn.toDerivationP
+	Else
+		Dim seen As Object
+		seen = nil
+		result = _toDerivationP(p, seen, False)
+		While Not(isNil(seen))
+			p = car(seen)
+			p.st2 = False
+			p.st3 = Empty
+			seen = cdr(seen)
+		Wend
 	End If
-	Dim result As Variant, f As Object
-	Select Case p.tp
-		Case &quot;str&quot;
-			result = pBind(p, compose(pReturn, mkDtTerminal))
-		Case &quot;item&quot;
-			result = pBind(p, compose(pReturn, mkDtCClass(&quot;(.)&quot;)))
-			&apos;result = pSeq(Array(p), mkDtCClass(&quot;(.)&quot;))
-		Case &quot;choice&quot;
-			result = pChoice( _
-				toDerivationP(p.st0), _
-				toDerivationP(p.st1) _
-			)
-		Case &quot;seq&quot; &apos; only simple sequences supported here
-			f = p.st(1)
-			If (getFnName(f) = getFnName(Fn.id)) Then
-				result = pSeqL( _
-					map(Fn.toDerivationP, p.st(0)), _
-					id _
-				)			
-			&apos;ElseIf isApplyToListId(f) Then
-			Else
-				croak(&quot;toDerivationP/NYI: pSeq(..., &quot; _
-					 &amp; TFn_toString(p.st(1)) &amp; &quot;)&quot; _
-					 &amp; chr(13) &amp; chr(10) _
-					 &amp; toString(p)_
-				)
-			End If
-		Case &quot;ind&quot;
-			If p.st2 Then &apos; seen before
-				If isEmpty(p.st3) Then
-					croak(&quot;toDerivationP: replace &quot; &amp; p.st1 &amp; &quot;???&quot;)
-				End If
-				result = p.st3
-			ElseIf isNull(p.st0) Then
-				croak(&quot;toDerivationP/NYI: uninitialized indirection &quot; &amp; p.st1)
-			Else &apos; p.st0 returns a single ASN
-				p.st2 = True &apos; set the &quot;visited&quot;-mark
-				Dim name As String, q As Object
-				name = p.st1
-				q = pInd(name)
-				p.st3 = q
-				q = fixIndirection(q, pBind( _
-						toDerivationP(p.st0), _
-						compose(pReturn, compose( _
-							mkDtNonterminal(q.st1), _
-							ite(isList, _
-								id, _
-								swap(cons, nil) _
-							) _
-						)) _
-				))
-				&apos;q = fixIndirection(q, pSeq( _
-				&apos;		Array(toDerivationP(p.st0)), _
-				&apos;		compose( _
-				&apos;			mkDtNonterminal(q.st1), _
-				&apos;			ite(isList, _
-				&apos;				id, _
-				&apos;				swap(cons, nil) _
-				&apos;			) _
-				&apos;		) _
-				&apos;))
-				p.st3 = Empty
-				p.st2 = False &apos; clear the &quot;visited&quot;-mark
-				
-				result = q
-			End If
-		Case Else
-			croak(&quot;toDerivationP: cannot handle .tp=&quot; &amp; toString(p.tp))
-	End Select
-	
 	toDerivationP = result
 End Function
 
-Function pStr_dt(s As String)
-	pStr_dt = pBind(pStr(s), compose(pReturn, mkDtTerminal))
+Function dtMultLabel(m As String, p As Object)
+	Dim t As String
+	Select Case p.tp
+		Case &quot;item&quot;	:	t = &quot;.&quot; 
+		Case &quot;str&quot;:		t = toString(p.st(0))
+		Case &quot;choice&quot;:	t = &quot;(..|..)&quot;
+		Case &quot;seq&quot;:		t = &quot;(...)&quot;
+		Case &quot;ind&quot;:		t = getPIndName(p)
+		Case Else
+			croak(&quot;dtMultLabel: cannot handle .tp=&quot; &amp; toString(p.tp))
+	End Select
+	dtMultLabel = &quot;(&quot; &amp; m &amp; &quot;):&quot; &amp; t
 End Function
 
-Function pMany_dt(p As Object)
-	pMany_dt = pBind(pMany(p), compose(pReturn, _
-		compose( _
-			mkDtMult(&quot;(*):W&quot;), _
-			id _
-		) _
-	))
-&apos;			map(ite(isString, compose(mkDtTerminal, concat(&quot;!!&quot;)), id) _
-&apos;			map(mkDtTerminal) _
-End Function
+Const typ_Parser_ASN = &quot;Parser ASN&quot;
+Const typ_Parser_List_ASN = &quot;Parser [ASN]&quot;
 
-Function pZeroOrOne_dt(p As Object)
-	Dim q As Object, f As Object
-	q = pZeroOrOne(p)
-	f = compose( _
-			mkDtMult(&quot;(?):(..|..)&quot;), _
-			ite(Fn.isEmpty, _
-				fstArg(nil), _
-				swap(cons, nil) _
-			) _
-		)
-	pZeroOrOne_dt = pBind(q, compose(pReturn, f))
+Function _toDerivationP( _
+	ByVal p As Object, _
+	ByRef seen As Object, _
+	ByVal wantList As Boolean _
+)
+	Dim result As Variant
+	Dim f As Object, s As String, q As Object, r As Object
+	Dim qs As Object, rs As Object
+	If isPMany(p) Then &apos; p is of shape (many1 q) +++ (return nil)
+		q = p.st0.st0
+		s = dtMultLabel(&quot;*&quot;, q)
+		f = mkDtMult(s)
+		q = _toDerivationP(q, seen, False)
+		If q.typ = typ_Parser_List_ASN Then
+			f = compose(f, mkDtNonterminal(&quot;(...)&quot;))
+		End If
+		&apos;result = pSeq(Array(pMany(q)), f)
+		result = pBind(pMany(q), compose(pReturn, f))
+		result.typ = typ_Parser_ASN
+	ElseIf isPZeroOrOne(p) Then &apos; p is of shape q +++ (return Empty)
+		q = p.st0
+		s = dtMultLabel(&quot;?&quot;, q)
+		f = mkDtMult(s)
+		q = _toDerivationP(q, seen, True)
+		If q.typ = typ_Parser_ASN Then
+			f = compose(f, swap(cons, nil))
+		End If
+		&apos;result = pSeq(Array(pChoice(q, pReturn(nil))), f)
+		result = pBind(pChoice(q, pReturn(nil)), compose(pReturn, f))
+		result.typ = typ_Parser_ASN
+	Else
+		Select Case p.tp
+			Case &quot;item&quot;
+				f = mkDtCClass(&quot;(.)&quot;)
+				result = pBind(p, compose(pReturn, f))
+				&apos;result = pSeq(Array(p),f)
+				result.typ = typ_Parser_ASN
+			Case &quot;str&quot;
+				f = mkDtTerminal
+				result = pBind(p, compose(pReturn, f))
+				&apos;result = pSeq(Array(p), f)
+				result.typ = typ_Parser_ASN
+			Case &quot;choice&quot;
+				q = _toDerivationP(p.st0, seen, wantList)
+				r = _toDerivationP(p.st1, seen, wantList)
+				If q.typ &lt;&gt; r.typ Then
+					If q.typ = typ_Parser_ASN Then
+						q = pBind(q, compose(pReturn, swap(cons, nil)))
+					Else
+						r = pBind(rq, compose(pReturn, swap(cons, nil)))
+					End If
+				End If
+				result = pChoice(q, r)
+				result.typ = q.typ
+			Case &quot;many1&quot;
+				q = p.st0
+				s = dtMultLabel(&quot;+&quot;, q)
+				f = mkDtMult(s)
+				q = _toDerivationP(q, seen, False)
+				If q.typ = typ_Parser_List_ASN Then
+					f = compose(f, mkDtNonterminal(&quot;(...)&quot;))
+				End If
+				&apos;result = pSeq(Array(pMany1(q)), f)
+				result = pBind(pMany1(q), compose(pReturn, f))
+				result.typ = typ_Parser_ASN
+			Case &quot;seq&quot; &apos; only simple sequences supported here
+				f = p.st(1)
+				If (getFnName(f) = getFnName(Fn.id)) Then
+					qs = toList(p.st(0))
+					rs = nil
+					While Not(isNil(qs))
+						q = car(qs)
+						q = _toDerivationP(q, seen, True)
+						If q.typ = typ_Parser_List_ASN Then
+							q = pBind(q, compose(pReturn, _
+								mkDtNonterminal(&quot;(...)&quot;)))
+						End If
+						rs = cons(q, rs)
+						qs = cdr(qs)
+					Wend
+					result = pSeqL( _
+						toArray(reverse(rs)), _
+						id _
+					)
+					result.typ = typ_Parser_List_ASN			
+				&apos;ElseIf isApplyToListId(f) Then
+				Else
+					croak(&quot;toDerivationP/NYI: pSeq(..., &quot; _
+						 &amp; TFn_toString(p.st(1)) &amp; &quot;)&quot; _
+						 &amp; chr(13) &amp; chr(10) _
+						 &amp; toString(p)_
+					)
+				End If
+			Case &quot;ind&quot;
+				If p.st2 Then &apos; seen before
+					If isEmpty(p.st3) Then
+						croak(&quot;toDerivationP: replace &quot; &amp; p.st1 &amp; &quot;???&quot;)
+					End If
+					result = p.st3
+				ElseIf isNull(p.st0) Then
+					croak(&quot;toDerivationP/NYI: uninitialized indirection &quot; &amp; p.st1)
+				Else
+					p.st2 = True &apos; set the &quot;visited&quot;-mark
+					seen = cons(p, seen)
+					s = getPIndName(p)
+					p.st3 = pInd(s)
+					q = _toDerivationP(p.st0, seen, True)
+					f = mkDtNonterminal(s)
+					If q.typ = typ_Parser_ASN Then
+						f = compose(f, swap(cons, nil))
+					End If
+					&apos;result = fixIndirection(q, _
+					&apos;	pBind( _
+					&apos;		q, _
+					&apos;		compose(pReturn, f) _
+					&apos;	)
+					&apos;)
+					result = fixIndirection(p.st3, _
+						pSeq(Array( _
+							q _
+						), f)_
+					)
+					result.typ = typ_Parser_ASN
+				End If
+			Case Else
+				croak(&quot;toDerivationP: cannot handle .tp=&quot; &amp; toString(p.tp))
+		End Select
+	End If
+	_toDerivationP = result
 End Function
 
 &apos;= tests ======================================================================
@@ -325,8 +385,7 @@ End Function
 Function test_AST()
 	test_AST_TASN_toString()
 	test_AST_toDerivationP()
-	test_AST_pMany_dt()
-
+	
 	Dim n0 As Object
 	n0 = mkASN(&quot;foo&quot;, &quot;bar&quot;, nil)
 	
@@ -503,9 +562,9 @@ Function test_AST_toDerivationP()
 	p = fixIndirection(p, pItem)
 	q = toDerivationP(p)
 	refute_parses(q, &quot;&quot;).x
-	x = mkDtNonterminal(q.st1, List(mkDtCClass(&quot;(.)&quot;, &quot;a&quot;)))
+	x = mkDtNonterminal(getPIndName(p), List(mkDtCClass(&quot;(.)&quot;, &quot;a&quot;)))
 	assert_parses(q, &quot;a&quot;, x, 2).x
-	x = mkDtNonterminal(q.st1, List(mkDtCClass(&quot;(.)&quot;, &quot;b&quot;)))
+	x = mkDtNonterminal(getPIndName(p), List(mkDtCClass(&quot;(.)&quot;, &quot;b&quot;)))
 	assert_parses(q, &quot;b&quot;, x, 2).x
 	assert_parses(q, &quot;bb&quot;, x, 2).x
 	assert_parses(q, &quot;bc&quot;, x, 2).x
@@ -513,58 +572,60 @@ Function test_AST_toDerivationP()
 	p = pInd(&quot;Bar&quot;)
 	p = fixIndirection(p, pSeqL(Array(pItem, pStr(&quot;1&quot;)), id)
 	q = toDerivationP(p)
-	msgbox(toString(p) &amp; chr(13) &amp; chr(13) &amp; toString(q))
+	&apos;msgbox(toString(p) &amp; chr(13) &amp; chr(13) &amp; toString(q))
 	refute_parses(q, &quot;&quot;, &quot;a&quot;, &quot;aa&quot;, &quot;a0&quot;, &quot;b&quot;, &quot;b1&quot;).x
-	x = mkDtNonterminal(q.st1, List(mkDtCClass(&quot;(.)&quot;, &quot;a&quot;), mkDtTerminal(&quot;1&quot;)))
-	msgbox(toString(x))
+	x = mkDtNonterminal(getPIndName(p), List( _
+			mkDtCClass(&quot;(.)&quot;, &quot;a&quot;), mkDtTerminal(&quot;1&quot;) _
+		))
+	&apos;msgbox(toString(x))
 	assert_parses(q, &quot;a1&quot;, x, 3).x
 	assert_parses(q, &quot;a1b&quot;, x, 3).x
-End Function
 
-Function test_AST_pMany_dt()
-	Dim p As Object, r As Variant, x As Object
+	&apos; -------------------------
+	&apos; pMany under toDerivationP
+
 	Dim termEps As Object, termZ As Object, termZY As Object
 	termEps = mkDtTerminal(&quot;&quot;)
 	termZ   = mkDtTerminal(&quot;z&quot;)
 	termZY	= mkDtTerminal(&quot;zy&quot;)
 	
-	p = pMany_dt(pStr_dt(&quot;z&quot;))
-	x = mkDtMult(&quot;*&quot;, nil)
-	assert_parses(p, &quot;&quot;, x, 1).x
-	assert_parses(p, &quot;x&quot;, x, 1).x
-	assert_parses(p, &quot;xy&quot;, x, 1).x
-	assert_parses(p, &quot;xyz&quot;, x, 1).x
+	p = pStr(&quot;z&quot;)
+	q = toDerivationP(pMany(p))
+	x = mkDtMult(dtMultLabel(&quot;*&quot;, p), nil)
+	assert_parses(q, &quot;&quot;, x, 1).x
+	assert_parses(q, &quot;x&quot;, x, 1).x
+	assert_parses(q, &quot;xy&quot;, x, 1).x
+	assert_parses(q, &quot;xyz&quot;, x, 1).x
 
-	x = mkDtNonterminal(&quot;*&quot;, List(termZ))
-	r = applyP(p, &quot;z&quot;)
-	r = TASN_toString(r(0))
-	assert_parses(p, &quot;z&quot;, x, 2).x
-	assert_parses(p, &quot;zx&quot;, x, 2).x
+	x = mkDtMult(dtMultLabel(&quot;*&quot;, p), List(termZ))
+	assert_parses(q, &quot;z&quot;, x, 2).x
+	assert_parses(q, &quot;zx&quot;, x, 2).x
 
-	x = mkDtNonterminal(&quot;*&quot;, List(termZ, termZ))
-	assert_parses(p, &quot;zz&quot;, x, 3).x
-	assert_parses(p, &quot;zza&quot;, x, 3).x
+	x = mkDtMult(dtMultLabel(&quot;*&quot;, p), List(termZ, termZ))
+	assert_parses(q, &quot;zz&quot;, x, 3).x
+	assert_parses(q, &quot;zza&quot;, x, 3).x
 
-	p = pMany_dt(pStr_dt(&quot;zy&quot;))
-	x = mkDtMult(&quot;*&quot;, nil)
-	assert_parses(p, &quot;&quot;, x, 1).x
-	assert_parses(p, &quot;x&quot;, x, 1).x
-	assert_parses(p, &quot;xy&quot;, x, 1).x
-	assert_parses(p, &quot;z&quot;, x, 1).x
-	assert_parses(p, &quot;xzy&quot;, x, 1).x
+	p = pStr(&quot;zy&quot;)
+	q = toDerivationP(pMany(p))
+	x = mkDtMult(dtMultLabel(&quot;*&quot;, p), nil)
+	assert_parses(q, &quot;&quot;, x, 1).x
+	assert_parses(q, &quot;x&quot;, x, 1).x
+	assert_parses(q, &quot;xy&quot;, x, 1).x
+	assert_parses(q, &quot;z&quot;, x, 1).x
+	assert_parses(q, &quot;xzy&quot;, x, 1).x
 	
-	x = mkDtNonterminal(&quot;*&quot;, List(termZY))
-	assert_parses(p, &quot;zy&quot;, x, 3).x
-	assert_parses(p, &quot;zyX&quot;, x, 3).x
-	assert_parses(p, &quot;zyXzy&quot;, x, 3).x
+	x = mkDtMult(dtMultLabel(&quot;*&quot;, p), List(termZY))
+	assert_parses(q, &quot;zy&quot;, x, 3).x
+	assert_parses(q, &quot;zyX&quot;, x, 3).x
+	assert_parses(q, &quot;zyXzy&quot;, x, 3).x
 	
-	x = mkDtNonterminal(&quot;*&quot;, List(termZY, termZY))
-	assert_parses(p, &quot;zyzy&quot;, x, 5).x
-	assert_parses(p, &quot;zyzyX&quot;, x, 5).x
+	x = mkDtMult(dtMultLabel(&quot;*&quot;, p), List(termZY, termZY))
+	assert_parses(q, &quot;zyzy&quot;, x, 5).x
+	assert_parses(q, &quot;zyzyX&quot;, x, 5).x
 	
-	x = mkDtNonterminal(&quot;*&quot;, List(termZY, termZY, termZY))
-	assert_parses(p, &quot;zyzyzy&quot;, x, 7).x
-	assert_parses(p, &quot;zyzyzyX&quot;, x, 7).x
+	x = mkDtMult(dtMultLabel(&quot;*&quot;, p), List(termZY, termZY, termZY))
+	assert_parses(q, &quot;zyzyzy&quot;, x, 7).x
+	assert_parses(q, &quot;zyzyzyX&quot;, x, 7).x
 End Function
 
 </script:module>

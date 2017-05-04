@@ -41,54 +41,69 @@ Function pLogic_dt()
 		pS = pInd(&quot;S&quot;)
 		pT = pInd(&quot;T&quot;)
 		pF = pInd(&quot;F&quot;)
-		&apos; pC = ((pStr &quot;0&quot;) +++ (pStr &quot;1&quot;)) &gt;&gt;= return ° (mkDtNonterm &quot;C&quot;) ° (swap cons nil)
+		pW = fixIndirection(pInd(&quot;W&quot;), _
+			pChoice(pStr(&quot; &quot;), pStr(chr(9))) _
+		)
 		pC = fixIndirection(pInd(&quot;C&quot;), _
 			pChoice(pStr(&quot;0&quot;), pStr(&quot;1&quot;)) _
 		)
-		pC = toDerivationP(pC)
-		&apos;pC = pBind(foldl1(pChoice, List( _
-		&apos;		pStr_dt(&quot;0&quot;), _
-		&apos;		pStr_dt(&quot;1&quot;) _
-		&apos;	)), compose(compose(pReturn, mkDtNonterminal(&quot;C&quot;)), swap(cons, nil)) _
-		&apos;)
-		pI = pBind(foldl1(pChoice, List( _
-				pStr_dt(&quot;A&quot;), _
-				pStr_dt(&quot;B&quot;), _
-				pStr_dt(&quot;C&quot;), _
-				pStr_dt(&quot;D&quot;) _
-			)), compose(compose(pReturn, mkDtNonterminal(&quot;I&quot;)), swap(cons, nil)) _
+		pI = fixIndirection(pInd(&quot;I&quot;), _
+			foldl1(pChoice, List( _
+				pStr(&quot;A&quot;), _
+				pStr(&quot;B&quot;), _
+				pStr(&quot;C&quot;), _
+				pStr(&quot;D&quot;) _
+			)) _
 		)
-		pW = pBind(foldl1(pChoice, List( _
-				pStr_dt(&quot; &quot;), _
-				pStr_dt(chr(9)) _
-			)), compose(compose(pReturn, mkDtNonterminal(&quot;W&quot;)), swap(cons, nil)) _
-		)
-		pN = pSeqL(Array( _
-				pStr_dt(&quot;!&quot;), _
-				pMany_dt(pW), _
-				pF _
-			), mkDtNonterminal(&quot;N&quot;) _
-		)
-		pF = fixIndirection(pF, foldl1(pChoice, List( _
-			pC, pI, pN _
-		)))
-		pT = fixIndirection(pT, pSeqL(Array( _
-				pMany_dt(pW), _
-				pF, _
-				pMany_dt(pW), _
-				pZeroOrOne_dt( _
-					pSeqL(Array( _
-							pStr_dt(&quot;*&quot;), _
-							pMany_dt(pW), _
-							pT _
-						), _
-						mkDtNonterminal(&quot;(..)&quot;) _
-					)) _
-			 ), mkDtNonterminal(&quot;Term&quot;)) _
-		)
-		result = pT
-		&apos;msgbox(toString(pF))
 
+		pN = fixIndirection(pInd(&quot;N&quot;), pSeqL(Array( _
+				pStr(&quot;!&quot;), _
+				pMany(pW), _
+				pF _
+			), id _
+		))
+		pF = fixIndirection(pF, foldl1(pChoice, List( _
+			pC, _
+			pI, _
+			pN, _
+			pSeqL(Array( _
+				pStr(&quot;(&quot;), _
+				pS, _
+				pStr(&quot;)&quot;) _
+			), id) _
+		)))
+		pT = fixIndirection(pT, _
+			pSeqL(Array( _
+				pMany(pW), _
+				pF, _
+				pMany(pW), _
+				pZeroOrOne( _
+					pSeqL(Array( _
+							pStr(&quot;*&quot;), _
+							pMany(pW), _
+							pT _
+					), id) _
+				) _
+			), id) _
+		)
+		pS = fixIndirection(pS, _
+			pSeqL(Array( _
+				pMany(pW), _
+				pT, _
+				pMany(pW), _
+				pZeroOrOne( _
+					pSeqL(Array( _
+							pStr(&quot;+&quot;), _
+							pMany(pW), _
+							pS _
+					), id) _
+				) _
+			), id) _
+		)
+		msgbox(toString(pS))
+		result = toDerivationP(pS)
+		
+		
 		
 &apos;		pS = fixIndirection(pS, pSeq(Array( _
 &apos;				pSkip(pMany(pWhite)), _

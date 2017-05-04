@@ -225,7 +225,11 @@ End Function
 
 &apos; Normally this is called &quot;concat&quot; but we already have that for Strings
 Function flatten(Optional xs As TList)
-	flatten = foldl(adjoin, nil, xs)
+	If isMissing(xs) Then
+		flatten = foldl(adjoin, nil)
+	Else
+		flatten = foldl(adjoin, nil, xs)
+	End If
 End Function
 
 Function reverse(Optional xs As TList)
