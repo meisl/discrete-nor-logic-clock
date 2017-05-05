@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="M08_PrsGrammar" script:language="StarBasic">REM  *****  BASIC  *****
+Option Explicit
+
+Sub Main
+	test_PrsGrammar
+End Sub
+
+Function derivationTree_prsGrammar(s As String)
+	Static p As Object
+	Dim result As Variant, parseResult As Variant
+	If isNull(p) Then
+		p = toDerivationP(pGrmGrammar)
+	End If
+	parseResult = applyP(p, s)
+	If isParseFailure(parseResult) Then
+		result = &quot;!ParseFailure!&quot;
+	Else
+		result = toString(parseResult(0))
+	End If
+			
+	derivationTree_prsGrammar = result
+End Function
+
+Function pGrmGrammar()
+	Static result As Object
+	If isNull(result) Then
+		result = fixIndirection(pInd(&quot;Grammar&quot;), _
+			pGrmRule _
+		)
+	End If
+	pGrmGrammar = result	
+End Function
+
+Function pGrmMult()
+	Static result As Object
+	If isNull(result) Then
+		result = foldl1(pChoice, List( _
+			pBind(pStr(&quot;*&quot;), fstArg(pReturn(pMany))), _
+			pBind(pStr(&quot;+&quot;), fstArg(pReturn(pMany1))), _
+			pBind(pStr(&quot;?&quot;), fstArg(pReturn(pZeroOrOne))) _
+		))
+	End If
+	pGrmMult = result
+End Function
+
+Function pGrmIdent()
+	Static result As Object
+	If isNull(result) Then
+		Dim pAlpha As Object, pAlphaNumDash As Object
+		
+		pAlpha = foldl1(pChoice, List( _
+			pStr(&quot;_&quot;), _
+			pRange(&quot;A&quot;, &quot;Z&quot;), _
+			pRange(&quot;a&quot;, &quot;z&quot;) _
+		))
+		&apos;pAlpha = fixIndirection(pInd(&quot;pAlpha&quot;), pAlpha)
+
+		pAlphaNumDash = foldl1(pChoice, List( _
+			pAlpha, _
+			pStr(&quot;-&quot;), _
+			pRange(&quot;0&quot;, &quot;9&quot;) _
+		))
+		&apos;pAlphaNumDash = fixIndirection(pInd(&quot;pAlphaNumDash&quot;), pAlphaNumDash)
+
+		result = pSeq(Array( _
+						pAlpha, _
+						pMany(pAlphaNumDash), _
+					), foldl(concat))
+		result = fixIndirection(pInd(&quot;ident&quot;), result)
+				 
+	End If
+	pGrmIdent = result
+End Function
+
+Function pGrmRule()
+	Static result As Object
+	If isNull(result) Then
+		result = pSeqL(Array( _
+					pMany(pWhite), _
+					pGrmIdent, _
+					pMany(pWhite), _
+					pStr(&quot;::=&quot;), _
+					pMany(pWhite) _
+				 ), id)
+		
+		result = fixIndirection(pInd(&quot;Rule&quot;), result)
+	End If
+	pGrmRule = result
+End Function
+
+&apos;= tests ======================================================================
+
+Function test_PrsGrammar()
+	test_PrsGrammar_pGrmMult()
+	test_PrsGrammar_pGrmIdent()
+End Function
+
+Function test_PrsGrammar_pGrmMult()
+	Dim p As Object, x As Object
+	p = pGrmMult
+	
+	refute_parses(p, Array(&quot;&quot;, &quot;abc&quot;, &quot;.&quot;, &quot;:&quot;, &quot;=&quot;, &quot;_&quot;, &quot;(&quot;, &quot;)&quot;, &quot; &quot;, &quot;A&quot;, &quot;Z&quot;)).x
+	assert_parses(p, &quot;*&quot;, pMany, 2).x
+	assert_parses(p, &quot;+&quot;, pMany1, 2).x
+	assert_parses(p, &quot;?&quot;, pZeroOrOne, 2).x
+End Function
+
+Function test_PrsGrammar_pGrmIdent()
+	Dim p As Object, x As Object
+	p = pGrmIdent
+	refute_parses(p, Array( _
+		&quot;&quot;, &quot;*&quot;, &quot;+&quot;, &quot;?&quot;, &quot;=&quot;, &quot;.&quot;, &quot;|&quot;, &quot;-&quot;, _
+		&quot;(&quot;, &quot;)&quot;, &quot;[&quot;, &quot;]&quot;, &quot;{&quot;, &quot;}&quot;, _
+		&quot; &quot;, chr(9), chr(10), chr(13), _
+		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot; _
+	)).x
+	
+	msgbox(toString(p))
+	
+	assert_parses(p, &quot;_&quot;, &quot;_&quot;, 2).x
+	assert_parses(p, &quot;A&quot;, &quot;A&quot;, 2).x
+	assert_parses(p, &quot;B&quot;, &quot;B&quot;, 2).x
+	assert_parses(p, &quot;Z&quot;, &quot;Z&quot;, 2).x
+	assert_parses(p, &quot;a&quot;, &quot;a&quot;, 2).x
+	assert_parses(p, &quot;b&quot;, &quot;b&quot;, 2).x
+	assert_parses(p, &quot;z&quot;, &quot;z&quot;, 2).x
+	
+	assert_parses(p, &quot;__&quot;, &quot;__&quot;, 3).x
+	assert_parses(p, &quot;AB&quot;, &quot;AB&quot;, 3).x
+	assert_parses(p, &quot;CB&quot;, &quot;CB&quot;, 3).x
+	assert_parses(p, &quot;Z_&quot;, &quot;Z_&quot;, 3).x
+	assert_parses(p, &quot;aB&quot;, &quot;aB&quot;, 3).x
+	assert_parses(p, &quot;by&quot;, &quot;by&quot;, 3).x
+	assert_parses(p, &quot;zz&quot;, &quot;zz&quot;, 3).x
+	
+	assert_parses(p, &quot;__0&quot;, &quot;__0&quot;, 	4).x
+	assert_parses(p, &quot;A1B|&quot;, &quot;A1B&quot;, 4).x
+	assert_parses(p, &quot;CBZ &quot;, &quot;CBZ&quot;, 4).x
+	assert_parses(p, &quot;Z_a*&quot;, &quot;Z_a&quot;, 4).x
+	assert_parses(p, &quot;aBc+&quot;, &quot;aBc&quot;, 4).x
+	assert_parses(p, &quot;b23?&quot;, &quot;b23&quot;, 4).x
+	assert_parses(p, &quot;zzx(&quot;, &quot;zzx&quot;, 4).x
+	
+End Function
+
+</script:module>

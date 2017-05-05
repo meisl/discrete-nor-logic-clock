@@ -4,6 +4,7 @@
 Option Explicit
 
 Type TFn
+	tyname		As String
 	str			As Variant
 	which		As Variant
 	arity 		As Integer
@@ -30,7 +31,8 @@ Type TFnObjs
 	equ			As Object
 	inRange		As Object
 	
-	applyToList	As Object
+	TFn_toString	As Object
+	applyToList		As Object
 
 	isList		As Object
 	isNil		As Object
@@ -55,6 +57,9 @@ Type TFnObjs
 	pStr				As Object
 	pBind				As Object
 	pChoice				As Object
+	pMany				As Object
+	pMany1				As Object
+	pZeroOrOne			As Object
 	mkTypeVar			As Object
 	maybeMakeArrowType	As Object
 	mkTypeCtor			As Object
@@ -75,6 +80,7 @@ End Sub
 
 Function newFn(name As String, arity As Integer, Optional typ)
 	Dim result As New TFn
+	result.tyname = &quot;TFn&quot;
 	result.which = name
 	result.arity = arity
 	If Not(isMissing(typ)) Then
@@ -107,7 +113,8 @@ Function Fn
 		result.equ		= lookupFn(&quot;equ&quot;)
 		result.inRange	= lookupFn(&quot;inRange&quot;)
 		
-		result.applyToList = lookupFn(&quot;applyToList&quot;)
+		result.TFn_toString = lookupFn(&quot;TFn_toString&quot;)
+		result.applyToList 	= lookupFn(&quot;applyToList&quot;)
 
 		result.isList	= lookupFn(&quot;isList&quot;)
 		result.isNil	= lookupFn(&quot;isNil&quot;)
@@ -132,6 +139,9 @@ Function Fn
 		result.pStr		= lookupFn(&quot;pStr&quot;)
 		result.pBind	= lookupFn(&quot;pBind&quot;)
 		result.pChoice	= lookupFn(&quot;pChoice&quot;)
+		result.pMany		= lookupFn(&quot;pMany&quot;)
+		result.pMany1		= lookupFn(&quot;pMany1&quot;)
+		result.pZeroOrOne	= lookupFn(&quot;pZeroOrOne&quot;)
 		result.mkTypeVar		  = lookupFn(&quot;mkTypeVar&quot;)
 		result.maybeMakeArrowType = lookupFn(&quot;maybeMakeArrowType&quot;)
 		result.mkTypeCtor		  = lookupFn(&quot;mkTypeCtor&quot;)
@@ -238,9 +248,10 @@ Function fnObjs()
 			newFn(&quot;chr&quot;,			1, &quot;Int -&gt; Char&quot;), _
 			newFn(&quot;readHex&quot;,		1, &quot;Str -&gt; Long&quot;), _
 			_
+			newFn(&quot;TFn_toString&quot;,	1, &quot;(a -&gt; b) -&gt; Str&quot;), _
+			newFn(&quot;applyToList&quot;,	2), _
 			newFn(&quot;existsF&quot;,		1), _
 			newFn(&quot;arityF&quot;, 		1), _
-			newFn(&quot;applyToList&quot;,	2), _
 			_
 			newFn(&quot;TList_toString&quot;,	1), _
 			newFn(&quot;TList_equ&quot;,		2), _
@@ -269,6 +280,9 @@ Function fnObjs()
 			newFn(&quot;pStr&quot;,				1, &quot;Str -&gt; Parser Str&quot;), _
 			newFn(&quot;pBind&quot;,				2, &quot;Parser a -&gt; (a -&gt; Parser b) -&gt; Parser b&quot;), _
 			newFn(&quot;pChoice&quot;,			2, &quot;Parser a -&gt; Parser a -&gt; Parser a&quot;), _
+			newFn(&quot;pMany&quot;,				1, &quot;Parser a -&gt; Parser [a]&quot;), _
+			newFn(&quot;pMany1&quot;,				1, &quot;Parser a -&gt; Parser [a]&quot;), _
+			newFn(&quot;pZeroOrOne&quot;,			1, &quot;Parser a -&gt; Parser (Maybe a)&quot;), _
 			newFn(&quot;mkTypeVar&quot;,			1, &quot;Char -&gt; Str&quot;), _
 			newFn(&quot;maybeMakeArrowType&quot;,	2, &quot;Typ -&gt; Maybe Typ -&gt; Typ&quot;), _
 			newFn(&quot;mkTypeCtor&quot;,			2, &quot;Str -&gt; [Typ] -&gt; Typ&quot;), _
@@ -429,7 +443,11 @@ applyLast_of_one:
 		Case &quot;toArray&quot;: 	result = toArray(	a0)
 		Case &quot;pStr&quot;: 		result = pStr(		a0)
 		Case &quot;pReturn&quot;:		result = pReturn(	a0)
+		Case &quot;pMany&quot;:		result = pMany(		a0)
+		Case &quot;pMany1&quot;:		result = pMany1(	a0)
+		Case &quot;pZeroOrOne&quot;:	result = pZeroOrOne(a0)
 		Case &quot;mkTypeVar&quot;:	result = mkTypeVar(	a0)
+		Case &quot;TFn_toString&quot;:		result = TFn_toString(		a0)
 		Case &quot;TList_toString&quot;:		result = TList_toString(	a0)
 		Case &quot;TParser_toString&quot;:	result = TParser_toString(	a0)
 		Case &quot;TASN_toString&quot;:		result = TASN_toString(		a0)

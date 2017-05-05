@@ -607,12 +607,19 @@ End Function
 &apos; never fails: if p fails than pZeroOrOne(p) returns Empty + same pos as result,
 &apos; otherwise returns whatever p returns as result (+ pos)
 &apos; matches at most once
-Function pZeroOrOne(p As Parser)
-	If isPZeroOrOne(p) Then
-		pZeroOrOne = p
+Function pZeroOrOne(Optional p As Parser)
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.pZeroOrOne : End If
+	Dim result As Variant
+	If isMissing(p) Then
+		result = oFn
 	Else
-		pZeroOrOne = pChoice(p, pReturn(Empty))
+		If isPZeroOrOne(p) Then
+			result = p
+		Else
+			result = pChoice(p, pReturn(Empty))
+		End If
 	End If
+	pZeroOrOne = result
 End Function
 
 Function isPMany1(p As Parser) As Boolean
@@ -640,17 +647,30 @@ End Function
 &apos; pMany: never fails: if p fails then pMany(p) returns nil + same pos as result,
 &apos; otherwise returns a of p results (in the order as in the parsed string) + last pos
 &apos; matches as many as possible
-Function pMany(p As Parser)
-	&apos; Note: direct impl might give a little more perf (not worth it)
-	pMany = pChoice(pMany1(p), pReturn(nil))
+Function pMany(Optional p As Parser)
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.pMany : End If
+	Dim result As Variant
+	If isMissing(p) Then
+		result = oFn
+		&apos; result = compose(swap(pChoice, pReturn(nil)), pMany1)
+	Else
+		&apos; Note: direct impl might give a little more perf (not worth it)
+		result = pChoice(pMany1(p), pReturn(nil))
+	End If
+	pMany = result
 End Function
 
 &apos; pMany1: same as pMany except that it fails if there is no match at all
 &apos; matches as many as possible
-Function pMany1(p As Parser)
+Function pMany1(Optional p As Parser)
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.pMany1 : End If
 	Dim result As Variant
-	result = mkParser(&quot;many1&quot;, p)
-	result.st0 = p	
+	If isMissing(p) Then
+		result = oFn
+	Else
+		result = mkParser(&quot;many1&quot;, p)
+		result.st0 = p	
+	End If
 	pMany1 = result
 End Function
 
@@ -722,42 +742,41 @@ Function pRange(lo As String, hi As String)
 End Function
 
 Function pWhite()
-	Static result As Parser	&apos; an uninitialized instance of Parser at first
-	If result.tp = &quot;&quot; Then
+	Static result As Object
+	If isNull(result) Then
 		result = pChoice(pStr(&quot; &quot;), pStr(Chr(9))
 		result.str = &quot;[ \t]&quot;
+		result.typ = &quot;Parser Char&quot;
+		result = fixIndirection(pInd(&quot;ws&quot;), result)
 	End If
 	pWhite = result
 End Function
 
 Function pAlphaLower()
 	Static result As Object
-	If isNull(result) Then
-		result = pSat(compose(inRange(Asc(&quot;a&quot;), Asc(&quot;z&quot;)), Fn.asc))
-		result.str = &quot;[a-z]&quot;
-	End If
+	If isNull(result) Then : result = pRange(&quot;a&quot;, &quot;z&quot;) : End If
 	pAlphaLower = result
 End Function
 
 Function pAlphaUpper()
 	Static result As Object
-	If isNull(result) Then
-		result = pSat(compose(inRange(Asc(&quot;A&quot;), Asc(&quot;Z&quot;)), Fn.asc))
-		result.str = &quot;[A-Z]&quot;
-	End If
+	If isNull(result) Then : result = pRange(&quot;A&quot; ,&quot;Z&quot;) : End If
 	pAlphaUpper = result
 End Function
 
 Function pBinDigit()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
 	If result.tp = &quot;&quot; Then
-		result = pInd(&quot;BinDigit&quot;)
-		result = fixIndirection(result, pChoice(_
+		result = pChoice(_
 			pBind(pStr(&quot;0&quot;), fstArg(pReturn(0))), _
 			pBind(pStr(&quot;1&quot;), fstArg(pReturn(1)))_
-		))
+		)
 		&apos;&apos;not paying off (yet):
 &apos;		result = pBind(pItem, compose(ite(inRange(Asc(&quot;0&quot;), Asc(&quot;1&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), Fn.asc)
+		result = pSeq(Array(pRange(&quot;0&quot;, &quot;1&quot;)), _
+			compose(add(-Asc(&quot;0&quot;)), Fn.Asc))
+		
+		result = fixIndirection(pInd(&quot;BinDigit&quot;), result)
 	End If
 	pBinDigit = result
 End Function

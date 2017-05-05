@@ -10,4 +10,5 @@
  <library:element library:name="M0x_Scratch"/>
  <library:element library:name="M06_AST"/>
  <library:element library:name="M07_PrsLogic"/>
+ <library:element library:name="M08_PrsGrammar"/>
 </library:library>
