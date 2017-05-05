@@ -74,6 +74,28 @@ Function pGrmIdent()
 	pGrmIdent = result
 End Function
 
+Function pGrmNonterminal()
+	Static result As Object
+	If isNull(result) Then
+		result = pGrmIdent
+		result = fixIndirection(pInd(&quot;Nonterminal&quot;), result)
+	End If
+	pGrmNonterminal = result
+End Function
+
+Function pGrmAlt()
+	Static result As Object
+	If isNull(result) Then
+		result = pSeqL(Array( _
+			pMany(pWhite), _
+			pGrmNonterminal, _
+			pMany(pWhite) _
+		), id)
+		result = fixIndirection(pInd(&quot;Alt&quot;), result)
+	End If
+	pGrmAlt = result
+End Function
+
 Function pGrmRule()
 	Static result As Object
 	If isNull(result) Then
@@ -82,7 +104,7 @@ Function pGrmRule()
 					pGrmIdent, _
 					pMany(pWhite), _
 					pStr(&quot;::=&quot;), _
-					pMany(pWhite) _
+					pGrmAlt, _
 				 ), id)
 		
 		result = fixIndirection(pInd(&quot;Rule&quot;), result)
@@ -94,7 +116,9 @@ End Function
 
 Function test_PrsGrammar()
 	test_PrsGrammar_pGrmMult()
-	test_PrsGrammar_pGrmIdent()
+	&apos; pGrmIdent and pGrmNonterminal are essentially the same
+	test_PrsGrammar_ident(pGrmIdent)
+	test_PrsGrammar_ident(pGrmNonterminal) &apos; Nonterminal ::= ident
 End Function
 
 Function test_PrsGrammar_pGrmMult()
@@ -107,9 +131,8 @@ Function test_PrsGrammar_pGrmMult()
 	assert_parses(p, &quot;?&quot;, pZeroOrOne, 2).x
 End Function
 
-Function test_PrsGrammar_pGrmIdent()
-	Dim p As Object, x As Object
-	p = pGrmIdent
+Function test_PrsGrammar_ident(p As Object)
+	Dim x As Object
 	refute_parses(p, Array( _
 		&quot;&quot;, &quot;*&quot;, &quot;+&quot;, &quot;?&quot;, &quot;=&quot;, &quot;.&quot;, &quot;|&quot;, &quot;-&quot;, _
 		&quot;(&quot;, &quot;)&quot;, &quot;[&quot;, &quot;]&quot;, &quot;{&quot;, &quot;}&quot;, _
