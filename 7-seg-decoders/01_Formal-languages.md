@@ -134,7 +134,7 @@ As we've seen, more than just nonterminals is needed on the rhs to make things i
 ```
 This defines the language that consists of only one word, namely the one-character-sequence "x".
 
-The enclosing double quotes serve to tell apart character sequences from names: `"x"` is a char-sequence, whereas `x` is a rule name. But what if we want to talk about the character sequence that consists of a double quote itself (as a character)?
+The enclosing double quotes serve to tell apart character sequences from names: `"x"` is a char-sequence, whereas `x` is a rule name (or nonterminal if on the rhs). But what if we want to talk about the character sequence that consists of a double quote itself, ie `"` as a character?
 
 For this we need a special symbol indicating that the following `"` is NOT the start or end of a terminal but rather the double quote character as such. This is called ***escaping*** and we'll use the backslash `\` for this purpose:
 ```
@@ -497,14 +497,14 @@ A similar operator is postfix `*` (again on the meta-level, not to be confused w
   F ::= C | I | N | "(" S ")"
   C ::= "0" | "1"
   I ::= "A" | "B" | "C" | "D"
-  N ::= "!" F
+  N ::= "!" W* F
   W ::= " " | "\t"
 ```
 So the new rule `W` matches one whitespace character, and is used twice in `S` and twice in `N`. Where to put those "whitespace consumers" can be quite tricky, particularly if you want it to be most efficient while at the same time being maximally liberal w.r.t. whitespace occurring in the input string. Anyways, let me just say that here I did think about the effect, but not too much about efficiency.
 
 The last multiplicity operator is a variation of `*`:  `+` meaning "once-or-more". We'll be using it in conjunction with the character classes from the next section.
 
-Note that the three multiplicity operators `?`, `*` and `+` do not add to the expressive power of grammars, at least not in a theoretical sense. That is: they are just abbreviations for certain constructs that could be built with concatenation, alternation and recursion alone.
+Note that the three multiplicity operators `?`, `*` and `+` do not add to the expressive power of grammars, at least not in a theoretical sense. That is: they are just abbreviations for certain constructs that could be built with concatenation, alternation and recursion alone[^simulate_mult_ops].
 
 Finally we need to state two conventions regarding `?`, `*` and `+`:
 
@@ -552,7 +552,7 @@ stand for
 ```
 
 Now this obviously assumes some order on the alphabet, say ASCII or Unicode.
-Also, since `...` isn't really defined the above isn't really a proper definition either. I'm pretty sure you get the idea. By the end of the following section we will have given a precise definition for it, and all the rest.
+Also, since `...` isn't really defined the above isn't really a proper definition either. I'm pretty sure you get the idea. By the end of the following section we will have given a precise definition for it, and for all the rest.
 
 Finally there is one special character class, or range: the whole alphabet itself. That means really any character[^any-character] that there is, not just letters. We will denote this class by a single dot `.`, NOT surrounded by `[` and `]`. Note: `[.]` would match the object-level dot, just like `"."`, and nothing else.
 
@@ -564,7 +564,7 @@ So, with everthing together, here's the final grammar for Logic expressions:
   F ::= C | I | N | "(" S ")"
   C ::= [01]
   I ::= [A-Za-z]+
-  N ::= "!" F
+  N ::= "!" W* F
   W ::= [ \t]
 ```
 
@@ -613,12 +613,13 @@ Doesn't that remind you of something? Yes, it's just like "sum-of-products". And
 `Alt` stands for alternation and `Con` for concatenation. The `LineSep?` in `Alt` allows for putting additional alternatives on the next line, as we have been doing routinely.
 ```        .
       mult ::= [*?+]
-     ident ::= [_A-Za-z][\-0-9_A-Za-z]+
+     ident ::= [_A-Za-z][\-0-9_A-Za-z]*
 
       Rule ::= ws* ident ws* "::=" Alt
        Alt ::= ws* Con ws* (LineSep? "|" Alt)?
        Con ::= Atom mult? (ws+ Con)?
       Atom ::= "(" Alt ")"
+             | Nonterminal
              | Terminal
              | CClass
 ```
@@ -630,9 +631,24 @@ Another difference is that the optional `mult` is postfix, rather than prefix as
 
 The name "Atom" may seem strange since the very first alternative of `Atom` is a concatenation of three! However, at this point we're done with the two main concepts of alternation and concatenation, so w.r.t. *them* everything from here on is indeed indivisible.
 
-`Atom` corresponds to `F`, so it is here where we cover parentheses. Similarly, `Terminal` corresponds to `C` but it's a bit more complicated, and even more so are character classes, `CClass`.
+`Atom` corresponds to `F`, so it is here where we cover parentheses. Similarly, `Nonterminal` corresponds to `I` and `Terminal` to `C`, but the latter is a bit more complicated. Even more so are character classes, `CClass`.
 
-### 3.4. The rule for terminals
+### 3.4. The rule for nonterminals
+
+This one's nearly trivial:
+```
+Nonterminal ::= ident
+```
+However, it does express that there is a slight difference between identifiers on the lhs vs the rhs. On the left we had called them "rule names", whereas on the right they're "nonterminals". This corresponds to how a definition works: there is
+
+  - a) a "definiendum", ie the name *to be defined*
+  - b) a "definiens", ie the thing that *is defining* the name
+
+So: as a rule name - hence on the lhs - an identifier is being defined, while as a nonterminal - hence on the rhs - it is (part of) what's defining some rule name.
+
+[TODO: explain why distinction rule name vs nonterminal comes in handy when building AST]
+
+### 3.5. The rule for terminals
 
 Well, they have double quotes `"` around them. The simplest way to  write these as terminals (themselves) is a single-char character class: `["]`.
 What's in between is a bit more complicated:
@@ -661,7 +677,7 @@ Ok, back to `Terminal`: besides an escape sequence we also want to allow *anythi
 <br>Note that inside a character class - negative or positive - there is no need to require `"` to be escaped. However, `\` still must be escaped since we'll be using it for the escaping mechanism for character classes as well.
 
 
-### 3.5. The rule for character classes
+### 3.6. The rule for character classes
 
 The simplest character class to define is dot: `"."`. All others are enclosed by `[` and `]` and may either be negative or positive, indicated by the presence, or non-presence of a `-` right after the opening `[`, resp. (`NCList` or `PCList`, just like negation `"!"` in logic expressions).
 ```
@@ -683,7 +699,7 @@ So `CCItem` follows the same pattern as double quotes above: either an escape se
 
 Finally `PCList` defines how `CCItem`s may be combined inside `[` and `]`. There may one or more (`+`) of the following: either a single `CCItem`, or two separated by a `-`.
 
-### 3.6. Closing the loop
+### 3.7. Closing the loop
 
 With a bit of rearrangement, here's the whole altogether:
 ```
@@ -694,7 +710,7 @@ With a bit of rearrangement, here's the whole altogether:
               | "\n" "\r"?
     LineSep ::= (ws* nl ws*)
        mult ::= [*?+]
-      ident ::= [_A-Za-z][\-0-9_A-Za-z]+
+      ident ::= [_A-Za-z][\-0-9_A-Za-z]*
        escQ ::= "\\" [nrt\\"]
        escC ::= "\\" [nrt\[\-\]\\"]
 
@@ -704,8 +720,10 @@ With a bit of rearrangement, here's the whole altogether:
         Alt ::= ws* Con ws* (LineSep? "|" Alt)?
         Con ::= Atom mult? (ws+ Con)?
        Atom ::= "(" Alt ")"
+              | Nonterminal
               | Terminal
               | CClass
+Nonterminal ::= ident              
    Terminal ::= ["] (escQ | [-"\\])+ ["]
      CClass ::= "." | ("[" (NCList | PCList) "]")
      NCList ::= "-" PCList
@@ -735,5 +753,9 @@ Footnotes
 [^solutionEx5.2.5a]: `T ::= F | T "*" F`, make `T` left-recursive. But the recursion - should we choose the second alternative - now happens before anything else is derived - and we are immediately faced with the very same decision to make again! One might think of some way of "looking ahead" in order to make this decision. But how far? In fact, the length of the sub-word derived by `T` can be arbitrarily long. A better solution is to not use left-recursion at all and instead transform the AST at (and below) those operator nodes for which left-associativity is desired.
 
 [^solutionEx5.2.5b]: TODO
+
+[^simulate_mult_ops]: `R ::= T?` ~> `R ::= T | ε`, 
+`R ::= T*` ~> `R ::= T R | ε`
+`R ::= T+` ~> `R ::= T R | T`
 
 [^any-character]: The "Any" character is the character produced by the ominous "Any" key, which so many people never could find on their keyboard. 
