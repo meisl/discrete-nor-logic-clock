@@ -95,14 +95,16 @@ Function _TParser_toString( _
 		result = p.str
 	Else : Select Case p.tp
 		Case &quot;ind&quot;
+			Dim name As String
+			name = getPIndName(p)
 			If p.st2 Then &apos; seen it before
-				result = p.st1 &apos; contains a name like Rule_123
+				result = name
 			ElseIf isNull(p.st0) Then &apos; yet uninitialized indirection
-				result = &quot;(ind &quot; &amp; p.st1 &amp; &quot; Nothing)&quot;
+				result = &quot;(ind &quot; &amp; p.st1 &amp; &quot; Nothing)&quot;	&apos; p.st1 &apos; contains a name like Rule_123
 			Else &apos; initialized but not seen before
 				p.st2 = True	&apos; set the &quot;visited&quot;-mark
 				seen = cons(p, seen)
-				result = p.st1 &amp; &quot; ::= &quot;
+				result = name &amp; &quot; ::= &quot;
 				&apos; In the new rule, start over fresh indent and var counter
 				indent = Space(Len(result))
 				Dim j As Integer
@@ -110,7 +112,7 @@ Function _TParser_toString( _
 				result = result &amp; _TParser_toString( _
 					p.st0, j, indent, True, rules, seen)
 				rules = cons(result, rules)
-				result = p.st1	&apos; just return the name
+				result = name	&apos; just return the name
 			End If
 		Case &quot;sat&quot;
 			result = &quot;(sat &quot;
@@ -709,6 +711,17 @@ End Function
 
 &apos;==================================================================
 
+Function pRange(lo As String, hi As String)
+	Static result As Object
+	If isNull(result) Then
+		Dim loAsc As Integer, hiAsc As Integer
+		loAsc = Asc(lo)
+		hiAsc = Asc(hi)
+		result = pSat(compose(inRange(Asc(lo), Asc(hi)), Fn.asc))
+		result.str = &quot;[&quot; &amp; lo &amp; &quot;-&quot; &amp; hi &amp; &quot;]&quot;
+	End If
+	pRange = result
+End Function
 
 Function pWhite()
 	Static result As Parser	&apos; an uninitialized instance of Parser at first
@@ -1431,6 +1444,7 @@ Function test_Parser(Optional what)
 		test_Parser_many1()
 	End If
 	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;basic&quot;) Then
+		test_Parser_range()
 		test_Parser_white()
 		test_Parser_seq()
 		test_Parser_alphaLower()
@@ -2138,6 +2152,20 @@ Function test_Parser_white()
 	refute_parses(p, chr(13) &amp; chr(13) &amp; &quot;asdf&quot;).x
 End Function
 
+Function test_Parser_range()
+	Dim p As Parser, i As Integer
+	p = pRange(&quot;A&quot;, &quot;Z&quot;)
+	For i = 1 To Asc(&quot;A&quot;) - 1
+		refute_parses(p, Chr(i)).x
+	Next i
+	For i = Asc(&quot;A&quot;) To Asc(&quot;Z&quot;)
+		assert_parses(p, Chr(i), Chr(i), 2).x
+	Next i
+	For i = Asc(&quot;Z&quot;) + 1 To 255
+		refute_parses(p, Chr(i)).x
+	Next i
+End Function
+
 Function test_Parser_alphaLower()
 	Dim p As Parser
 	p = pAlphaLower
@@ -2663,7 +2691,7 @@ Function assert_toStr(p As Object, expected As String)
 End Function
 
 Function test_Parser_toString()
-	Dim f As Object, p As Object, q As Object
+	Dim f As Object, p As Object, q As Object, k As Integer
 	f = TParser_toString
 	assertEqual(isFn(f), True).x
 	assertEqual(arity(f),   1).x
@@ -2761,23 +2789,25 @@ Function test_Parser_toString()
 	&apos; P ::= Q
 	&apos; P MUST NOT be visited twice when traversing Q!
 	p = pInd(&quot;P&quot;)
-	q = fixIndirection(pInd(&quot;q&quot;), pChoice( _
+	q = fixIndirection(pInd(&quot;Q&quot;), pChoice( _
 		pSeq(Array(pStr(&quot;x&quot;), p), cons), _
 		pSeq(Array(pStr(&quot;y&quot;), p), cons) _
 	))
 	p = fixIndirection(p, q)
-	MsgBox(toString(q))
+	k = InStr(1, TParser_toString(p), &quot;P ::= Q&quot;)
+	assertEqual(k &gt;= 1, True).x	&apos; it does appear once
+	k = InStr(k + 1, TParser_toString(p), &quot;P ::= Q&quot;)
+	assertEqual(k &gt;= 1, False).x &apos; but only once
 	
-
-	MsgBox(toString(pTypeExpr))
-
-	
+	&apos;MsgBox(toString(pTypeExpr))
 
 	p = pInd(&quot;&quot;)
-	assert_toStr(p,	&quot;(ind Nothing)&quot;).x
+	assert_toStr(p,	&quot;(ind &quot; &amp; p.st1 &amp; &quot; Nothing)&quot;).x
 	q = pItem
 	p = fixIndirection(p, q)
-	assert_toStr(p,	&quot;(ind P&quot; &amp; q.id &amp; &quot; ::= &quot; &amp; toString(q) &amp; &quot;)&quot;).x
+	k = InStr(TParser_toString(p), _
+		getPIndName(p) &amp; &quot; ::= &quot; &amp; TParser_toString(q))
+	assertEqual(k &gt;= 1, True).x
 
 	p = pInd(&quot;&quot;)
 	p = fixIndirection(p, pChoice(pStr(&quot;x&quot;), pSeq(Array(pSkip(pStr(&quot;(&quot;)), p, pSkip(pStr(&quot;)&quot;))), id))
