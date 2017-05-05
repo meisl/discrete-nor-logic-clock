@@ -48,14 +48,11 @@ Function pLogic_dt()
 			pChoice(pStr(&quot;0&quot;), pStr(&quot;1&quot;)) _
 		)
 		pI = fixIndirection(pInd(&quot;I&quot;), _
-			foldl1(pChoice, List( _
-				pStr(&quot;A&quot;), _
-				pStr(&quot;B&quot;), _
-				pStr(&quot;C&quot;), _
-				pStr(&quot;D&quot;) _
+			 pMany1(pChoice( _
+				pRange(&quot;A&quot;, &quot;Z&quot;), _
+				pRange(&quot;a&quot;, &quot;z&quot;) _
 			)) _
 		)
-
 		pN = fixIndirection(pInd(&quot;N&quot;), pSeqL(Array( _
 				pStr(&quot;!&quot;), _
 				pMany(pW), _

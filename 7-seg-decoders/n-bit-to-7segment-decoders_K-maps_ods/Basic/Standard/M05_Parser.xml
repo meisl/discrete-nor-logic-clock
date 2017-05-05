@@ -494,8 +494,11 @@ Function pEnd()
 End Function
 
 Function pSat(predicate As Object)
-&apos;	pSat = pBind( pItem, ite(predicate, pReturn, fstArg(pFail)) )
-	pSat = mkParser(&quot;sat&quot;, predicate)
+	Dim result As Object
+&apos;	result = pBind( pItem, ite(predicate, pReturn, fstArg(pFail)) )
+	result = mkParser(&quot;sat&quot;, predicate)
+	result.st0 = predicate
+	pSat = result
 End Function
 
 &apos; pattern-matches p against &quot;q &gt;&gt;= K (return Empty)&quot; where q any parser
@@ -712,14 +715,9 @@ End Function
 &apos;==================================================================
 
 Function pRange(lo As String, hi As String)
-	Static result As Object
-	If isNull(result) Then
-		Dim loAsc As Integer, hiAsc As Integer
-		loAsc = Asc(lo)
-		hiAsc = Asc(hi)
-		result = pSat(compose(inRange(Asc(lo), Asc(hi)), Fn.asc))
-		result.str = &quot;[&quot; &amp; lo &amp; &quot;-&quot; &amp; hi &amp; &quot;]&quot;
-	End If
+	Dim result As Object
+	result = pSat(compose(inRange(Asc(lo), Asc(hi)), Fn.asc))
+	result.str = &quot;[&quot; &amp; lo &amp; &quot;-&quot; &amp; hi &amp; &quot;]&quot;
 	pRange = result
 End Function
 
@@ -1293,7 +1291,7 @@ _applyP_bind_B_return:
 				Goto _applyP_parseFailure
 			End If
 			result = Mid(s, pos, 1)
-			If Not(apply(p.st, result)) Then
+			If Not(apply(p.st0, result)) Then
 				Goto _applyP_parseFailure
 			End If
 			endPos = pos + 1
@@ -1387,6 +1385,10 @@ Function _applyP_stats( _
 		Case &quot;skip&quot;	&apos; tail-recursive
 			applyP_skip = applyP_skip + 1
 		Case &quot;sat&quot;
+			assertEqual(isFn(p.st), True).x
+			assertEqual(isFn(p.st0), True).x
+			assertEqual(arity(p.st0), arity(p.st)).x
+			assertEqual(getFnName(p.st0), getFnName(p.st)).x
 			applyP_sat = applyP_sat + 1
 		Case &quot;many1&quot;
 			applyP_many1 = applyP_many1 + 1

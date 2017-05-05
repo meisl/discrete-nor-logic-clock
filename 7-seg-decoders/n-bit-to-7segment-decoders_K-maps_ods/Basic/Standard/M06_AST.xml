@@ -240,6 +240,12 @@ Function dtMultLabel(m As String, p As Object)
 		Case &quot;choice&quot;:	t = &quot;(..|..)&quot;
 		Case &quot;seq&quot;:		t = &quot;(...)&quot;
 		Case &quot;ind&quot;:		t = getPIndName(p)
+		Case &quot;sat&quot;
+			If p.str &lt;&gt; &quot;&quot; Then
+				t = &quot;(&quot; &amp; p.str &amp; &quot;)&quot;
+			Else
+				t = &quot;(&quot; &amp; TFn_toString(p.st0) &amp; &quot;)&quot;
+			End If
 		Case Else
 			croak(&quot;dtMultLabel: cannot handle .tp=&quot; &amp; toString(p.tp))
 	End Select
@@ -288,6 +294,15 @@ Function _toDerivationP( _
 				result.typ = typ_Parser_ASN
 			Case &quot;str&quot;
 				f = mkDtTerminal
+				result = pBind(p, compose(pReturn, f))
+				&apos;result = pSeq(Array(p), f)
+				result.typ = typ_Parser_ASN
+			Case &quot;sat&quot;
+				If p.str &lt;&gt; &quot;&quot; Then
+					f = mkDtCClass(&quot;(&quot; &amp; p.str &amp; &quot;)&quot;
+				Else
+					f = mkDtCClass(&quot;(.):&quot; &amp; TFn_toString(p.st0))
+				End If
 				result = pBind(p, compose(pReturn, f))
 				&apos;result = pSeq(Array(p), f)
 				result.typ = typ_Parser_ASN
@@ -626,6 +641,40 @@ Function test_AST_toDerivationP()
 	x = mkDtMult(dtMultLabel(&quot;*&quot;, p), List(termZY, termZY, termZY))
 	assert_parses(q, &quot;zyzyzy&quot;, x, 7).x
 	assert_parses(q, &quot;zyzyzyX&quot;, x, 7).x
+
+	&apos; -------------------------
+	&apos; pSat under toDerivationP
+
+	p = pSat(equ(&quot;z&quot;))
+	p.str = &quot;[z]&quot;
+	q = toDerivationP(p)
+	x = mkDtCClass(&quot;([z])&quot;, &quot;z&quot;)
+	refute_parses(q, Array(&quot;&quot;, &quot;x&quot;, &quot;xy&quot;, &quot;xyz&quot;)).x
+	assert_parses(q, &quot;z&quot;, x, 2).x
+	assert_parses(q, &quot;zy&quot;, x, 2).x
+	assert_parses(q, &quot;zyz&quot;, x, 2).x
+	assert_parses(q, &quot;zzy&quot;, x, 2).x
+
+	&apos; -------------------------
+	&apos; pMany1(pSat) under toDerivationP
+
+	p = pSat(compose(inRange(Asc(&quot;y&quot;), Asc(&quot;z&quot;)), Fn.Asc))
+	p.str = &quot;[y-z]&quot;
+	q = toDerivationP(pMany1(p))
+	x = mkDtMult(dtMultLabel(&quot;+&quot;, p), List( _
+		mkDtCClass(&quot;([y-z])&quot;, &quot;z&quot;) _
+	))
+	refute_parses(q, Array(&quot;&quot;, &quot;x&quot;, &quot;xy&quot;, &quot;xyz&quot;)).x
+	assert_parses(q, &quot;z&quot;, x, 2).x
+	assert_parses(q, &quot;zx&quot;, x, 2).x
+	assert_parses(q, &quot;zxz&quot;, x, 2).x
+	x = mkDtMult(dtMultLabel(&quot;+&quot;, p), List( _
+		mkDtCClass(&quot;([y-z])&quot;, &quot;y&quot;), _
+		mkDtCClass(&quot;([y-z])&quot;, &quot;z&quot;) _
+	))
+	assert_parses(q, &quot;yz&quot;, x, 3).x
+	assert_parses(q, &quot;yzx&quot;, x, 3).x
+	assert_parses(q, &quot;yzxz&quot;, x, 3).x
 End Function
 
 </script:module>
