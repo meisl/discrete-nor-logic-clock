@@ -244,6 +244,7 @@ Function dtMultLabel(m As String, p As Object)
 		Case &quot;choice&quot;:	t = &quot;(..|..)&quot;
 		Case &quot;seq&quot;:		t = &quot;(...)&quot;
 		Case &quot;ind&quot;:		t = getPIndName(p)
+		Case &quot;skip&quot;:	t = dtMultLabel(m, p.st0)
 		Case &quot;sat&quot;
 			If p.str &lt;&gt; &quot;&quot; Then
 				t = &quot;(&quot; &amp; p.str &amp; &quot;)&quot;
@@ -284,19 +285,28 @@ Function _toDerivationP( _
 		s = dtMultLabel(&quot;?&quot;, q)
 		f = mkDtMult(s)
 		q = _toDerivationP(q, seen, options)
-		If q.typ = typ_Parser_ASN Then
-			q = pBind(q, compose(pReturn, swap(cons, nil)))
-		Else &apos; q.typ = typ_Parser_List_ASN
-			q = pBind(q, compose(pReturn, _
-				compose( _
-					swap(cons, nil), _
-					mkDtNonterminal(&quot;(...)&quot;) _
-				) _
-			))
+		If ((options And dtOpt_keepSkip) &lt;&gt; 0) And isPSkip(q) Then
+			result = pSkip(pZeroOrOne(q.st0))
+		Else
+			If q.typ = typ_Parser_ASN Then
+				q = pBind(q, compose(pReturn, swap(cons, nil)))
+			ElseIf q.typ = typ_Parser_List_ASN Then
+				q = pBind(q, compose(pReturn, _
+					compose( _
+						swap(cons, nil), _
+						mkDtNonterminal(&quot;(...)&quot;) _
+					) _
+				))
+			Else
+				croak(&quot;toDerivationP/zeroOrOne: q.typ = &quot; _
+					&amp; toString(q.typ) _
+					&amp; chr(13) &amp; chr(10) &amp; toString(q) _
+				)
+			End If
+			&apos;result = pSeq(Array(pChoice(q, pReturn(nil))), f)
+			result = pBind(pChoice(q, pReturn(nil)), compose(pReturn, f))
+			result.typ = typ_Parser_ASN
 		End If
-		&apos;result = pSeq(Array(pChoice(q, pReturn(nil))), f)
-		result = pBind(pChoice(q, pReturn(nil)), compose(pReturn, f))
-		result.typ = typ_Parser_ASN
 	Else
 		Select Case p.tp
 			Case &quot;skip&quot;
@@ -648,6 +658,36 @@ Function test_AST_toDerivationP()
 	assert_parses(q, &quot;z&quot;, x, 2).x
 	assert_parses(q, &quot;zy&quot;, x, 2).x	&apos; reads at most one
 
+	&apos; -- pZeroOrOne(pStr)
+	
+	p = pStr(&quot;z&quot;)
+	q = toDerivationP(pZeroOrOne(p))
+	x = mkDtMult(dtMultLabel(&quot;?&quot;, p), nil)
+	assert_parses(q, &quot;&quot;, x, 1).x
+	assert_parses(q, &quot;y&quot;, x, 1).x
+	assert_parses(q, &quot;yz&quot;, x, 1).x
+	x = mkDtMult(dtMultLabel(&quot;?&quot;, p), List(termZ))
+	assert_parses(q, &quot;z&quot;, x, 2).x
+	assert_parses(q, &quot;zz&quot;, x, 2).x	&apos; reads at most one
+	assert_parses(q, &quot;zy&quot;, x, 2).x
+
+	&apos; -- pZeroOrOne(pSkip(...))
+	
+	p = pSkip(pItem)
+	q = toDerivationP(pZeroOrOne(p))
+	&apos;msgbox(toString(applyP(pZeroOrOne(p), &quot;x&quot;)))
+	&apos;q = pSkip(pZeroOrOne(pItem))
+	Dim out As Variant
+	out = applyP(q, &quot;&quot;)
+	msgbox(toString(q) &amp; chr(13) &amp; chr(10) &amp; toString(out))
+	x = mkDtMult(dtMultLabel(&quot;?&quot;, p), nil)
+	assert_parses(q, &quot;&quot;, x, 1).x
+	assert_parses(q, &quot;y&quot;, x, 1).x
+	assert_parses(q, &quot;yz&quot;, x, 1).x
+	x = mkDtMult(dtMultLabel(&quot;?&quot;, p), List(termZ))
+	assert_parses(q, &quot;z&quot;, x, 2).x
+	assert_parses(q, &quot;zz&quot;, x, 2).x	&apos; reads at most one
+	assert_parses(q, &quot;zy&quot;, x, 2).x
 
 	&apos; -- pZeroOrOne(pSeqL(..., id))
 	

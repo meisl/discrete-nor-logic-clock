@@ -1207,7 +1207,9 @@ _applyP_choiceL:
 			End If
 		Case &quot;return&quot;
 			endPos = pos
-			If Not(isUnderSkip) Then
+			If isUnderSkip Then
+				result = Empty
+			Else
 				result = p.st
 			End If
 		Case &quot;bind&quot;	&apos; tail-recursive
@@ -1355,13 +1357,21 @@ _applyP_bind_B_return:
 			result = &quot;unknown Parser &apos;&quot; &amp; p.tp &amp; &quot;&apos;&quot;
 			MsgBox(&quot;Error in applyP: &quot; &amp; result)
 	End Select
-	&apos;If isUnderSkip And Not(isParseFailure(result)) Then
-	&apos;	assertEqual(result(0), Empty).x
-	&apos;End If
 _applyP_parseSuccess:
+	assertEqual(endPos &gt; 0, True).x
+	If isUnderSkip Then
+		If Not(isEmpty(result)) Then
+			MsgBox(toString(p) _
+				&amp; chr(13) &amp; chr(10) &amp; toString(result) _
+				&amp; chr(13) &amp; chr(10) &amp; Len(toString(result)) _
+			)
+		End If
+		assertEqual(result, Empty).x
+	End If
 	_applyP = result
 	Exit Function
 _applyP_parseFailure:
+	_applyP = Empty	&apos; needed to ensure that under skip really *always* Empty is returned
 	endPos = -1
 End Function
 
@@ -1912,6 +1922,16 @@ Function test_Parser_skip()
 	assert_parses(p, &quot;foo&quot; &amp; chr(13),   Empty, 4).x
 	assert_parses(p, &quot;foo&quot; &amp; chr( 9),	Empty, 4).x
 	
+	Set p = pSkip(pZeroOrOne(pItem))
+	assert_parses(p, &quot;&quot;,		Empty, 1).x
+	assert_parses(p, &quot; &quot;,		Empty, 2).x
+	assert_parses(p, &quot;a&quot;,		Empty, 2).x
+	assert_parses(p, &quot;1&quot;,		Empty, 2).x
+	assert_parses(p, &quot;[]&quot;,		Empty, 2).x &apos; reads at most one
+	assert_parses(p, &quot;abcd&quot;,	Empty, 2).x
+	assert_parses(p, chr(13),   Empty, 2).x
+	assert_parses(p, chr( 9),	Empty, 2).x
+	
 	Set p = pSkip(pMany(pItem))
 &apos;	msgbox(toString(p))
 	assert_parses(p, &quot;&quot;,		Empty, 1).x
@@ -1960,6 +1980,7 @@ Function test_Parser_skip()
 	refute_parses(p, &quot;  x&quot;).x
 	assert_parses(p, &quot;  xx&quot;,	&quot;xx&quot;,  5).x
 	assert_parses(p, &quot;  xxx&quot;,	&quot;xx&quot;,  5).x
+	refute_parses(p, chr(9)).x
 	refute_parses(p, chr(9) &amp; &quot;  &quot;).x
 	refute_parses(p, chr(9) &amp; &quot;  x&quot;).x
 	assert_parses(p, chr(9) &amp; &quot;  xx&quot;,	&quot;xx&quot;,  6).x
