@@ -68,10 +68,18 @@ Function pGrmIdent()
 						pAlpha, _
 						pMany(pAlphaNumDash), _
 					), foldl(concat))
-		result = fixIndirection(pInd(&quot;ident&quot;), result)
-				 
+&apos;		result = fixIndirection(pInd(&quot;ident&quot;), result)
 	End If
 	pGrmIdent = result
+End Function
+
+Function pGrmRuleName()
+	Static result As Object
+	If isNull(result) Then
+		result = pGrmIdent
+		result = fixIndirection(pInd(&quot;RuleName&quot;), result)
+	End If
+	pGrmRuleName = result
 End Function
 
 Function pGrmNonterminal()
@@ -87,22 +95,48 @@ Function pGrmAlt()
 	Static result As Object
 	If isNull(result) Then
 		result = pSeqL(Array( _
-			pMany(pWhite), _
-			pGrmNonterminal, _
-			pMany(pWhite) _
+			pSkip(pMany(pWhite)), _
+			pGrmCon, _
+			pSkip(pMany(pWhite)) _
 		), id)
 		result = fixIndirection(pInd(&quot;Alt&quot;), result)
 	End If
 	pGrmAlt = result
 End Function
 
+Function pGrmCon()
+	Static result As Object
+	If isNull(result) Then
+		Dim pCon As Object
+		pCon = pInd(&quot;Con&quot;)
+		result = pSeqL(Array( _
+			pGrmNonterminal, _
+			pZeroOrOne( _
+				pSeqL(Array( _
+					pSkip(pMany1(pWhite)), _
+					pCon _
+				), id) _
+			) _
+		), id)
+		result = pMany1( _
+			pSeqL(Array( _
+				pGrmNonterminal, _
+				pSkip(pMany(pWhite)) _
+			), id) _
+		)
+		result = fixIndirection(pCon, result)
+	End If
+	pGrmCon = result
+End Function
+
+
 Function pGrmRule()
 	Static result As Object
 	If isNull(result) Then
 		result = pSeqL(Array( _
-					pMany(pWhite), _
-					pGrmIdent, _
-					pMany(pWhite), _
+					pSkip(pMany(pWhite)), _
+					pGrmRuleName, _
+					pSkip(pMany(pWhite)), _
 					pStr(&quot;::=&quot;), _
 					pGrmAlt, _
 				 ), id)
@@ -116,9 +150,10 @@ End Function
 
 Function test_PrsGrammar()
 	test_PrsGrammar_pGrmMult()
-	&apos; pGrmIdent and pGrmNonterminal are essentially the same
+	&apos; pGrmIdent, pGrmRuleName and pGrmNonterminal are essentially the same
 	test_PrsGrammar_ident(pGrmIdent)
-	test_PrsGrammar_ident(pGrmNonterminal) &apos; Nonterminal ::= ident
+	test_PrsGrammar_ident(pGrmRuleName) 	&apos;    RuleName ::= ident
+	test_PrsGrammar_ident(pGrmNonterminal)	&apos; Nonterminal ::= ident
 End Function
 
 Function test_PrsGrammar_pGrmMult()

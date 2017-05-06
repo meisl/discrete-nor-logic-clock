@@ -576,7 +576,7 @@ Why not use these to write a grammar that defines the language of grammars?
 
 ### 3.1. A few more conventions
 
-Rules with rhs a concatenation or alternation of only literals and possibly multiplicity ops get names starting with a lower-case letter.
+Rules with rhs a concatenation or alternation of only literals and possibly multiplicity operators get names starting with a lower-case letter.
 
 All other rules get names starting with an upper-case letter.
 
@@ -584,10 +584,11 @@ Won't enforce these conventions for object-level grammars, just use them for the
 
 ### 3.2. A grammar's just a list of rules
 
-The very first rule in the grammar for grammars is just to fix the start rule. Next come definitions for whitespace `ws` and a newline `nl`. The latter is trying to be liberal about all that mess with Windows vs Unix vs Mac style newlines, while in any instance matching exactly one.
+The very first rule in the grammar for grammars is just to fix the start rule. Next come definitions for whitespace `ws` and a newline `nl`. The latter is trying to be liberal about all that mess with [the various representations of a *line break*](https://en.wikipedia.org/wiki/Newline).
+TODO: Windows vs Unix vs Mac style newline sequence, while in any instance matching exactly one.
 `LineSep` then combines the two to "eat up" any preceeding as subsequent whitespace, but still require the derivation to continue on an actual new line.
 
-`Grammar` finally does the "heavy lifting": it requires at least one `Rule`, and each of them must start on a line of its own.
+`Grammar` finally "heavy lifting": it requires at least one `Rule`, and each of them must start on a line of its own.
 ```
           S ::= Grammar
 
@@ -599,7 +600,7 @@ The very first rule in the grammar for grammars is just to fix the start rule. N
     Grammar ::= StartRule (LineSep+ Rule)*
   StartRule ::= Rule
 ```
-The extra `StartRule` rule may look bogus, but it makes explicit that every grammar has one special rule: the start rule.
+The extra `StartRule` rule may look bogus, but it makes explicit that every grammar has one rule that is special: the start rule.
 
 
 ### 3.3. The rule for rules
@@ -716,7 +717,8 @@ With a bit of rearrangement, here's the whole altogether:
 
     Grammar ::= StartRule (LineSep+ Rule)*
   StartRule ::= Rule
-       Rule ::= ws* ident ws* "::=" Alt
+       Rule ::= ws* RuleName ws* "::=" Alt
+   RuleName ::= ident
         Alt ::= ws* Con ws* (LineSep? "|" Alt)?
         Con ::= Atom mult? (ws+ Con)?
        Atom ::= "(" Alt ")"

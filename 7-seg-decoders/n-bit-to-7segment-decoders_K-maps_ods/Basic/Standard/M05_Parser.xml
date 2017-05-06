@@ -529,6 +529,7 @@ Function pSkip(p As Object)
 			Else
 				&apos;result = pBind(p, fstArg(pReturn(Empty)))
 				result = mkParser(&quot;skip&quot;, p)
+				result.st0 = p
 			End If
 	End Select
 	pSkip = result
@@ -1255,7 +1256,7 @@ _applyP_bind_K_return:
 _applyP_bind_B_return:
 			&apos; We know that the function (bind&apos;s 2nd arg) will always
 			&apos; produce a pReturn(x), where x is produced by an inner 
-			&apos; function (which we have stored directly .st3)
+			&apos; function (which we have stored in .st3)
 			&apos; Therefore we can directly apply this function to the 
 			&apos; parser&apos;s result (bind&apos;s 1st arg) in order to get the 
 			&apos; overall result value.
@@ -1298,10 +1299,10 @@ _applyP_bind_B_return:
 				result = apply(p.st(1), reverse(lst))
 			End If
 		Case &quot;skip&quot;	&apos; tail-recursive
-			p = p.st
+			p = p.st0
 			isUnderSkip = True
 			Goto _applyP_begin
-			&apos;result = _applyP(p.st, s, pos, endPos, True)
+			&apos;result = _applyP(p.st0, s, pos, endPos, True)
 			&apos;If endPos &gt; 0 Then
 			&apos;	assertEqual(result, Empty).x
 			&apos;End If
@@ -1402,6 +1403,9 @@ Function _applyP_stats( _
 		Case &quot;seq&quot;
 			applyP_seq = applyP_seq + 1
 		Case &quot;skip&quot;	&apos; tail-recursive
+			assertEqual(typeOf(p.st(0)), typeOf(p.st0)).x
+			assertEqual(typeOf(p.st0), typeOf(pFail)).x
+			assertEqual(p.st0.id, p.st(0).id).x
 			applyP_skip = applyP_skip + 1
 		Case &quot;sat&quot;
 			assertEqual(isFn(p.st), True).x
@@ -2794,8 +2798,8 @@ Function test_Parser_toString()
 
 	assert_toStr(pMany1(pItem),						&quot;item+&quot;).x
 	assert_toStr(pSkip(pMany1(pItem)),				&quot;(skip item+)&quot;).x
-	assert_toStr(pMany1(pWhite),					&quot;(&quot; + toString(pWhite) &amp; &quot;)+&quot;).x
-	assert_toStr(pSkip(pMany1(pWhite)),				&quot;(skip (&quot; &amp; toString(pWhite) &amp; &quot;)+)&quot;).x
+&apos;	assert_toStr(pMany1(pWhite),					toString(pWhite) &amp; &quot;+&quot;).x
+&apos;	assert_toStr(pSkip(pMany1(pWhite)),				&quot;(skip (&quot; &amp; toString(pWhite) &amp; &quot;)+)&quot;).x
 
 	assert_toStr(pMany(pItem),						&quot;item*&quot;).x
 	assert_toStr(pSkip(pMany(pItem)),				&quot;(skip item*)&quot;).x
