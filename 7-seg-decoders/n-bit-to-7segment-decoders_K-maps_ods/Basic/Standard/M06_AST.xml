@@ -243,28 +243,23 @@ Function dtMultLabel(m As String, p As Object)
 	dtMultLabel = &quot;(&quot; &amp; m &amp; &quot;):&quot; &amp; t
 End Function
 
+&apos; Function rather than Const so it can be accessed from spreadsheet
+Function dtOpt_hideSkipped() : dtOpt_hideSkipped = 1 : End Function
 
-Const dtOpt_keepSkip = 1
 Const typ_Parser_ASN = &quot;Parser ASN&quot;
 Const typ_Parser_List_ASN = &quot;Parser [ASN]&quot;
 
-Function toDerivationP(Optional ByVal p As Object)
-	Dim result As Variant
-	If isMissing(p) Then
-		result = Fn.toDerivationP
-	Else
-		Dim seen As Object, options As Integer
-		seen = nil
-		options = 0
-		&apos;options = options Or dtOpt_keepSkip
-		result = _toDerivationP(p, seen, options)
-		While Not(isNil(seen))
-			p = car(seen)
-			p.st2 = False
-			p.st3 = Empty
-			seen = cdr(seen)
-		Wend
-	End If
+Function toDerivationP(p As Object, options As Integer)
+	Dim result As Object
+	Dim seen As Object, q As Object
+	seen = nil
+	result = _toDerivationP(p, seen, options)
+	While Not(isNil(seen))
+		q = car(seen)
+		q.st2 = False	&apos; clear visited marker
+		q.st3 = Empty	&apos; clear ptr to with what it was replaced
+		seen = cdr(seen)
+	Wend
 	toDerivationP = result
 End Function
 
@@ -318,8 +313,8 @@ Function _toDerivationP( _
 	Else
 		Select Case p.tp
 			Case &quot;skip&quot;
-				If (options And dtOpt_keepSkip) Then
-					result = p
+				If (options And dtOpt_hideSkipped) Then
+					result = p &apos; so when applying p it&apos;ll return Empty
 				Else
 					result = _toDerivationP(p.st0, seen, options)
 				End If
@@ -559,9 +554,12 @@ End Function
 
 Function test_AST_toDerivationP()
 	Dim p As Object, q As Object, r As Variant, x As Object
+	Dim opts As Integer
+	
+	opts = dtOpt_hideSkipped
 
 	p = pItem
-	q = toDerivationP(p)
+	q = toDerivationP(p, opts)
 	refute_parses(q, &quot;&quot;).x
 	x = mkDtCClass(&quot;(.)&quot;, &quot;a&quot;)
 	assert_parses(q, &quot;a&quot;, x, 2).x
@@ -573,7 +571,7 @@ Function test_AST_toDerivationP()
 	assert_parses(q, &quot; xyzabc&quot;, x, 2).x
 	
 	p = pStr(&quot;z&quot;)
-	q = toDerivationP(p)
+	q = toDerivationP(p, opts)
 	refute_parses(q, Array(&quot;&quot;, &quot;cba&quot;, &quot;x&quot;, &quot;y&quot;)).x
 	x = mkDtTerminal(&quot;z&quot;)
 	assert_parses(q, &quot;z&quot;, x, 2).x
@@ -582,7 +580,7 @@ Function test_AST_toDerivationP()
 	assert_parses(q, &quot;zy&quot;, x, 2).x
 
 	p = pStr(&quot;abc&quot;)
-	q = toDerivationP(p)
+	q = toDerivationP(p, opts)
 	refute_parses(q, Array(&quot;&quot;, &quot;y&quot;, &quot;cba&quot;)).x
 	x = mkDtTerminal(&quot;abc&quot;)
 	assert_parses(q, &quot;abc&quot;, x, 4).x
@@ -591,7 +589,7 @@ Function test_AST_toDerivationP()
 	assert_parses(q, &quot;abcxyz&quot;, x, 4).x
 
 	p = pChoice(pStr(&quot;0&quot;), pStr(&quot;1&quot;))
-	q = toDerivationP(p)
+	q = toDerivationP(p, opts)
 	refute_parses(q, Array(&quot;&quot;, &quot;y&quot;, &quot;cba&quot;)).x
 	x = mkDtTerminal(&quot;0&quot;)
 	assert_parses(q, &quot;0&quot;, x, 2).x
@@ -599,7 +597,7 @@ Function test_AST_toDerivationP()
 	assert_parses(q, &quot;1&quot;, x, 2).x
 
 	p = pSeqL(Array(pItem), id)
-	q = toDerivationP(p)
+	q = toDerivationP(p, opts)
 	refute_parses(q, &quot;&quot;).x
 	x = List(mkDtCClass(&quot;(.)&quot;, &quot;x&quot;))
 	assert_parses(q, &quot;x&quot;, x, 2).x
@@ -608,7 +606,7 @@ Function test_AST_toDerivationP()
 	assert_parses(q, &quot;y1abc&quot;, x, 2).x
 
 	p = pSeqL(Array(pItem, pStr(&quot;1&quot;)), id)
-	q = toDerivationP(p)
+	q = toDerivationP(p, opts)
 	refute_parses(q, &quot;&quot;, &quot;x0&quot;, &quot; a&quot;).x
 	x = List(mkDtCClass(&quot;(.)&quot;, &quot;x&quot;), mkDtTerminal(&quot;1&quot;))
 	assert_parses(q, &quot;x1&quot;, x, 3).x
@@ -616,7 +614,7 @@ Function test_AST_toDerivationP()
 	assert_parses(q, &quot;y1abc&quot;, x, 3).x
 
 	p = pSeqL(Array(pStr(&quot;0&quot;), pItem, pStr(&quot;1&quot;)), id)
-	q = toDerivationP(p)
+	q = toDerivationP(p, opts)
 	refute_parses(q, &quot;&quot;, &quot;0&quot;, &quot;0a&quot;, &quot;xa1&quot;).x
 	x = List(mkDtTerminal(&quot;0&quot;), mkDtCClass(&quot;(.)&quot;, &quot;a&quot;), mkDtTerminal(&quot;1&quot;))
 	assert_parses(q, &quot;0a1&quot;, x, 4).x
@@ -625,7 +623,7 @@ Function test_AST_toDerivationP()
 	
 	p = pInd(&quot;Foo&quot;)
 	p = fixIndirection(p, pItem)
-	q = toDerivationP(p)
+	q = toDerivationP(p, opts)
 	refute_parses(q, &quot;&quot;).x
 	x = mkDtNonterminal(getPIndName(p), List(mkDtCClass(&quot;(.)&quot;, &quot;a&quot;)))
 	assert_parses(q, &quot;a&quot;, x, 2).x
@@ -636,7 +634,7 @@ Function test_AST_toDerivationP()
 		
 	p = pInd(&quot;Bar&quot;)
 	p = fixIndirection(p, pSeqL(Array(pItem, pStr(&quot;1&quot;)), id)
-	q = toDerivationP(p)
+	q = toDerivationP(p, opts)
 	&apos;msgbox(toString(p) &amp; chr(13) &amp; chr(13) &amp; toString(q))
 	refute_parses(q, &quot;&quot;, &quot;a&quot;, &quot;aa&quot;, &quot;a0&quot;, &quot;b&quot;, &quot;b1&quot;).x
 	x = mkDtNonterminal(getPIndName(p), List( _
@@ -659,7 +657,7 @@ Function test_AST_toDerivationP()
 	&apos; -- pZeroOrOne(pItem)
 	
 	p = pItem
-	q = toDerivationP(pZeroOrOne(p))
+	q = toDerivationP(pZeroOrOne(p), opts)
 	x = mkDtMult(dtMultLabel(&quot;?&quot;, p), nil)
 	assert_parses(q, &quot;&quot;, x, 1).x
 	x = mkDtMult(dtMultLabel(&quot;?&quot;, p), List(mkDtCClass(&quot;(.)&quot;, &quot;z&quot;)))
@@ -669,7 +667,7 @@ Function test_AST_toDerivationP()
 	&apos; -- pZeroOrOne(pStr)
 	
 	p = pStr(&quot;z&quot;)
-	q = toDerivationP(pZeroOrOne(p))
+	q = toDerivationP(pZeroOrOne(p), opts)
 	x = mkDtMult(dtMultLabel(&quot;?&quot;, p), nil)
 	assert_parses(q, &quot;&quot;, x, 1).x
 	assert_parses(q, &quot;y&quot;, x, 1).x
@@ -682,7 +680,7 @@ Function test_AST_toDerivationP()
 	&apos; -- pZeroOrOne(pSkip(...))
 	
 	p = pSkip(pItem)
-	q = toDerivationP(pZeroOrOne(p))
+	q = toDerivationP(pZeroOrOne(p), opts)
 	&apos;msgbox(toString(applyP(pZeroOrOne(p), &quot;x&quot;)))
 	&apos;q = pSkip(pZeroOrOne(pItem))
 	Dim out As Variant
@@ -699,7 +697,7 @@ Function test_AST_toDerivationP()
 	&apos; -- pZeroOrOne(pSeqL(..., id))
 	
 	p = pSeqL(Array(pStr(&quot;z&quot;), pStr(&quot;y&quot;)), id)
-	q = toDerivationP(pZeroOrOne(p))
+	q = toDerivationP(pZeroOrOne(p), opts)
 	x = mkDtMult(dtMultLabel(&quot;?&quot;, p), nil)
 	assert_parses(q, &quot;&quot;, x, 1).x
 	assert_parses(q, &quot;abc&quot;, x, 1).x
@@ -720,7 +718,7 @@ Function test_AST_toDerivationP()
 	&apos; -- pMany(pStr(...))
 
 	p = pStr(&quot;z&quot;)
-	q = toDerivationP(pMany(p))
+	q = toDerivationP(pMany(p), opts)
 	x = mkDtMult(dtMultLabel(&quot;*&quot;, p), nil)
 	assert_parses(q, &quot;&quot;, x, 1).x
 	assert_parses(q, &quot;x&quot;, x, 1).x
@@ -736,7 +734,7 @@ Function test_AST_toDerivationP()
 	assert_parses(q, &quot;zza&quot;, x, 3).x
 
 	p = pStr(&quot;zy&quot;)
-	q = toDerivationP(pMany(p))
+	q = toDerivationP(pMany(p), opts)
 	x = mkDtMult(dtMultLabel(&quot;*&quot;, p), nil)
 	assert_parses(q, &quot;&quot;, x, 1).x
 	assert_parses(q, &quot;x&quot;, x, 1).x
@@ -760,7 +758,7 @@ Function test_AST_toDerivationP()
 	&apos; -- pMany(pSeqL(..., id))
 	
 	p = pSeqL(Array(pStr(&quot;z&quot;), pStr(&quot;y&quot;)), id)
-	q = toDerivationP(pMany(p))
+	q = toDerivationP(pMany(p), opts)
 	x = mkDtMult(dtMultLabel(&quot;*&quot;, p), nil)
 	assert_parses(q, &quot;&quot;, x, 1).x
 	assert_parses(q, &quot;abc&quot;, x, 1).x
@@ -785,7 +783,7 @@ Function test_AST_toDerivationP()
 	&apos; -- pMany1(pSeqL(..., id))
 	
 	p = pSeqL(Array(pStr(&quot;z&quot;), pStr(&quot;y&quot;)), id)
-	q = toDerivationP(pMany1(p))
+	q = toDerivationP(pMany1(p), opts)
 	refute_parses(q, &quot;&quot;, x, 1).x
 	refute_parses(q, &quot;abc&quot;, x, 1).x
 	x = mkDtMult(dtMultLabel(&quot;+&quot;, p), List( _
@@ -808,7 +806,7 @@ Function test_AST_toDerivationP()
 
 	p = pSat(equ(&quot;z&quot;))
 	p.str = &quot;[z]&quot;
-	q = toDerivationP(p)
+	q = toDerivationP(p, opts)
 	x = mkDtCClass(&quot;([z])&quot;, &quot;z&quot;)
 	refute_parses(q, Array(&quot;&quot;, &quot;x&quot;, &quot;xy&quot;, &quot;xyz&quot;)).x
 	assert_parses(q, &quot;z&quot;, x, 2).x
@@ -821,7 +819,7 @@ Function test_AST_toDerivationP()
 
 	p = pSat(compose(inRange(Asc(&quot;y&quot;), Asc(&quot;z&quot;)), Fn.Asc))
 	p.str = &quot;[y-z]&quot;
-	q = toDerivationP(pMany1(p))
+	q = toDerivationP(pMany1(p), opts)
 	x = mkDtMult(dtMultLabel(&quot;+&quot;, p), List( _
 		mkDtCClass(&quot;([y-z])&quot;, &quot;z&quot;) _
 	))

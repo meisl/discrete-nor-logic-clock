@@ -70,7 +70,6 @@ Type TFnObjs
 	mkDtCClass			As Object
 	mkDtNonterminal		As Object
 	mkDtMult			As Object
-	toDerivationP		As Object
 End Type
 
 
@@ -152,7 +151,6 @@ Function Fn
 		result.mkDtCClass		= lookupFn(&quot;mkDtCClass&quot;)
 		result.mkDtNonterminal  = lookupFn(&quot;mkDtNonterminal&quot;)
 		result.mkDtMult  		= lookupFn(&quot;mkDtMult&quot;)
-		result.toDerivationP	= lookupFn(&quot;toDerivationP&quot;)
 	End If
 	Fn = result
 End Function
@@ -292,8 +290,7 @@ Function fnObjs()
 			newFn(&quot;mkDtTerminal&quot;,		1, &quot;Str -&gt; ASN&quot;), _
 			newFn(&quot;mkDtCClass&quot;,			2, &quot;Str -&gt; Str -&gt; ASN&quot;), _
 			newFn(&quot;mkDtNonterminal&quot;,	2, &quot;Str -&gt; [ASN] -&gt; ASN&quot;), _
-			newFn(&quot;mkDtMult&quot;,			2, &quot;Str -&gt; [ASN] -&gt; ASN&quot;), _
-			newFn(&quot;toDerivationP&quot;, 		1, &quot;Parser Str -&gt; Parser ASN&quot;) _
+			newFn(&quot;mkDtMult&quot;,			2, &quot;Str -&gt; [ASN] -&gt; ASN&quot;) _
 	))
 	End If
 	fnObjs = result
@@ -452,7 +449,6 @@ applyLast_of_one:
 		Case &quot;TParser_toString&quot;:	result = TParser_toString(	a0)
 		Case &quot;TASN_toString&quot;:		result = TASN_toString(		a0)
 		Case &quot;mkDtTerminal&quot;:		result = mkDtTerminal(		a0)
-		Case &quot;toDerivationP&quot;:		result = toDerivationP(		a0)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select

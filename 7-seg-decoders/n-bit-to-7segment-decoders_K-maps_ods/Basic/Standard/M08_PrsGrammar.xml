@@ -7,11 +7,14 @@ Sub Main
 	test_PrsGrammar
 End Sub
 
-Function derivationTree_prsGrammar(s As String)
+Function derivationTree_prsGrammar( _
+	s As String, _
+	Optional ByVal options As Integer _
+)
 	Static p As Object
 	Dim result As Variant, parseResult As Variant
 	If isNull(p) Then
-		p = toDerivationP(pGrmGrammar)
+		p = toDerivationP(pGrmGrammar, options)
 	End If
 	parseResult = applyP(p, s)
 	If isParseFailure(parseResult) Then
