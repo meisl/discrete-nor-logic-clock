@@ -95,7 +95,7 @@ Function pGrmAlt()
 	Static result As Object
 	If isNull(result) Then
 		result = pSeqL(Array( _
-			pSkip(pMany(pWhite)), _
+			pZeroOrOne(pSkip(pMany(pWhite))), _
 			pGrmCon, _
 			pSkip(pMany(pWhite)) _
 		), id)

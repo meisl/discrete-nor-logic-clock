@@ -2130,7 +2130,6 @@ Function test_Parser_zeroOrOne()
 	)
 
 	p = pZeroOrOne(pStr(&quot;x&quot;))
-
 	assert_parses(p, data,	zeroMatches, 1).x
 	assert_parses(p, &quot;x&quot;, 	oneMatch, 2).x
 	assert_parses(p, &quot;xx&quot;, 	oneMatch, 2).x
@@ -2148,6 +2147,27 @@ Function test_Parser_zeroOrOne()
 	assert_parses(p, &quot; x&quot;, 	zeroMatches, 1).x
 	assert_parses(p, &quot; xx&quot;, zeroMatches, 1).x
 	assert_parses(p, &quot; xxx&quot;,zeroMatches, 1).x
+	
+	&apos; (skip p)? always yields Empty, but pos may or may not be advanced:
+	p = pZeroOrOne(pSkip(pStr(&quot;x&quot;)))
+	assert_parses(p, data,	Empty, 1).x
+	assert_parses(p, &quot;x&quot;, 	Empty, 2).x
+	assert_parses(p, &quot;xx&quot;, 	Empty, 2).x
+	assert_parses(p, &quot;xxx&quot;, Empty, 2).x
+	assert_parses(p, &quot; x&quot;, 	Empty, 1).x
+	assert_parses(p, &quot; xx&quot;, Empty, 1).x
+	assert_parses(p, &quot; xxx&quot;,Empty, 1).x
+	
+	&apos; (skip p?) always yields Empty, but pos may or may not be advanced.
+	&apos; So: (skip p?) = (skip p)?
+	p = pSkip(pZeroOrOne(pStr(&quot;x&quot;)))
+	assert_parses(p, data,	Empty, 1).x
+	assert_parses(p, &quot;x&quot;, 	Empty, 2).x
+	assert_parses(p, &quot;xx&quot;, 	Empty, 2).x
+	assert_parses(p, &quot;xxx&quot;, Empty, 2).x
+	assert_parses(p, &quot; x&quot;, 	Empty, 1).x
+	assert_parses(p, &quot; xx&quot;, Empty, 1).x
+	assert_parses(p, &quot; xxx&quot;,Empty, 1).x
 End Function
 
 Function test_Parser_skip_zeroOrOne()
