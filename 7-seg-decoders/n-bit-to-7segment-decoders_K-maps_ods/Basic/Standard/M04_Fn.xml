@@ -3,6 +3,7 @@
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M04_Fn" script:language="StarBasic">REM  *****  BASIC  *****
 Option Explicit
 
+Const TFn_tyname = &quot;TFn&quot;
 Type TFn
 	tyname		As String
 	str			As Variant
@@ -77,18 +78,6 @@ Sub Main
 	test_Fn()
 End Sub
 
-Function newFn(name As String, arity As Integer, Optional typ)
-	Dim result As New TFn
-	result.tyname = &quot;TFn&quot;
-	result.which = name
-	result.arity = arity
-	If Not(isMissing(typ)) Then
-		result.str = name &amp; &quot; :: &quot; &amp; typ
-	Else
-		result.str = name
-	End If
-	newFn = result
-End Function
 
 Function Fn
 	Static result As Object
@@ -155,8 +144,22 @@ Function Fn
 	Fn = result
 End Function
 
+Function newFn(name As String, arity As Integer, Optional typ)
+	Dim result As New TFn
+	result.tyname = TFn_tyname
+	result.which = name
+	result.arity = arity
+	If Not(isMissing(typ)) Then
+		result.str = name &amp; &quot; :: &quot; &amp; typ
+	Else
+		result.str = name
+	End If
+	newFn = result
+End Function
+
 Function mkPartialApp(fn As Object, arg As Variant)
 	Dim result As New TFn
+	result.tyname = TFn_tyname
 	Dim baseArity As Integer, newArity As Integer
 	Dim args As Variant
 	If isPartialApp(fn) Then
@@ -624,6 +627,11 @@ Function test_Fn()
 	assertEqual(isPartialApp(fId), False).x
 	assertEqual(arity(fId), 1).x
 	assertEqual(apply(fId, 0), id(0)).x
+	
+	Dim temp As Object
+	temp = fId &apos; do not access fields on fId directly...!
+	assertEqual(temp.tyname &lt;&gt; &quot;&quot;, True).x
+	
 
 	Dim fCar As Variant
 	fCar = Fn.car
@@ -647,6 +655,10 @@ Function test_Fn()
 	assertEqual(isPartialApp(eq5), True).x
 	assertEqual(isNil(partialArgs(eq5)), False).x
 	assertEqual(arity(eq5), 1).x
+	
+	&apos; partially applied fns also have a proper .tyname:
+	&apos; Note typeOf is the BASIC type, not the actual fn type
+	assertEqual(typeOf(eq5), typeOf(fId)).x
 	
 	Dim eq5_7 As Variant
 	eq5_7 = apply1(eq5, 7)

@@ -443,9 +443,20 @@ End Function
 &apos;= tests ======================================================================
 
 Function test_AST()
+	test_AST_mkASN()
 	test_AST_TASN_toString()
-	test_AST_toDerivationP()
 	
+	test_AST_toDerivationP_simple(0)
+	test_AST_toDerivationP_simple(dtOpt_hideSkipped)
+
+	test_AST_toDerivationP_mult(0)
+	test_AST_toDerivationP_mult(dtOpt_hideSkipped)
+
+	test_AST_toDerivationP_skip(0)
+	test_AST_toDerivationP_skip(dtOpt_hideSkipped)
+End Function 
+
+Function test_AST_mkASN()	
 	Dim n0 As Object
 	n0 = mkASN(&quot;foo&quot;, &quot;bar&quot;, nil)
 	
@@ -509,7 +520,7 @@ Function test_AST()
 	n4 = mkDtNonterminal(&quot;S&quot;, List(n0, n1, n4))
 	
 	s = toString(n4)
-	test_AST = s
+	test_AST_mkASN = s
 End Function
 
 Function test_AST_TASN_toString()
@@ -549,14 +560,13 @@ Function test_AST_TASN_toString()
 	assertEqual(TASN_toString(n), &quot;─W+&quot;).x
 	n = mkASN(&quot;W?&quot;, Empty, nil)
 	assertEqual(TASN_toString(n), &quot;─W?&quot;).x
-	
 End Function
 
-Function test_AST_toDerivationP()
-	Dim p As Object, q As Object, r As Variant, x As Object
-	Dim opts As Integer
-	
-	opts = dtOpt_hideSkipped
+Function test_AST_toDerivationP_simple(opts As Integer)
+	Dim p As Object, q As Object, x As Object
+
+	&apos; ------------------------
+	&apos; pItem under toDerivationP
 
 	p = pItem
 	q = toDerivationP(p, opts)
@@ -570,6 +580,9 @@ Function test_AST_toDerivationP()
 	x = mkDtCClass(&quot;(.)&quot;, &quot; &quot;)
 	assert_parses(q, &quot; xyzabc&quot;, x, 2).x
 	
+	&apos; ------------------------
+	&apos; pStr under toDerivationP
+
 	p = pStr(&quot;z&quot;)
 	q = toDerivationP(p, opts)
 	refute_parses(q, Array(&quot;&quot;, &quot;cba&quot;, &quot;x&quot;, &quot;y&quot;)).x
@@ -587,6 +600,22 @@ Function test_AST_toDerivationP()
 	&apos; really reads only as many chars as pStr does:
 	assert_parses(q, &quot;abcabc&quot;, x, 4).x
 	assert_parses(q, &quot;abcxyz&quot;, x, 4).x
+	
+	&apos; ------------------------
+	&apos; pSat under toDerivationP
+
+	p = pSat(equ(&quot;z&quot;))
+	p.str = &quot;[z]&quot;
+	q = toDerivationP(p, opts)
+	x = mkDtCClass(&quot;([z])&quot;, &quot;z&quot;)
+	refute_parses(q, Array(&quot;&quot;, &quot;x&quot;, &quot;xy&quot;, &quot;xyz&quot;)).x
+	assert_parses(q, &quot;z&quot;, x, 2).x
+	assert_parses(q, &quot;zy&quot;, x, 2).x
+	assert_parses(q, &quot;zyz&quot;, x, 2).x
+	assert_parses(q, &quot;zzy&quot;, x, 2).x
+
+	&apos; ---------------------------
+	&apos; pChoice under toDerivationP
 
 	p = pChoice(pStr(&quot;0&quot;), pStr(&quot;1&quot;))
 	q = toDerivationP(p, opts)
@@ -595,6 +624,9 @@ Function test_AST_toDerivationP()
 	assert_parses(q, &quot;0&quot;, x, 2).x
 	x = mkDtTerminal(&quot;1&quot;)
 	assert_parses(q, &quot;1&quot;, x, 2).x
+
+	&apos; -------------------------
+	&apos; pSeqL under toDerivationP
 
 	p = pSeqL(Array(pItem), id)
 	q = toDerivationP(p, opts)
@@ -621,6 +653,9 @@ Function test_AST_toDerivationP()
 	x = List(mkDtTerminal(&quot;0&quot;), mkDtCClass(&quot;(.)&quot;, &quot;b&quot;), mkDtTerminal(&quot;1&quot;))
 	assert_parses(q, &quot;0b1xyz&quot;, x, 4).x
 	
+	&apos; ------------------------
+	&apos; pInd under toDerivationP
+
 	p = pInd(&quot;Foo&quot;)
 	p = fixIndirection(p, pItem)
 	q = toDerivationP(p, opts)
@@ -643,13 +678,16 @@ Function test_AST_toDerivationP()
 	&apos;msgbox(toString(x))
 	assert_parses(q, &quot;a1&quot;, x, 3).x
 	assert_parses(q, &quot;a1b&quot;, x, 3).x
+End Function
+
+Function test_AST_toDerivationP_mult(opts As Integer)
+	Dim p As Object, q As Object, r As Variant, x As Object
 
 	Dim termEps As Object, termY As Object, termZ As Object, termZY As Object
 	termEps = mkDtTerminal(&quot;&quot;)
 	termY   = mkDtTerminal(&quot;y&quot;)
 	termZ   = mkDtTerminal(&quot;z&quot;)
 	termZY	= mkDtTerminal(&quot;zy&quot;)
-
 
 	&apos; ------------------------------
 	&apos; pZeroOrOne under toDerivationP
@@ -677,22 +715,6 @@ Function test_AST_toDerivationP()
 	assert_parses(q, &quot;zz&quot;, x, 2).x	&apos; reads at most one
 	assert_parses(q, &quot;zy&quot;, x, 2).x
 
-	&apos; -- pZeroOrOne(pSkip(...))
-	
-	p = pSkip(pItem)
-	q = toDerivationP(pZeroOrOne(p), opts)
-	&apos;msgbox(toString(applyP(pZeroOrOne(p), &quot;x&quot;)))
-	&apos;q = pSkip(pZeroOrOne(pItem))
-	Dim out As Variant
-	out = applyP(q, &quot;&quot;)
-	x = mkDtMult(dtMultLabel(&quot;?&quot;, p), nil)
-	assert_parses(q, &quot;&quot;, x, 1).x
-	x = mkDtMult(dtMultLabel(&quot;?&quot;, p), List(mkDtSkip(p.st0)))
-	assert_parses(q, &quot;y&quot;, x, 2).x
-	assert_parses(q, &quot;yz&quot;, x, 2).x
-	assert_parses(q, &quot;z&quot;, x, 2).x
-	assert_parses(q, &quot;zz&quot;, x, 2).x	&apos; reads at most one
-	assert_parses(q, &quot;zy&quot;, x, 2).x
 
 	&apos; -- pZeroOrOne(pSeqL(..., id))
 	
@@ -800,20 +822,6 @@ Function test_AST_toDerivationP()
 	assert_parses(q, &quot;zyzyz&quot;, x, 5).x
 	assert_parses(q, &quot;zyzyzz&quot;, x, 5).x
 
-	
-	&apos; -------------------------
-	&apos; pSat under toDerivationP
-
-	p = pSat(equ(&quot;z&quot;))
-	p.str = &quot;[z]&quot;
-	q = toDerivationP(p, opts)
-	x = mkDtCClass(&quot;([z])&quot;, &quot;z&quot;)
-	refute_parses(q, Array(&quot;&quot;, &quot;x&quot;, &quot;xy&quot;, &quot;xyz&quot;)).x
-	assert_parses(q, &quot;z&quot;, x, 2).x
-	assert_parses(q, &quot;zy&quot;, x, 2).x
-	assert_parses(q, &quot;zyz&quot;, x, 2).x
-	assert_parses(q, &quot;zzy&quot;, x, 2).x
-
 	&apos; -------------------------
 	&apos; pMany1(pSat) under toDerivationP
 
@@ -834,6 +842,68 @@ Function test_AST_toDerivationP()
 	assert_parses(q, &quot;yz&quot;, x, 3).x
 	assert_parses(q, &quot;yzx&quot;, x, 3).x
 	assert_parses(q, &quot;yzxz&quot;, x, 3).x
+End Function
+
+Function test_AST_toDerivationP_skip(opts As Integer)
+	Dim p As Object, q As Object, x As Variant
+	Dim hideSkipped As Boolean
+	hideSkipped = ((opts And dtOpt_hideSkipped) &lt;&gt; 0)
+	
+	Dim termEps As Object, termY As Object, termZ As Object, termZY As Object
+	termEps = mkDtTerminal(&quot;&quot;)
+	termY   = mkDtTerminal(&quot;y&quot;)
+	termZ   = mkDtTerminal(&quot;z&quot;)
+	termZY	= mkDtTerminal(&quot;zy&quot;)
+
+	&apos; -- pSkip(pItem)
+	
+	p = pItem
+	q = toDerivationP(pSkip(p), opts)
+	refute_parses(q, &quot;&quot;).x
+	If hideSkipped Then
+		x = Empty
+	Else
+		x = mkDtCClass(&quot;(.)&quot;, &quot;y&quot;)
+	End If
+	assert_parses(q, &quot;y&quot;, x, 2).x
+	assert_parses(q, &quot;yz&quot;, x, 2).x
+
+	&apos; -- pInd(pSkip(...))
+	
+	p = fixIndirection(pInd(&quot;P&quot;), pSkip(pItem))
+	q = toDerivationP(p, opts)
+	refute_parses(q, &quot;&quot;).x
+	If hideSkipped Then
+		x = mkDtNonterminal(&quot;P&quot;, List(termZ))
+	Else
+		x = mkDtNonterminal(&quot;P&quot;, List(mkDtCClass(&quot;(.)&quot;, &quot;y&quot;)
+	End If
+	&apos;TODO: handle empty pSeq/pSeqL (ie maybe all innerParsers are skip)
+	&apos;assert_parses(q, &quot;y&quot;, x, 2).x
+	&apos;assert_parses(q, &quot;yz&quot;, x, 2).x
+
+	&apos; -- pZeroOrOne(pSkip(...))
+	
+	p = pSkip(pItem)
+	q = toDerivationP(pZeroOrOne(p), opts)
+	x = mkDtMult(dtMultLabel(&quot;?&quot;, p), nil)
+	assert_parses(q, &quot;&quot;, x, 1).x
+	If hideSkipped Then
+		&apos; even with hideSkipped it&apos;ll show up because it&apos;s under pZeroOrOne
+		x = mkDtMult(dtMultLabel(&quot;?&quot;, p), List(mkDtSkip(p.st0)))
+	Else
+		x = mkDtMult(dtMultLabel(&quot;?&quot;, p), List(mkDtCClass(&quot;(.)&quot;, &quot;y&quot;)))
+	End If		
+	assert_parses(q, &quot;y&quot;, x, 2).x
+	assert_parses(q, &quot;yz&quot;, x, 2).x
+
+	If Not(hideSkipped) Then
+		x = mkDtMult(dtMultLabel(&quot;?&quot;, p), List(mkDtCClass(&quot;(.)&quot;, &quot;z&quot;)))
+	End If		
+	assert_parses(q, &quot;z&quot;, x, 2).x
+	assert_parses(q, &quot;zz&quot;, x, 2).x	&apos; reads at most one
+	assert_parses(q, &quot;zy&quot;, x, 2).x
+
 End Function
 
 </script:module>
