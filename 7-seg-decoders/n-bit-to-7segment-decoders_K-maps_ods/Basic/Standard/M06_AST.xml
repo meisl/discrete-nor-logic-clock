@@ -16,6 +16,16 @@ Sub Main
 	test_AST()
 End Sub
 
+Const dtAnonConLabel = &quot;(. . .)&quot;
+Const dtAnonAltLabel = &quot;(..|..)&quot;
+Const typ_Parser_ASN = &quot;Parser ASN&quot;
+Const typ_Parser_List_ASN = &quot;Parser [ASN]&quot;
+
+&apos; Function rather than Const so it can be accessed from spreadsheet
+Function dtOpt_hideSkipped()   : dtOpt_hideSkipped   = 1 : End Function
+Function dtOpt_doFoldlConcat() : dtOpt_doFoldlConcat = 2 : End Function
+Function dtOpt_implicitMult()  : dtOpt_implicitMult  = 4 : End Function
+
 
 Function mkASN( _
 	Optional label, _
@@ -212,7 +222,6 @@ Function mkDtNonterminal( _
 End Function
 
 &apos; Abstract Syntax Node representing an anonymous alternation
-Const dtAnonAltLabel = &quot;(..|..)&quot;
 Function mkDtAnonAlt(Optional children As Object)
 	Dim oFn As Object : If isNull(oFn) Then : oFn = mkASN(dtAnonAltLabel, Empty) : End If
 	Dim result As Variant
@@ -225,7 +234,6 @@ Function mkDtAnonAlt(Optional children As Object)
 End Function
 
 &apos; Abstract Syntax Node representing an anonymous concatenation
-Const dtAnonConLabel = &quot;(. . .)&quot;
 Function mkDtAnonCon(Optional children As Object)
 	Dim oFn As Object : If isNull(oFn) Then : oFn = mkASN(dtAnonConLabel, Empty) : End If
 	Dim result As Variant
@@ -285,12 +293,6 @@ Function dtMultLabel(m As String, p As Object)
 	dtMultLabel = &quot;(&quot; &amp; m &amp; &quot;):&quot; &amp; t
 End Function
 
-&apos; Function rather than Const so it can be accessed from spreadsheet
-Function dtOpt_hideSkipped()  : dtOpt_hideSkipped  = 1 : End Function
-Function dtOpt_implicitMult() : dtOpt_implicitMult = 2 : End Function
-
-Const typ_Parser_ASN = &quot;Parser ASN&quot;
-Const typ_Parser_List_ASN = &quot;Parser [ASN]&quot;
 
 Function toDerivationP(p As Object, options As Integer)
 	Dim result As Object
@@ -519,17 +521,21 @@ Function _toDerivationP( _
 								pSeqL(p.st(0), id), _
 								seen, options)
 						End If
-					
 					ElseIf fName = getFnName(Fn.foldl) Then
 						f = car(partialArgs(f))
 						fName = getFnName(f)
 						If fName = getFnName(Fn.concat) Then
-							If False Then
-								result = _toDerivationP( _
-									pSeqL(p.st(0), id), seen, options)
-							Else
-								result = pBind(p, compose(pReturn, mkDtTerminal))
+							If (options And dtOpt_doFoldlConcat) Then
+								&apos; let it do its thing and package up
+								&apos; the result under a Terminal ASN
+								result = pBind(p, compose(pReturn, _
+									mkDtTerminal))
 								result.typ = typ_Parser_ASN
+							Else
+								&apos; ignore the foldl concat and treat it
+								&apos; as a plain seqL id
+								result = _toDerivationP( _
+									pSeq(p.st(0), cons), seen, options)
 							End If
 						End If
 					End If		
