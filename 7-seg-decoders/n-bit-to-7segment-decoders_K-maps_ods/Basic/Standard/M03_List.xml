@@ -144,7 +144,7 @@ Function filter(fn As Variant, ByVal xs As TList)
 End Function
 
 Function foldl(Optional f As Object, Optional acc, Optional ByVal xs As TList)
-	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.foldl : End If
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.foldl : End If
 	If isMissing(xs) Then
 		If isMissing(acc) Then
 			If isMissing(f) Then
@@ -171,7 +171,7 @@ Function foldl(Optional f As Object, Optional acc, Optional ByVal xs As TList)
 End Function
 
 Function foldl1(Optional f As Object, Optional xs As TList)
-	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.foldl1 : End If
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.foldl1 : End If
 	If isMissing(f) Then
 		foldl1 = oFn
 	ElseIf isMissing(xs) Then
@@ -185,7 +185,7 @@ Function foldl1(Optional f As Object, Optional xs As TList)
 End Function
 
 Function foldr(Optional f As Object, Optional acc As Variant, Optional xs As TList)
-	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.foldr : End If
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.foldr : End If
 	If isMissing(xs) Then
 		If isMissing(acc) Then
 			If isMissing(f) Then
@@ -211,7 +211,7 @@ End Function
 
 &apos; Cannot name this function &quot;append&quot;, seems to be a BASIC keyword(?)
 Function adjoin(Optional xs As TList, Optional ys As TList)
-	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.adjoin : End If
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.adjoin : End If
 	If isMissing(ys) Then 
 		If isMissing(xs) Then
 			adjoin = oFn

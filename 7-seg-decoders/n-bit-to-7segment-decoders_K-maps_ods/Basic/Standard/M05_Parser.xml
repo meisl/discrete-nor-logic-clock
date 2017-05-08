@@ -348,7 +348,7 @@ End Function
 &apos; which applies the Parser p and if that succeeds feeds its result to the fn f
 &apos; to give the overall result Parser b that f returns
 Function pBind(Optional p As Parser, Optional f As Object)
-	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.pBind : End If
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.pBind : End If
 	Dim result As Variant
 	If isMissing(f) Then
 		If isMissing(p) Then
@@ -558,7 +558,7 @@ End Function
 &apos; or (and only if p1 fails) if p2 succeeds, returns p2&apos;s result and pos.
 &apos; fails if both, p1 and p2 fail
 Function pChoice(Optional p1 As Parser, Optional p2 As Parser)
-	Dim oFn As Object :	If isNull(oFn) Then : oFn = Fn.pChoice : End If
+	Static oFn As Object :	If isNull(oFn) Then : oFn = Fn.pChoice : End If
 	Dim result As Object
 	If isMissing(p1) Then
 		result = oFn
@@ -1030,7 +1030,7 @@ Function pTypeCtor()
 End Function
 
 Function mkTypeVar(Optional ByVal name As String)
-	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.mkTypeVar : End If
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.mkTypeVar : End If
 	If isMissing(name) Then
 		mkTypeVar = oFn
 	Else
@@ -1051,7 +1051,7 @@ Function maybeMakeArrowType(i, o)
 End Function
 
 Function mkTypeCtor(Optional ctorName As String, Optional typeArgs As Object)
-	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.mkTypeCtor : End If
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.mkTypeCtor : End If
 	Dim result As Variant
 	If isMissing(typeArgs) Then
 		If isMissing(ctorName) Then
@@ -1078,7 +1078,7 @@ Function mkTypeCtor(Optional ctorName As String, Optional typeArgs As Object)
 End Function
 
 Function mkTupleType(Optional x As Variant, Optional xs As Variant)
-	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.mkTupleType : End If
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.mkTupleType : End If
 	Dim result As Variant
 	If isMissing(xs) Then
 		If isMissing(x) Then

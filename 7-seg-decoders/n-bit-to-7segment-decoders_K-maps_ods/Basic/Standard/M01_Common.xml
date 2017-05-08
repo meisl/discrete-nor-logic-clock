@@ -18,6 +18,9 @@ Sub Main
 	test_Common()
 End Sub
 
+
+Function NL() : NL = Chr(13) &amp; Chr(10) : End Function
+
 Function typeOf(x As Variant)
 	Dim result As String
 	result = TypeName(x)
@@ -115,7 +118,7 @@ Function inRange(Optional lo As Long, Optional hi As Long, Optional x As Long)
 End Function
 
 Function equ(Optional a As Variant, Optional b As Variant)
-	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.equ : End If
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.equ : End If
 	Dim result as Variant
 	If isMissing(a) Then
 		result = oFn

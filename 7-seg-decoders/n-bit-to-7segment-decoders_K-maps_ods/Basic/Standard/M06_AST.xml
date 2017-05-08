@@ -3,7 +3,7 @@
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M06_AST" script:language="StarBasic">REM  *****  BASIC  *****
 Option Explicit
 
-
+Const TASN_tyname = &quot;TASN&quot;
 Type TASN &apos; &quot;Abstract Syntax Node&quot;
 	tyname As String
 	label As Variant
@@ -25,14 +25,48 @@ Const typ_Parser_List_ASN = &quot;Parser [ASN]&quot;
 Function dtOpt_hideSkipped()   : dtOpt_hideSkipped   = 1 : End Function
 Function dtOpt_doFoldlConcat() : dtOpt_doFoldlConcat = 2 : End Function
 Function dtOpt_implicitMult()  : dtOpt_implicitMult  = 4 : End Function
+Function dtOpt_promoteSingleTerminal()  : dtOpt_promoteSingleTerminal  = 8 : End Function
 
+
+Function isASN(x As Variant) As Boolean
+	isASN = (typeOf(x) = &quot;Object/&quot; &amp; TASN_tyname)
+End Function
+
+Function TASN_dot( _
+	Optional fieldName As String, _
+	Optional instance As Object _
+)
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.TASN_dot : End If
+	Dim result As Variant
+	If isMissing(fieldName) Then
+		result = oFn
+	Else
+		&apos; TODO/dot-access: check if fieldName is valid, even before we get an instance
+		If isMissing(instance) Then
+			result = apply(oFn, fieldName)
+		ElseIf isASN(instance) Then
+			Select Case fieldName
+				Case &quot;label&quot;:	 result = instance.label
+				Case &quot;value&quot;:	 result = instance.value
+				Case &quot;children&quot;: result = instance.children
+				Case Else
+					croak(&quot;TASN_dot: no such field: &quot; &amp; toString(fieldName))
+			End Select
+		Else
+			croak(&quot;TASN_dot: .&quot; &amp; fieldName &amp; &quot; - not an ASN instance:&quot; _
+				&amp; NL &amp; toString(instance))
+		End If
+	End If
+	TASN_dot = result
+	Exit Function
+End Function
 
 Function mkASN( _
 	Optional label, _
 	Optional value, _
 	Optional children As Object _
 )
-	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.mkASN : End If
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.mkASN : End If
 	Dim result As Variant
 	If isMissing(label) Then
 		result = oFn
@@ -53,8 +87,25 @@ Function mkASN( _
 	mkAsn = result
 End Function
 
-Function isASN(x As Variant) As Boolean
-	isASN = (typeOf(x) = &quot;Object/TASN&quot;)
+
+Function asnLabel(Optional n As Object)
+	asnLabel = _apply(Fn.TASN_dot, &quot;label&quot;, n)
+End Function
+
+Function asnValue(Optional n As Object)
+	asnValue = _apply(Fn.TASN_dot, &quot;value&quot;, n)
+End Function
+
+Function asnChildren(n As Object)
+	asnChildren = _apply(Fn.TASN_dot, &quot;children&quot;, n)
+End Function
+
+Function asnIsLeaf(n As Object) As Boolean
+	asnIsLeaf = isNil(asnChildren(n))
+End Function
+
+Function asnChildCount(n As Object) As Integer
+	asnChildCount = length(asnChildren(n))
 End Function
 
 Function TASN_toString(Optional n As Object)
@@ -141,25 +192,6 @@ Function _TASN_toString_head(n As Object) As String
 	_TASN_toString_head = result
 End Function
 
-Function asnLabel(n As Object)
-	asnLabel = n.label
-End Function
-
-Function asnValue(n As Object)
-	asnValue = n.value
-End Function
-
-Function asnChildren(n As Object)
-	asnChildren = n.children
-End Function
-
-Function asnIsLeaf(n As Object) As Boolean
-	asnIsLeaf = isNil(asnChildren(n))
-End Function
-
-Function asnChildCount(n As Object) As Integer
-	asnChildCount = length(asnChildren(n))
-End Function
 
 Function asnChild(n As Object, ByVal i As Integer)
 	Dim result As Variant, cs As Object, len As Integer
@@ -223,7 +255,7 @@ End Function
 
 &apos; Abstract Syntax Node representing an anonymous alternation
 Function mkDtAnonAlt(Optional children As Object)
-	Dim oFn As Object : If isNull(oFn) Then : oFn = mkASN(dtAnonAltLabel, Empty) : End If
+	Static oFn As Object : If isNull(oFn) Then : oFn = mkASN(dtAnonAltLabel, Empty) : End If
 	Dim result As Variant
 	If isMissing(children) Then
 		result = oFn
@@ -235,7 +267,7 @@ End Function
 
 &apos; Abstract Syntax Node representing an anonymous concatenation
 Function mkDtAnonCon(Optional children As Object)
-	Dim oFn As Object : If isNull(oFn) Then : oFn = mkASN(dtAnonConLabel, Empty) : End If
+	Static oFn As Object : If isNull(oFn) Then : oFn = mkASN(dtAnonConLabel, Empty) : End If
 	Dim result As Variant
 	If isMissing(children) Then
 		result = oFn
@@ -560,20 +592,28 @@ Function _toDerivationP( _
 					seen = cons(p, seen)
 					s = getPIndName(p)
 					p.st3 = pInd(s)
-					f = mkDtNonterminal(s)
 					q = _toDerivationP(p.st0, seen, options)
 					q = _wrapSkipWithDummyASN(q)
-					If q.typ = typ_Parser_ASN Then
-						f = compose(f, swap(cons, nil))
+					
+					If (options And dtOpt_promoteSingleTerminal) _
+						And (q.typ = typ_Parser_ASN) _
+					Then &apos; TODO: do the work at transformation time rather than parse time
+						f = swap(mkASN(s), nil)
+						f = ite(compose(Fn.isEmpty, asnLabel), _
+								compose(f, asnValue), _
+								compose(mkDtNonterminal(s), swap(cons, nil)) _
+							)
+						q = pBind(q, compose(pReturn, f))
+						&apos;s = toString(p.st0) &amp; &quot; :: &quot; &amp; toString(p.st0.typ)
+						&apos;msgbox(s &amp; NL &amp; toString(q))
+					Else
+						f = mkDtNonterminal(s)
+						If q.typ = typ_Parser_ASN Then
+							f = compose(f, swap(cons, nil))
+						End If
+						q = pBind(q, compose(pReturn, f))
 					End If
-					result = fixIndirection(p.st3, _
-						pBind(q, compose(pReturn, f)) _
-					)
-					&apos;result = fixIndirection(p.st3, _
-					&apos;	pSeq(Array( _
-					&apos;		q _
-					&apos;	), f)_
-					&apos;)
+					result = fixIndirection(p.st3, q)
 					result.typ = typ_Parser_ASN
 				End If
 			Case Else
