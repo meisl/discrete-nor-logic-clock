@@ -67,6 +67,7 @@ Type TFnObjs
 	mkTupleType			As Object
 	
 	TASN_toString		As Object
+	mkASN				As Object
 	mkDtTerminal		As Object
 	mkDtCClass			As Object
 	mkDtNonterminal		As Object
@@ -136,6 +137,7 @@ Function Fn
 		result.mkTupleType		  = lookupFn(&quot;mkTupleType&quot;)
 
 		result.TASN_toString 	= lookupFn(&quot;TASN_toString&quot;)
+		result.mkASN			= lookupFn(&quot;mkASN&quot;)
 		result.mkDtTerminal		= lookupFn(&quot;mkDtTerminal&quot;)
 		result.mkDtCClass		= lookupFn(&quot;mkDtCClass&quot;)
 		result.mkDtNonterminal  = lookupFn(&quot;mkDtNonterminal&quot;)
@@ -290,6 +292,7 @@ Function fnObjs()
 			newFn(&quot;mkTupleType&quot;,		2, &quot;Typ -&gt; [Typ] -&gt; Typ&quot;), _
 			_
 			newFn(&quot;TASN_toString&quot;,		1, &quot;ASN -&gt; Str&quot;), _
+			newFn(&quot;mkASN&quot;,				3, &quot;Any -&gt; a -&gt; [b] -&gt; ASN&quot;), _
 			newFn(&quot;mkDtTerminal&quot;,		1, &quot;Str -&gt; ASN&quot;), _
 			newFn(&quot;mkDtCClass&quot;,			2, &quot;Str -&gt; Str -&gt; ASN&quot;), _
 			newFn(&quot;mkDtNonterminal&quot;,	2, &quot;Str -&gt; [ASN] -&gt; ASN&quot;), _
@@ -498,6 +501,7 @@ applyLast_of_three:
 		Case &quot;inRange&quot;:		result = CBool( (a0 &lt;= a2) And (a2 &lt;= a1) )
 		Case &quot;foldl&quot;:		result = foldl(		a0, a1, a2)
 		Case &quot;foldr&quot;:		result = foldr(		a0, a1, a2)
+		Case &quot;mkASN&quot;:		result = mkASN(		a0, a1, a2)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select

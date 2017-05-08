@@ -17,15 +17,29 @@ Sub Main
 End Sub
 
 
-Function mkASN(label, value, children As Object)
-	Dim result As New TASN
-	result.tyname = &quot;TASN&quot;
-	result.label = label
-	result.value = value
-	If Not(typeOf(children) = typeOf(nil)) Then
-		croak(&quot;mkASN: invalid list of children &quot; &amp; toString(children))
+Function mkASN( _
+	Optional label, _
+	Optional value, _
+	Optional children As Object _
+)
+	Dim oFn As Object : If isNull(oFn) Then : oFn = Fn.mkASN : End If
+	Dim result As Variant
+	If isMissing(label) Then
+		result = oFn
+	ElseIf isMissing(value) Then
+		result = apply(oFn, label)
+	ElseIf isMissing(children) Then
+		result = apply(oFn, label, value)
+	Else
+		result = New TASN
+		result.tyname = &quot;TASN&quot;
+		result.label = label
+		result.value = value
+		If Not(typeOf(children) = typeOf(nil)) Then
+			croak(&quot;mkASN: invalid list of children &quot; &amp; toString(children))
+		End If
+		result.children = children
 	End If
-	result.children = children
 	mkAsn = result
 End Function
 
@@ -188,11 +202,39 @@ Function mkDtNonterminal( _
 	ElseIf isMissing(children) Then
 		result = apply(Fn.mkDtNonterminal, ruleName)
 	ElseIf isNil(children) Then
-		croak(&quot;mkDtNonterminal: nil not valid as list of children&quot;)
+		croak(&quot;mkDtNonterminal: &quot; _
+			&amp; toString(ruleName) _
+			&amp; &quot; nil not valid as list of children&quot;)
 	Else
 		result = mkASN(ruleName, Empty, children)
 	End If
 	mkDtNonterminal = result
+End Function
+
+&apos; Abstract Syntax Node representing an anonymous alternation
+Const dtAnonAltLabel = &quot;(..|..)&quot;
+Function mkDtAnonAlt(Optional children As Object)
+	Dim oFn As Object : If isNull(oFn) Then : oFn = mkASN(dtAnonAltLabel, Empty) : End If
+	Dim result As Variant
+	If isMissing(children) Then
+		result = oFn
+	Else
+		result = apply(oFn, children)
+	End If
+	mkDtAnonAlt = result
+End Function
+
+&apos; Abstract Syntax Node representing an anonymous concatenation
+Const dtAnonConLabel = &quot;(. . .)&quot;
+Function mkDtAnonCon(Optional children As Object)
+	Dim oFn As Object : If isNull(oFn) Then : oFn = mkASN(dtAnonConLabel, Empty) : End If
+	Dim result As Variant
+	If isMissing(children) Then
+		result = oFn
+	Else
+		result = apply(oFn, children)
+	End If
+	mkDtAnonCon = result
 End Function
 
 Function mkDtMult( _
@@ -225,8 +267,8 @@ Function dtMultLabel(m As String, p As Object)
 	Select Case p.tp
 		Case &quot;item&quot;	:	t = &quot;.&quot; 
 		Case &quot;str&quot;:		t = toString(p.st(0))
-		Case &quot;choice&quot;:	t = &quot;(..|..)&quot;
-		Case &quot;seq&quot;:		t = &quot;(. . .)&quot;
+		Case &quot;choice&quot;:	t = dtAnonAltLabel
+		Case &quot;seq&quot;:		t = dtAnonConLabel
 		Case &quot;ind&quot;:		t = getPIndName(p)
 		Case &quot;skip&quot;:	
 			dtMultLabel = dtMultLabel(m &amp; &quot;°skip&quot;, p.st0)
@@ -244,7 +286,8 @@ Function dtMultLabel(m As String, p As Object)
 End Function
 
 &apos; Function rather than Const so it can be accessed from spreadsheet
-Function dtOpt_hideSkipped() : dtOpt_hideSkipped = 1 : End Function
+Function dtOpt_hideSkipped()  : dtOpt_hideSkipped  = 1 : End Function
+Function dtOpt_implicitMult() : dtOpt_implicitMult = 2 : End Function
 
 Const typ_Parser_ASN = &quot;Parser ASN&quot;
 Const typ_Parser_List_ASN = &quot;Parser [ASN]&quot;
@@ -284,18 +327,7 @@ Function _toDerivationP( _
 	Dim f As Object, s As String, fName As String
 	Dim q As Object, r As Object
 	Dim qs As Object, rs As Object
-	If isPMany(p) Then &apos; p is of shape (many1 q) +++ (return nil)
-		q = p.st0.st0
-		s = dtMultLabel(&quot;*&quot;, q)
-		f = mkDtMult(s)
-		q = _toDerivationP(q, seen, options)
-		If q.typ = typ_Parser_List_ASN Then
-			q = pBind(q, compose(pReturn, mkDtNonterminal(&quot;(...)&quot;)))
-		End If
-		&apos;result = pSeq(Array(pMany(q)), f)
-		result = pBind(pMany(q), compose(pReturn, f))
-		result.typ = typ_Parser_ASN
-	ElseIf isPZeroOrOne(p) Then &apos; p is of shape q +++ (return Empty)
+	If isPZeroOrOne(p) Then &apos; p is of shape q +++ (return Empty)
 		q = p.st0
 		s = dtMultLabel(&quot;?&quot;, q)
 		f = mkDtMult(s)
@@ -307,7 +339,7 @@ Function _toDerivationP( _
 			q = pBind(q, compose(pReturn, _
 				compose( _
 					swap(cons, nil), _
-					mkDtNonterminal(&quot;(...)&quot;) _
+					mkDtAnonCon _
 				) _
 			))
 		Else
@@ -316,11 +348,45 @@ Function _toDerivationP( _
 				&amp; chr(13) &amp; chr(10) &amp; toString(q) _
 			)
 		End If
-		&apos;result = pSeq(Array(pChoice(q, pReturn(nil))), f)
-		result = pBind(pChoice(q, pReturn(nil)), compose(pReturn, f))
-		result.typ = typ_Parser_ASN
+		result = pChoice(q, pReturn(nil))
+		If (options And dtOpt_implicitMult) &lt;&gt; 0 Then
+			result.typ = typ_Parser_List_ASN
+		Else
+			result = pBind(result, compose(pReturn, f))
+			result.typ = typ_Parser_ASN
+		End If
+	ElseIf isPMany(p) Then &apos; p is of shape (many1 q) +++ (return nil)
+		q = p.st0.st0
+		s = dtMultLabel(&quot;*&quot;, q)
+		f = mkDtMult(s)
+		q = _toDerivationP(q, seen, options)
+		If q.typ = typ_Parser_List_ASN Then
+			q = pBind(q, compose(pReturn, mkDtAnonCon))
+		End If
+		result = pMany(q)
+		If (options And dtOpt_implicitMult) &lt;&gt; 0 Then
+			result.typ = typ_Parser_List_ASN
+		Else
+			result = pBind(result, compose(pReturn, f))
+			result.typ = typ_Parser_ASN
+		End If
 	Else
 		Select Case p.tp
+			Case &quot;many1&quot;
+				q = p.st0
+				s = dtMultLabel(&quot;+&quot;, q)
+				f = mkDtMult(s)
+				q = _toDerivationP(q, seen, options)
+				If q.typ = typ_Parser_List_ASN Then
+					q = pBind(q, compose(pReturn, mkDtAnonCon))
+				End If
+				result = pMany1(q)
+				If (options And dtOpt_implicitMult) &lt;&gt; 0 Then
+					result.typ = typ_Parser_List_ASN
+				Else
+					result = pBind(result, compose(pReturn, f))
+					result.typ = typ_Parser_ASN
+				End If
 			Case &quot;skip&quot;
 				If (options And dtOpt_hideSkipped) Then
 					result = p &apos; so when applying p it&apos;ll return Empty
@@ -365,17 +431,6 @@ Function _toDerivationP( _
 				End If
 				result = pChoice(q, r)
 				result.typ = q.typ
-			Case &quot;many1&quot;
-				q = p.st0
-				s = dtMultLabel(&quot;+&quot;, q)
-				f = mkDtMult(s)
-				q = _toDerivationP(q, seen, options)
-				If q.typ = typ_Parser_List_ASN Then
-					q = pBind(q, compose(pReturn, mkDtNonterminal(&quot;(...)&quot;)))
-				End If
-				&apos;result = pSeq(Array(pMany1(q)), f)
-				result = pBind(pMany1(q), compose(pReturn, f))
-				result.typ = typ_Parser_ASN
 			Case &quot;seq&quot; &apos; only simple sequences supported here
 				&apos;result = Empty
 				qs = toList(p.st(0))
@@ -388,7 +443,7 @@ Function _toDerivationP( _
 						q = _toDerivationP(q, seen, options)
 						If q.typ = typ_Parser_List_ASN Then
 							q = pBind(q, compose(pReturn, _
-								mkDtNonterminal(&quot;(...)&quot;)))
+								mkDtAnonCon))
 						End If
 						rs = cons(q, rs)
 						qs = cdr(qs)
@@ -398,30 +453,6 @@ Function _toDerivationP( _
 						id _
 					)
 					result.typ = typ_Parser_List_ASN
-				ElseIf isApplyToListId(f) Then
-					If (options And dtOpt_hideSkipped) Then
-						Dim tmpTyp As Variant
-						While Not(isNil(qs))
-							q = car(qs)
-							q = _toDerivationP(q, seen, options)
-							If Not(isPSkip(q)) Then
-								tmpTyp = q.typ
-							End If
-							rs = cons(q, rs)
-							qs = cdr(qs)
-						Wend
-						result = pSeq( _
-							toArray(reverse(rs)), _
-							id _
-						)
-						result.typ = tmpTyp
-					Else
-						result = _toDerivationP( _
-							pSeqL(p.st(0), id), _
-							seen, _
-							options _
-						)
-					End If
 				ElseIf fName = getFnName(Fn.applyToList) Then
 					f = car(partialArgs(f))
 					fName = getFnName(f)
@@ -436,6 +467,30 @@ Function _toDerivationP( _
 								result = pBind(p, compose(pReturn, mkDtTerminal))
 								result.typ = typ_Parser_ASN
 							End If
+						End If
+					ElseIf fName = getFnName(Fn.id) Then
+						If (options And dtOpt_hideSkipped) Then
+							Dim tmpTyp As Variant
+							While Not(isNil(qs))
+								q = car(qs)
+								q = _toDerivationP(q, seen, options)
+								If Not(isPSkip(q)) Then
+									tmpTyp = q.typ
+								End If
+								rs = cons(q, rs)
+								qs = cdr(qs)
+							Wend
+							result = pSeq( _
+								toArray(reverse(rs)), _
+								id _
+							)
+							result.typ = tmpTyp
+						Else
+							result = _toDerivationP( _
+								pSeqL(p.st(0), id), _
+								seen, _
+								options _
+							)
 						End If
 					End If		
 				End If
@@ -501,7 +556,24 @@ Function test_AST()
 	test_AST_toDerivationP_skip(dtOpt_hideSkipped)
 End Function 
 
-Function test_AST_mkASN()	
+Function test_AST_mkASN()
+	Dim f As Object
+	f = Fn.mkASN
+	assertEqual(isFn(f), True).x
+	assertEqual(arity(f), 3).x
+
+	f = mkASN
+	assertEqual(isFn(f), True).x
+	assertEqual(arity(f), 3).x
+
+	f = mkASN(&quot;foo&quot;)
+	assertEqual(isFn(f), True).x
+	assertEqual(arity(f), 2).x
+
+	f = mkASN(&quot;foo&quot;, &quot;bar&quot;)
+	assertEqual(isFn(f), True).x
+	assertEqual(arity(f), 1).x
+	
 	Dim n0 As Object
 	n0 = mkASN(&quot;foo&quot;, &quot;bar&quot;, nil)
 	
@@ -769,7 +841,7 @@ Function test_AST_toDerivationP_mult(opts As Integer)
 	assert_parses(q, &quot;&quot;, x, 1).x
 	assert_parses(q, &quot;abc&quot;, x, 1).x
 	x = mkDtMult(dtMultLabel(&quot;?&quot;, p), List( _
-		mkDtNonterminal(&quot;(...)&quot;, List(termZ, termY)) _
+		mkDtAnonCon(List(termZ, termY)) _
 	))
 	assert_parses(q, &quot;zy&quot;, x, 3).x
 	assert_parses(q, &quot;zyz&quot;, x, 3).x
@@ -830,14 +902,14 @@ Function test_AST_toDerivationP_mult(opts As Integer)
 	assert_parses(q, &quot;&quot;, x, 1).x
 	assert_parses(q, &quot;abc&quot;, x, 1).x
 	x = mkDtMult(dtMultLabel(&quot;*&quot;, p), List( _
-		mkDtNonterminal(&quot;(...)&quot;, List(termZ, termY)) _
+		mkDtAnonCon(List(termZ, termY)) _
 	))
 	assert_parses(q, &quot;zy&quot;, x, 3).x
 	assert_parses(q, &quot;zyz&quot;, x, 3).x
 	assert_parses(q, &quot;zyzz&quot;, x, 3).x
 	x = mkDtMult(dtMultLabel(&quot;*&quot;, p), List( _
-		mkDtNonterminal(&quot;(...)&quot;, List(termZ, termY)), _
-		mkDtNonterminal(&quot;(...)&quot;, List(termZ, termY)) _
+		mkDtAnonCon(List(termZ, termY)), _
+		mkDtAnonCon(List(termZ, termY)) _
 	))
 	assert_parses(q, &quot;zyzy&quot;, x, 5).x
 	assert_parses(q, &quot;zyzyz&quot;, x, 5).x
@@ -876,14 +948,14 @@ Function test_AST_toDerivationP_mult(opts As Integer)
 	refute_parses(q, &quot;&quot;, x, 1).x
 	refute_parses(q, &quot;abc&quot;, x, 1).x
 	x = mkDtMult(dtMultLabel(&quot;+&quot;, p), List( _
-		mkDtNonterminal(&quot;(...)&quot;, List(termZ, termY)) _
+		mkDtAnonCon(List(termZ, termY)) _
 	))
 	assert_parses(q, &quot;zy&quot;, x, 3).x
 	assert_parses(q, &quot;zyz&quot;, x, 3).x
 	assert_parses(q, &quot;zyzz&quot;, x, 3).x
 	x = mkDtMult(dtMultLabel(&quot;+&quot;, p), List( _
-		mkDtNonterminal(&quot;(...)&quot;, List(termZ, termY)), _
-		mkDtNonterminal(&quot;(...)&quot;, List(termZ, termY)) _
+		mkDtAnonCon(List(termZ, termY)), _
+		mkDtAnonCon(List(termZ, termY)) _
 	))
 	assert_parses(q, &quot;zyzy&quot;, x, 5).x
 	assert_parses(q, &quot;zyzyz&quot;, x, 5).x
@@ -898,15 +970,15 @@ Function test_AST_toDerivationP_mult(opts As Integer)
 	refute_parses(r, &quot;&quot;).x
 	refute_parses(q, &quot;&quot;).x
 	x = mkDtMult(dtMultLabel(&quot;+&quot;, p), List( _
-		mkDtNonterminal(&quot;(...)&quot;, List(termZ)) _
+		mkDtAnonCon(List(termZ)) _
 	))
 	assert_parses(r, &quot;z&quot;,  List(List(&quot;z&quot;)), 2).x
 	assert_parses(r, &quot;zy&quot;, List(List(&quot;z&quot;)), 2).x
 	assert_parses(q, &quot;z&quot;,  x, 2).x
 	assert_parses(q, &quot;zy&quot;, x, 2).x
 	x = mkDtMult(dtMultLabel(&quot;+&quot;, p), List( _
-		mkDtNonterminal(&quot;(...)&quot;, List(termZ)), _
-		mkDtNonterminal(&quot;(...)&quot;, List(termZ)) _
+		mkDtAnonCon(List(termZ)), _
+		mkDtAnonCon(List(termZ)) _
 	))
 	assert_parses(r, &quot;zz&quot;,  List(List(&quot;z&quot;), List(&quot;z&quot;)), 3).x
 	assert_parses(r, &quot;zzy&quot;, List(List(&quot;z&quot;), List(&quot;z&quot;)), 3).x
