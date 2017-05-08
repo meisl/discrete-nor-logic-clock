@@ -26,27 +26,6 @@ Function derivationTree_prsGrammar( _
 	derivationTree_prsGrammar = result
 End Function
 
-Function pGrmGrammar()
-	Static result As Object
-	If isNull(result) Then
-		result = fixIndirection(pInd(&quot;Grammar&quot;), _
-			pGrmRule _
-		)
-	End If
-	pGrmGrammar = result	
-End Function
-
-Function pGrmMult()
-	Static result As Object
-	If isNull(result) Then
-		result = foldl1(pChoice, List( _
-			pBind(pStr(&quot;*&quot;), fstArg(pReturn(pMany))), _
-			pBind(pStr(&quot;+&quot;), fstArg(pReturn(pMany1))), _
-			pBind(pStr(&quot;?&quot;), fstArg(pReturn(pZeroOrOne))) _
-		))
-	End If
-	pGrmMult = result
-End Function
 
 Function pGrmIdent()
 	Static result As Object
@@ -71,9 +50,35 @@ Function pGrmIdent()
 						pAlpha, _
 						pMany(pAlphaNumDash), _
 					), foldl(concat))
-&apos;		result = fixIndirection(pInd(&quot;ident&quot;), result)
+		result = fixIndirection(pInd(&quot;Ident&quot;), result)
 	End If
 	pGrmIdent = result
+End Function
+
+Function pGrmGrammar()
+	Static result As Object
+	If isNull(result) Then
+		result = fixIndirection(pInd(&quot;Grammar&quot;), _
+			pGrmRule _
+		)
+	End If
+	pGrmGrammar = result	
+End Function
+
+Function pGrmRule()
+	Static result As Object
+	If isNull(result) Then
+		result = pSeqL(Array( _
+					pSkip(pMany(pWhite)), _
+					pGrmRuleName, _
+					pSkip(pMany(pWhite)), _
+					pSkip(pStr(&quot;::=&quot;)), _
+					pGrmAlt, _
+				 ), id)
+		
+		result = fixIndirection(pInd(&quot;Rule&quot;), result)
+	End If
+	pGrmRule = result
 End Function
 
 Function pGrmRuleName()
@@ -83,15 +88,6 @@ Function pGrmRuleName()
 		result = fixIndirection(pInd(&quot;RuleName&quot;), result)
 	End If
 	pGrmRuleName = result
-End Function
-
-Function pGrmNonterminal()
-	Static result As Object
-	If isNull(result) Then
-		result = pGrmIdent
-		result = fixIndirection(pInd(&quot;Nonterminal&quot;), result)
-	End If
-	pGrmNonterminal = result
 End Function
 
 Function pGrmAlt()
@@ -138,22 +134,27 @@ Function pGrmCon()
 	pGrmCon = result
 End Function
 
-
-Function pGrmRule()
+Function pGrmNonterminal()
 	Static result As Object
 	If isNull(result) Then
-		result = pSeqL(Array( _
-					pSkip(pMany(pWhite)), _
-					pGrmRuleName, _
-					pSkip(pMany(pWhite)), _
-					pSkip(pStr(&quot;::=&quot;)), _
-					pGrmAlt, _
-				 ), id)
-		
-		result = fixIndirection(pInd(&quot;Rule&quot;), result)
+		result = pGrmIdent
+		result = fixIndirection(pInd(&quot;Nonterminal&quot;), result)
 	End If
-	pGrmRule = result
+	pGrmNonterminal = result
 End Function
+
+Function pGrmMult()
+	Static result As Object
+	If isNull(result) Then
+		result = foldl1(pChoice, List( _
+			pBind(pStr(&quot;*&quot;), fstArg(pReturn(pMany))), _
+			pBind(pStr(&quot;+&quot;), fstArg(pReturn(pMany1))), _
+			pBind(pStr(&quot;?&quot;), fstArg(pReturn(pZeroOrOne))) _
+		))
+	End If
+	pGrmMult = result
+End Function
+
 
 &apos;= tests ======================================================================
 
