@@ -97,7 +97,7 @@ End Function
 Function pGrmAlt()
 	Static result As Object
 	If isNull(result) Then
-		result = pSeqL(Array( _
+		result = pSeq(Array( _
 			pSkip(pMany(pWhite)), _
 			pGrmCon, _
 			pMany( _
@@ -107,7 +107,7 @@ Function pGrmAlt()
 					pGrmCon _
 				), id) _
 			) _
-		), id)
+		), cons)
 		result = fixIndirection(pInd(&quot;Alt&quot;), result)
 	End If
 	pGrmAlt = result

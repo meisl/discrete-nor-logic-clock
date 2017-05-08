@@ -456,19 +456,7 @@ Function _toDerivationP( _
 				ElseIf fName = getFnName(Fn.applyToList) Then
 					f = car(partialArgs(f))
 					fName = getFnName(f)
-					If fName = getFnName(Fn.foldl) Then
-						f = car(partialArgs(f))
-						fName = getFnName(f)
-						If fName = getFnName(Fn.concat) Then
-							If False Then
-								result = _toDerivationP( _
-									pSeqL(p.st(0), id), seen, options)
-							Else
-								result = pBind(p, compose(pReturn, mkDtTerminal))
-								result.typ = typ_Parser_ASN
-							End If
-						End If
-					ElseIf fName = getFnName(Fn.id) Then
+					If fName = getFnName(Fn.id) Then
 						If (options And dtOpt_hideSkipped) Then
 							Dim tmpTyp As Variant
 							While Not(isNil(qs))
@@ -491,6 +479,58 @@ Function _toDerivationP( _
 								seen, _
 								options _
 							)
+						End If
+					ElseIf fName = getFnName(Fn.cons) Then
+						&apos; For this to take effect in the derivation tree
+						&apos; we must end up with an ASN and a [ASN], and
+						&apos; nothing else as arguments for cons.
+						&apos; So, if there are skips amongst the inner parsers
+						&apos; they must be hidden (dtOpt_hideSkipped).
+						&apos; Similarly, if there are multiplicity ops then
+						&apos; must not be made explicit (dtOpt_implicitMult).
+						&apos; However, we do not test those options here.
+						&apos; Rather we look at the .typ s of the transformed
+						&apos; inner parsers.
+						Dim typs As Object
+						typs = nil
+						While Not(isNil(qs))
+							q = car(qs)
+							q = _toDerivationP(q, seen, options)
+							If Not(isPSkip(q)) Then
+								typs = cons(q.typ, typs)
+							End If
+							rs = cons(q, rs)
+							qs = cdr(qs)
+						Wend
+						&apos; ATTENTION: typs is backwards
+						If equ(typs, List( _
+								typ_Parser_List_ASN, _
+								typ_Parser_ASN _
+							)) _
+						Then
+							result = pSeq(toArray(reverse(rs)), cons)
+							result.typ = typ_Parser_List_ASN
+						Else
+							&apos; What we could do is make a big list with
+							&apos; the 2nd arg for cons &quot;flattened&quot; in
+							&apos;msgbox(&quot;pSeq(..., cons): &quot; &amp; toString(typs) _
+							&apos;&amp; chr(13) &amp; chr(10) &amp; toString(p))
+							result = _toDerivationP( _
+								pSeqL(p.st(0), id), _
+								seen, options)
+						End If
+					
+					ElseIf fName = getFnName(Fn.foldl) Then
+						f = car(partialArgs(f))
+						fName = getFnName(f)
+						If fName = getFnName(Fn.concat) Then
+							If False Then
+								result = _toDerivationP( _
+									pSeqL(p.st(0), id), seen, options)
+							Else
+								result = pBind(p, compose(pReturn, mkDtTerminal))
+								result.typ = typ_Parser_ASN
+							End If
 						End If
 					End If		
 				End If
