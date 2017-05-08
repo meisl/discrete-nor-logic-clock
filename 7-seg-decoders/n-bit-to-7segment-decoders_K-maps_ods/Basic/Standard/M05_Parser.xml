@@ -2678,6 +2678,18 @@ Function test_Parser_many1()
 	assert_parses(p, &quot;1&quot;, 			List(1), 2).x
 	assert_parses(p, &quot;10 &quot;, 		List(1, 0), 3).x
 	assert_parses(p, &quot;102345&quot;, 		List(1, 0, 2, 3, 4, 5), 7).x
+	
+	p = pMany1(pSeqL(Array(pStr(&quot; &quot;)), id))
+	refute_parses(p, &quot;&quot;).x
+	assert_parses(p, &quot; &quot;, 			List(List(&quot; &quot;)), 2).x
+	assert_parses(p, &quot; &quot; &amp; chr(13),	List(List(&quot; &quot;)), 2).x
+	refute_parses(p, &quot;asdf&quot;).x
+	assert_parses(p, &quot;  &quot;,			List(List(&quot; &quot;), List(&quot; &quot;)), 3).x
+	assert_parses(p, &quot;   &quot;,			List(List(&quot; &quot;), List(&quot; &quot;), List(&quot; &quot;)), 4).x
+	assert_parses(p, &quot; x &quot;,			List(List(&quot; &quot;)), 2).x
+	assert_parses(p, &quot; x  &quot;,		List(List(&quot; &quot;)), 2).x
+	assert_parses(p, &quot;  x &quot;,		List(List(&quot; &quot;), List(&quot; &quot;)), 3).x
+
 End Function
 
 Function test_Parser_seq()
