@@ -611,8 +611,8 @@ Now for the `Rule` rule itself: since concatenation has precedence over alternat
 <br>**A rule's rhs is an alternation of concatenations.** This includes alternations with just one alternative, as well as concatenations of just one element.
 
 Doesn't that remind you of something? Yes, it's just like "sum-of-products". And indeed: alternation and concation are for grammars what addition `"+"` and `"*"` are for logic expressions. So we will just adapt the pattern with right-recursion from there.
-`Alt` stands for alternation and `Con` for concatenation. The `LineSep?` in `Alt` allows for putting additional alternatives on the next line, as we have been doing routinely.
-```        .
+`Alt` stands for alternation and `Con` for concatenation. The `LineSep?` in `Alt` allows for putting additional alternatives on the next line, as we have been doing already.
+```
       mult ::= [*?+]
      ident ::= [_A-Za-z][\-0-9_A-Za-z]*
 
@@ -654,9 +654,9 @@ So: as a rule name - hence on the lhs - an identifier is being defined, while as
 Well, they have double quotes `"` around them. The simplest way to  write these as terminals (themselves) is a single-char character class: `["]`.
 What's in between is a bit more complicated:
 ```
-       escQ ::= "\\" [nrt\\"]
+       escQ ::= "\\" [rnt\\"]
 
-   Terminal ::= ["] (escQ | [-"\\])+ ["]
+   Terminal ::= ["] (escQ | [-"\r\n\t\\])+ ["]
 ```
 Here we formally define the **escaping mechanism for double quotes**, just as we did in plain English in [2.2 Terminals and escaping](#22-terminals-and-escaping).
 
@@ -674,7 +674,7 @@ Let's call our grammar of grammars G. It defines what grammars must look like. F
 Now here comes the twist: **G and H may as well be identical!** That's perfectly fine. G simply can talk about itself, why not?
 
 
-Ok, back to `Terminal`: besides an escape sequence we also want to allow *anything but* (unescaped) `"` and `\`. For this we use the **negative character class** `[-"\\]` which says exactly that: *anything but*...
+Ok, back to `Terminal`: besides an escape sequence we also want to allow *anything but* (unescaped) `"`, `\`, line breaks (`\r` or `\n`) and TAB. For this we use the **negative character class** `[-"\r\n\t\\]` which says exactly that: *anything but*...
 <br>Note that inside a character class - negative or positive - there is no need to require `"` to be escaped. However, `\` still must be escaped since we'll be using it for the escaping mechanism for character classes as well.
 
 
@@ -682,18 +682,18 @@ Ok, back to `Terminal`: besides an escape sequence we also want to allow *anythi
 
 The simplest character class to define is dot: `"."`. All others are enclosed by `[` and `]` and may either be negative or positive, indicated by the presence, or non-presence of a `-` right after the opening `[`, resp. (`NCList` or `PCList`, just like negation `"!"` in logic expressions).
 ```
-       escC ::= "\\" [nrt\[\-\]\\"]
+       escC ::= "\\" [rnt\[\-\]\\"]
 
      CClass ::= "." | ("[" (NCList | PCList) "]")
      NCList ::= "-" PCList
      PCList ::= (CCItem ("-" CCItem)?)+
-     CCItem ::= escC | [-\[\-\]\\]
+     CCItem ::= escC | [-\r\n\t\[\-\]\\]
 ```
 Again we need an ***escaping mechanism***, now ***for character classes***. Escape sequences are defined by `escC`; as usual they consist of one `\` followed by
 
- - `n`, `r`, `t` for unprintable characters
+ - `r`, `n`, `t` for unprintable characters
  - single `\` - denoted by `\\` inside char class - for the backslash itself
- - "trouble-makers" w.r.t. character class notation, namely `[`, `-` and `]`
+ - "trouble-makers" w.r.t. character class notation, namely `[`, `-`, `]`, line breaks (`\r` or `\n`) or TAB.
  - finally `"` which, as we said, need not be required to be escaped but by adding it here we can just *allow* this. It's so common to escape `"` when the object level is meant, so by simply allowing it even if not strictly necessary just makes people happier.
 
 So `CCItem` follows the same pattern as double quotes above: either an escape sequence `escC` or *anything but* the "trouble makers".
@@ -704,16 +704,14 @@ Finally `PCList` defines how `CCItem`s may be combined inside `[` and `]`. There
 
 With a bit of rearrangement, here's the whole altogether:
 ```
-          S ::= Grammar
-
          ws ::= [ \t]
          nl ::= "\r" "\n"?
               | "\n" "\r"?
     LineSep ::= (ws* nl ws*)
        mult ::= [*?+]
       ident ::= [_A-Za-z][\-0-9_A-Za-z]*
-       escQ ::= "\\" [nrt\\"]
-       escC ::= "\\" [nrt\[\-\]\\"]
+       escQ ::= "\\" [rnt\\"]
+       escC ::= "\\" [rnt\[\-\]\\"]
 
     Grammar ::= StartRule (LineSep+ Rule)*
   StartRule ::= Rule
@@ -726,11 +724,12 @@ With a bit of rearrangement, here's the whole altogether:
               | Terminal
               | CClass
 Nonterminal ::= ident              
-   Terminal ::= ["] (escQ | [-"\\])+ ["]
-     CClass ::= "." | ("[" (NCList | PCList) "]")
+   Terminal ::= ["] (escQ | [-"\r\n\t\\])+ ["]
+     CClass ::= "."
+              | ("[" (NCList | PCList) "]")
      NCList ::= "-" PCList
      PCList ::= (CCItem ("-" CCItem)?)+
-     CCItem ::= escC | [-\[\-\]\\]
+     CCItem ::= escC | [-\r\n\t\[\-\]\\]
 ```
 [TODO]
 
