@@ -84,6 +84,17 @@ Function pGrmEscQ()
 						pStr(DQ) _
 					) ) _
 				 ), id)
+		
+		result = pSeq(Array( _
+					pSkip(pStr(&quot;\&quot;)), _
+					foldl1(pChoice, List( _
+						pStr(&quot;r&quot;), _
+						pStr(&quot;n&quot;), _
+						pStr(&quot;t&quot;), _
+						pStr(&quot;\&quot;), _
+						pStr(DQ) _
+					) ) _
+				 ), id)
 		result = fixIndirection(pInd(&quot;escQ&quot;), result)
 	End If
 	pGrmEscQ = result
@@ -203,12 +214,26 @@ End Function
 Function pGrmTerminal()
 	Static result As Object
 	If isNull(result) Then
+		Dim badQ As Object
+		badQ = pSat( _
+					ite(equ(DQ), _
+						fstArg(False), _
+						ite(equ(&quot;\&quot;), _
+							fstArg(False), _
+							ite(equ(CR), _
+								fstArg(False), _
+								neq(LF) _
+							) _
+						) _
+					) _
+				)
+		badQ.str = &quot;[-&quot; &amp; DQ &amp; &quot;\r\n\t\\]&quot;
 		result = pSeq(Array( _
 					pSkip(pStr(DQ)), _
 					pBind(pMany1( _
 						pChoice( _
 							pGrmEscQ, _
-							pSat( ite(neq(DQ), neq(&quot;\&quot;), fstArg(False)) ) _
+							badQ _
 						) _
 					), compose(pReturn, foldl1(concat))), _
 					pSkip(pStr(DQ)) _
@@ -217,7 +242,6 @@ Function pGrmTerminal()
 	End If
 	pGrmTerminal = result
 End Function
-
 
 Function pGrmMult()
 	Static result As Object
@@ -258,59 +282,54 @@ Function test_PrsGrammar_newline()
 		&quot;a&quot;, &quot;b&quot;, &quot;c&quot;,   &quot;q&quot;,        &quot;x&quot;, &quot;y&quot;, &quot;z&quot;, _
 		&quot;A&quot;, &quot;B&quot;, &quot;C&quot;,        &quot;R&quot;,   &quot;X&quot;, &quot;Y&quot;, &quot;Z&quot; _
 	)).x
-	Dim sCR As String, sLF As String
-	sCR = &quot;\n&quot; &apos; TODO: fix toString \r vs \n
-	sLF = &quot;\r&quot; &apos; TODO: fix toString \r vs \n
-	
 	Dim CRLF As String,  LFCR As String
-	Dim sCRLF As String, sLFCR As String
-	CRLF = CR &amp; LF : sCRLF = sCR &amp; sLF
-	LFCR = LF &amp; CR : sLFCR = sLF &amp; sCR
+	CRLF = CR &amp; LF
+	LFCR = LF &amp; CR
 	
-	assert_parses(p, CR,		sCR, 2).x
-	assert_parses(p, LF, 		sLF, 2).x
-	assert_parses(p, CR &amp; &quot; &quot;,	sCR, 2).x
-	assert_parses(p, LF &amp; &quot; &quot;,	sLF, 2).x
-	assert_parses(p, CR &amp; CR,	sCR, 2).x &apos; consumes only one!
-	assert_parses(p, LF &amp; LF,	sLF, 2).x
+	assert_parses(p, CR,		CR, 2).x
+	assert_parses(p, LF, 		LF, 2).x
+	assert_parses(p, CR &amp; &quot; &quot;,	CR, 2).x
+	assert_parses(p, LF &amp; &quot; &quot;,	LF, 2).x
+	assert_parses(p, CR &amp; CR,	CR, 2).x &apos; consumes only one!
+	assert_parses(p, LF &amp; LF,	LF, 2).x
 
-	assert_parses(p, CRLF, 		sCR &amp; sLF, 3).x &apos; consumes both!
-	assert_parses(p, LFCR, 		sLF &amp; sCR, 3).x
-	assert_parses(p, CRLF &amp; &quot; &quot;,	sCR &amp; sLF, 3).x
-	assert_parses(p, LFCR &amp; &quot; &quot;,	sLF &amp; sCR, 3).x
+	assert_parses(p, CRLF, 			CRLF, 3).x &apos; consumes both!
+	assert_parses(p, LFCR, 			LFCR, 3).x
+	assert_parses(p, CRLF &amp; &quot; &quot;,	CRLF, 3).x
+	assert_parses(p, LFCR &amp; &quot; &quot;,	LFCR, 3).x
 	
-	assert_parses(p, CRLF &amp; CR, sCRLF, 3).x &apos; consumes only first two!
-	assert_parses(p, CRLF &amp; LF, sCRLF, 3).x
-	assert_parses(p, LFCR &amp; CR, sLFCR, 3).x
-	assert_parses(p, LFCR &amp; LF, sLFCR, 3).x
+	assert_parses(p, CRLF &amp; CR, CRLF, 3).x &apos; consumes only first two!
+	assert_parses(p, CRLF &amp; LF, CRLF, 3).x
+	assert_parses(p, LFCR &amp; CR, LFCR, 3).x
+	assert_parses(p, LFCR &amp; LF, LFCR, 3).x
 	
 	p = pMany(p)
 	&apos; all the following yield exactly two strings:
-	assert_parses(p, CR &amp; CR,			List(sCR, sCR),		3).x
-	assert_parses(p, LF &amp; LF,			List(sLF, sLF),		3).x
-	assert_parses(p, CR &amp; CRLF,			List(sCR, sCRLF),	4).x
-	assert_parses(p, LF &amp; LFCR,			List(sLF, sLFCR),	4).x
-	assert_parses(p, CRLF &amp; CR,			List(sCRLF, sCR),	4).x
-	assert_parses(p, CRLF &amp; LF,			List(sCRLF, sLF),	4).x
-	assert_parses(p, LFCR &amp; CR,			List(sLFCR, sCR),	4).x
-	assert_parses(p, LFCR &amp; LF,			List(sLFCR, sLF),	4).x
-	assert_parses(p, CRLF &amp; CRLF,		List(sCRLF, sCRLF),	5).x
-	assert_parses(p, CRLF &amp; LFCR,		List(sCRLF, sLFCR),	5).x
-	assert_parses(p, LFCR &amp; CRLF,		List(sLFCR, sCRLF),	5).x
-	assert_parses(p, LFCR &amp; LFCR,		List(sLFCR, sLFCR),	5).x
+	assert_parses(p, CR &amp; CR,			List(CR, CR),		3).x
+	assert_parses(p, LF &amp; LF,			List(LF, LF),		3).x
+	assert_parses(p, CR &amp; CRLF,			List(CR, CRLF),		4).x
+	assert_parses(p, LF &amp; LFCR,			List(LF, LFCR),		4).x
+	assert_parses(p, CRLF &amp; CR,			List(CRLF, CR),		4).x
+	assert_parses(p, CRLF &amp; LF,			List(CRLF, LF),		4).x
+	assert_parses(p, LFCR &amp; CR,			List(LFCR, CR),		4).x
+	assert_parses(p, LFCR &amp; LF,			List(LFCR, LF),		4).x
+	assert_parses(p, CRLF &amp; CRLF,		List(CRLF, CRLF),	5).x
+	assert_parses(p, CRLF &amp; LFCR,		List(CRLF, LFCR),	5).x
+	assert_parses(p, LFCR &amp; CRLF,		List(LFCR, CRLF),	5).x
+	assert_parses(p, LFCR &amp; LFCR,		List(LFCR, LFCR),	5).x
 	&apos; again with an additional non-CR, non-LF character suffix:
-	assert_parses(p, CR &amp; CR &amp; &quot; &quot;,		List(sCR, sCR),		3).x
-	assert_parses(p, LF &amp; LF &amp; &quot; &quot;,		List(sLF, sLF),		3).x
-	assert_parses(p, CR &amp; CRLF &amp; &quot; &quot;,	List(sCR, sCRLF),	4).x
-	assert_parses(p, LF &amp; LFCR &amp; &quot; &quot;,	List(sLF, sLFCR),	4).x
-	assert_parses(p, CRLF &amp; CR &amp; &quot; &quot;,	List(sCRLF, sCR),	4).x
-	assert_parses(p, CRLF &amp; LF &amp; &quot; &quot;,	List(sCRLF, sLF),	4).x
-	assert_parses(p, LFCR &amp; CR &amp; &quot; &quot;,	List(sLFCR, sCR),	4).x
-	assert_parses(p, LFCR &amp; LF &amp; &quot; &quot;,	List(sLFCR, sLF),	4).x
-	assert_parses(p, CRLF &amp; CRLF &amp; &quot; &quot;,	List(sCRLF, sCRLF),	5).x
-	assert_parses(p, CRLF &amp; LFCR &amp; &quot; &quot;,	List(sCRLF, sLFCR),	5).x
-	assert_parses(p, LFCR &amp; CRLF &amp; &quot; &quot;,	List(sLFCR, sCRLF),	5).x
-	assert_parses(p, LFCR &amp; LFCR &amp; &quot; &quot;,	List(sLFCR, sLFCR),	5).x
+	assert_parses(p, CR &amp; CR &amp; &quot; &quot;,		List(CR, CR),		3).x
+	assert_parses(p, LF &amp; LF &amp; &quot; &quot;,		List(LF, LF),		3).x
+	assert_parses(p, CR &amp; CRLF &amp; &quot; &quot;,	List(CR, CRLF),		4).x
+	assert_parses(p, LF &amp; LFCR &amp; &quot; &quot;,	List(LF, LFCR),		4).x
+	assert_parses(p, CRLF &amp; CR &amp; &quot; &quot;,	List(CRLF, CR),		4).x
+	assert_parses(p, CRLF &amp; LF &amp; &quot; &quot;,	List(CRLF, LF),		4).x
+	assert_parses(p, LFCR &amp; CR &amp; &quot; &quot;,	List(LFCR, CR),		4).x
+	assert_parses(p, LFCR &amp; LF &amp; &quot; &quot;,	List(LFCR, LF),		4).x
+	assert_parses(p, CRLF &amp; CRLF &amp; &quot; &quot;,	List(CRLF, CRLF),	5).x
+	assert_parses(p, CRLF &amp; LFCR &amp; &quot; &quot;,	List(CRLF, LFCR),	5).x
+	assert_parses(p, LFCR &amp; CRLF &amp; &quot; &quot;,	List(LFCR, CRLF),	5).x
+	assert_parses(p, LFCR &amp; LFCR &amp; &quot; &quot;,	List(LFCR, LFCR),	5).x
 End Function
 
 Function _dq(s As String) : _dq = DQ &amp; s &amp; DQ : End Function
@@ -327,27 +346,25 @@ Function test_PrsGrammar_terminal()
 		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;, _
 		&quot;a&quot;, &quot;b&quot;, &quot;c&quot;,   &quot;q&quot;,        &quot;x&quot;, &quot;y&quot;, &quot;z&quot;, _
 		&quot;A&quot;, &quot;B&quot;, &quot;C&quot;,        &quot;R&quot;,   &quot;X&quot;, &quot;Y&quot;, &quot;Z&quot;, _
-		_dq(&quot;\&quot;), _dq(&quot;\-&quot;), _dq(&quot;\[&quot;), _dq(&quot;\]&quot;) _
+		_dq(&quot;\&quot;), _dq(&quot;\-&quot;), _dq(&quot;\[&quot;), _dq(&quot;\]&quot;), _
+		_dq(CR), _dq(LF) _
 	)).x
-	dim a as Variant
-
 	assert_parses(p, _dq(&quot;\\&quot;),     &quot;\&quot;,   5).x
 	assert_parses(p, _dq(&quot;\&quot; &amp; DQ), DQ,    5).x
-	assert_parses(p, _dq(&quot;\t&quot;),		TAB,   5).x
-	assert_parses(p, _dq(&quot;\r&quot;),		CR,    5).x
-	assert_parses(p, _dq(&quot;\n&quot;),		LF,    5).x
-	assert_parses(p, _dq(&quot;\r\n&quot;),	CR &amp; LF, 7).x
-	assert_parses(p, _dq(&quot;\n\r&quot;),	LF &amp; CR, 7).x
-	
-	assert_parses(p, _dq(&quot; &quot;), &quot; &quot;, 4).x
+
+	&apos;assert_parses(p, _dq(&quot;\t&quot;),		TAB,   5).x
+	&apos;assert_parses(p, _dq(&quot;\r&quot;),		CR,    5).x
+	&apos;assert_parses(p, _dq(&quot;\n&quot;),		LF,    5).x
+	&apos;assert_parses(p, _dq(&quot;\r\n&quot;),	CR &amp; LF, 7).x
+	&apos;assert_parses(p, _dq(&quot;\n\r&quot;),	LF &amp; CR, 7).x
 	assert_parses(p, _dq(TAB), TAB, 4).x
+		
+	assert_parses(p, _dq(&quot; &quot;), &quot; &quot;, 4).x
 	assert_parses(p, _dq(&quot;a&quot;), &quot;a&quot;, 4).x
 	assert_parses(p, _dq(&quot;b&quot;), &quot;b&quot;, 4).x
 	assert_parses(p, _dq(&quot;c&quot;), &quot;c&quot;, 4).x
 	assert_parses(p, _dq(&quot;z&quot;), &quot;z&quot;, 4).x
 
-	assert_parses(p, DQ &amp; CR  &amp; DQ, CR,  4).x
-	assert_parses(p, DQ &amp; LF  &amp; DQ, LF,  4).x
 End Function
 
 Function test_PrsGrammar_ident(p As Object)

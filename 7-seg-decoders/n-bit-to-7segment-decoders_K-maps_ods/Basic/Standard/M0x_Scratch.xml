@@ -19,7 +19,7 @@ End Type
 Sub Main
 	Dim s As String
 	s = &quot;µ -A B -C&quot;
-	MsgBox(&quot;&apos;&quot; &amp; s &amp; &quot;&apos;&quot; &amp; chr(13) &amp; evalNorExpr(s))
+	MsgBox(&quot;&apos;&quot; &amp; s &amp; &quot;&apos;&quot; &amp; CR &amp; evalNorExpr(s))
 	
 	
 	Dim e0 As Object
@@ -29,19 +29,19 @@ Sub Main
 	Set e1 = Env_new(e0)
 
 	lu = Env_lookup(e1, &quot;A&quot;)
-	MsgBox(Env_show(e1) &amp; Chr(13) &amp; &quot;lookup(&apos;A&apos;) ~&gt; &quot; &amp; toString(lu))	
+	MsgBox(Env_show(e1) &amp; CR &amp; &quot;lookup(&apos;A&apos;) ~&gt; &quot; &amp; toString(lu))	
 
 	Env_add(e0, &quot;A&quot;, 1)
 	Env_add(e1, &quot;B&quot;, 2)
 	Env_add(e1, &quot;C&quot;, 3)
 
 	lu = Env_lookup(e1, &quot;A&quot;)
-	MsgBox(Env_show(e1) &amp; Chr(13) &amp; &quot;lookup(&apos;A&apos;) ~&gt; &quot; &amp; toString(lu))	
+	MsgBox(Env_show(e1) &amp; CR &amp; &quot;lookup(&apos;A&apos;) ~&gt; &quot; &amp; toString(lu))	
 
 	Env_add(e1, &quot;A&quot;, &quot;abc&quot;)
 
 	lu = Env_lookup(e1, &quot;A&quot;)
-	MsgBox(Env_show(e1) &amp; Chr(13) &amp; &quot;lookup(&apos;A&apos;) ~&gt; &quot; &amp; toString(lu))
+	MsgBox(Env_show(e1) &amp; CR &amp; &quot;lookup(&apos;A&apos;) ~&gt; &quot; &amp; toString(lu))
 End Sub
 
 &apos;================================================================================
@@ -99,7 +99,7 @@ Function Env_show(e As Env, Optional indent As String)
 	Dim nl As String
 	Dim result As String
 	Dim mappingsStr As String
-	nl = Chr(13)
+	nl = CR
 	If IsMissing(indent) Then
 		indent = &quot;&quot;
 	End If

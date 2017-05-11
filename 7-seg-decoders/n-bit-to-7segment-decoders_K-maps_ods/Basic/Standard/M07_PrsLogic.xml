@@ -42,7 +42,7 @@ Function pLogic_dt()
 		pT = pInd(&quot;T&quot;)
 		pF = pInd(&quot;F&quot;)
 		pW = fixIndirection(pInd(&quot;W&quot;), _
-			pChoice(pStr(&quot; &quot;), pStr(chr(9))) _
+			pChoice(pStr(&quot; &quot;), pStr(TAB)) _
 		)
 		pC = fixIndirection(pInd(&quot;C&quot;), _
 			pChoice(pStr(&quot;0&quot;), pStr(&quot;1&quot;)) _

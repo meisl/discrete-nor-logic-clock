@@ -46,7 +46,7 @@ On Local Error Goto whatstheproblem
 	Array_toString = result
 	Exit Function
 whatstheproblem:
-	MsgBox(&quot;got problem at index &quot; &amp; i &amp; chr(13) &amp; &quot;LBound=&quot; &amp; LBound(v) &amp; &quot;, UBound=&quot; &amp; UBound(v))
+	MsgBox(&quot;got problem at index &quot; &amp; i &amp; CR &amp; &quot;LBound=&quot; &amp; LBound(v) &amp; &quot;, UBound=&quot; &amp; UBound(v))
 End Function
 
 &apos;= tests ============================================================

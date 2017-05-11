@@ -64,7 +64,7 @@ Function assertThrows(vF As Variant, args As Array, Optional errNo As Integer)
 	Dim fResult As Variant
 	Dim k As Integer, n As Integer
 	If Not(isArray(args)) Then
-		croak(&quot;assertThrows: expected Array of args but got&quot; &amp; chr(13) &amp; toString(args))
+		croak(&quot;assertThrows: expected Array of args but got&quot; &amp; CR &amp; toString(args))
 	End If
 	k = LBound(args)
 	n = UBound(args) - k + 1
@@ -103,7 +103,7 @@ On Local Error Goto Boom
 On Local Error Goto Boom
 				fResult = assertThrows(args(k), args(k+1), args(k+2))
 			Else
-				croak(&quot;assertThrows: expected Array of 2 or 3 args but got&quot; &amp; chr(13) &amp; toString(args))
+				croak(&quot;assertThrows: expected Array of 2 or 3 args but got&quot; &amp; CR &amp; toString(args))
 			End If
 		Case &quot;i_will_throw0&quot;:
 			testLevel = testLevel + 1
@@ -113,7 +113,7 @@ On Local Error Goto Boom
 			Dim argsList As Object
 			argsList = toList(args)
 			If isNil(argsList) Then
-				croak(&quot;assertThrows: don&apos;t know how to apply zero args - fn:&quot; &amp; chr(13) &amp; toString(fName))
+				croak(&quot;assertThrows: don&apos;t know how to apply zero args - fn:&quot; &amp; CR &amp; toString(fName))
 			Else 
 				testLevel = testLevel + 1
 On Local Error Goto Boom
@@ -126,10 +126,10 @@ On Local Error Goto Boom
 	Dim msg As String
 	msg = &quot;expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield &quot; &amp; x
 On Local Error Goto skipMsgPart1	
-	 msg = msg &amp; &quot; on args&quot; &amp; chr(13) &amp; _argsStr(fName, args)
+	 msg = msg &amp; &quot; on args&quot; &amp; CR &amp; _argsStr(fName, args)
 skipMsgPart1:
 On Local Error Goto skipMsgPart2	
-	 msg = msg &amp; chr(13) &amp; &quot;returned &quot; &amp; toString(fResult)
+	 msg = msg &amp; CR &amp; &quot;returned &quot; &amp; toString(fResult)
 skipMsgPart2:
 	Set result = mkFail(a, x, msg)
 	assertThrows = result
@@ -141,10 +141,10 @@ Boom:
 		x = &quot;error &quot; &amp; errNo &amp; &quot;: &quot; &amp; toString(Error(errNo))
 		Set result = mkFail(a, x, _
 			&quot;expected fn &apos;&quot; &amp; fName &amp; &quot;&apos; to yield&quot; _
-				&amp; chr(13) &amp; &quot;       &quot; &amp; x _
-				&amp; chr(13) &amp; &quot; not &quot; &amp; a _
-				&amp; chr(13) &amp; &quot;on args:&quot; _
-				&amp; chr(13) &amp; _argsStr(fName, args) _
+				&amp; CR &amp; &quot;       &quot; &amp; x _
+				&amp; CR &amp; &quot; not &quot; &amp; a _
+				&amp; CR &amp; &quot;on args:&quot; _
+				&amp; CR &amp; _argsStr(fName, args) _
 		)
 	Else
 		Set result = mkPass()
@@ -203,7 +203,7 @@ Function assertEqual(actual As Variant, expected As Variant)
 assertEqual_failed:
 	assertEqual = mkFail(actual, expected, _
 			&quot;expected &quot; &amp; toString(actual) _
-				&amp; chr(13) &amp; &quot;     to equal &quot; &amp; toString(expected) _
+				&amp; CR &amp; &quot;     to equal &quot; &amp; toString(expected) _
 		)
 	Exit Function
 assertEqual_passed:
@@ -225,9 +225,9 @@ Function assertPasses(assertionName As String, args As Array)
 				x = &quot;pass&quot;
 				Set result = mkFail(a, x, _
 					&quot;expected &quot; &amp; assertionName &amp; &quot; to pass on args &quot; _
-						&amp; chr(13) &amp; &quot;  &quot; &amp; _argsStr(assertionName, args) _
-						&amp; chr(13) &amp; &quot;but it failed:&quot; _
-						&amp; chr(13) &amp; a.msg _
+						&amp; CR &amp; &quot;  &quot; &amp; _argsStr(assertionName, args) _
+						&amp; CR &amp; &quot;but it failed:&quot; _
+						&amp; CR &amp; a.msg _
 				)
 			Else
 				Set result = mkPass()
@@ -252,8 +252,8 @@ Function assertFails(assertionName As String, args As Array)
 				x = &quot;fail&quot;
 				Set result = mkFail(a, x, _
 					&quot;expected &quot; &amp; assertionName &amp; &quot; to fail on args &quot; _
-						&amp; chr(13) &amp; &quot;  &quot; &amp; _argsStr(assertionName, args) _
-						&amp; chr(13) &amp; &quot;but it passed.&quot; _
+						&amp; CR &amp; &quot;  &quot; &amp; _argsStr(assertionName, args) _
+						&amp; CR &amp; &quot;but it passed.&quot; _
 				)
 			Else
 				Set result = mkPass()

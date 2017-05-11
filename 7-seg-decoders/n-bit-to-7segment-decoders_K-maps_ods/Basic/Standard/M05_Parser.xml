@@ -49,7 +49,7 @@ Sub Main
 	s = &quot;FF 0x1F __µ 0&quot;
 
 	MsgBox( _
-		&quot;applying parser &apos;&quot; &amp; p.tp &amp; &quot;&apos; to &quot; &amp; toString(s) &amp; &quot;: &quot; &amp; chr(13) _
+		&quot;applying parser &apos;&quot; &amp; p.tp &amp; &quot;&apos; to &quot; &amp; toString(s) &amp; &quot;: &quot; &amp; CR _
 		&amp; toString(applyP(p, s)) _
 	)
 End Sub
@@ -71,9 +71,9 @@ Function TParser_toString(Optional ByVal p As Variant)
 		result = _TParser_toString(p, 0, &quot;&quot;, False, rules, seen)
 		If Not(isNil(rules)) Then
 			Dim newLine As String
-			newLine = chr(13) &amp; chr(10)
-			result = result &amp; &quot; where&quot; &amp; newLine _
-				   &amp; Join(toArray(rules), newLine)
+			newLine = NL
+			result = result &amp; &quot; where&quot; &amp; NL _
+				   &amp; Join(toArray(rules), NL)
 		End If
 		While Not(isNil(seen))
 			car(seen).st2 = False
@@ -177,7 +177,7 @@ Function _TParser_toString( _
 				altRStr = _TParser_toString( _
 							altR, k, indent, isNewLines, rules, seen)	
 				result = altLStr _
-					   &amp; chr(13) &amp; chr(10) _
+					   &amp; NL _
 					   &amp; space(len(indent) - 2) _
 					   &amp; &quot;| &quot; _
 					   &amp; altRStr
@@ -228,7 +228,7 @@ Function _TParser_toString( _
 			result = &quot;(do &quot;
 			Dim addIndent As String, newLine As String, innerIndent As String
 			addIndent = Space(Len(result))
-			newLine = chr(13) &amp; chr(10) &amp; indent
+			newLine = NL &amp; indent
 			innerIndent = indent &amp; addIndent &amp; Space(Len(&quot;aX &lt;- &quot;))
 			For i = LBound(ps) To UBound(ps)
 				If isPSkip(ps(i)) Then
@@ -460,7 +460,7 @@ Function bindFns(Optional f As Object)
 			Else
 				xStr = TFn_toString(x)
 			End If
-			out = cons(chr(10) &amp; &quot;  &quot; &amp; xStr, out)
+			out = cons(NL &amp; &quot;  &quot; &amp; xStr, out)
 			xs = cdr(xs)
 		Wend
 		bindFns = out
@@ -750,7 +750,7 @@ End Function
 Function pWhite()
 	Static result As Object
 	If isNull(result) Then
-		result = pChoice(pStr(&quot; &quot;), pStr(Chr(9))
+		result = pChoice(pStr(&quot; &quot;), pStr(TAB)
 		result.str = &quot;[ \t]&quot;
 		result.typ = &quot;Parser Char&quot;
 		result = fixIndirection(pInd(&quot;ws&quot;), result)
@@ -1532,33 +1532,33 @@ end_of_Parser_tests:
 		aPerSec =  CLng(10 * aCount / tm) / 10
 		Dim summary As String
 		summary = tm &amp; &quot; sec for &quot; &amp; aCount &amp; &quot; assertions, &quot;_
-		&amp; chr(13) &amp; &quot;that&apos;s ~&quot; &amp; aPerSec &amp; &quot; assertions/sec&quot;
+		&amp; CR &amp; &quot;that&apos;s ~&quot; &amp; aPerSec &amp; &quot; assertions/sec&quot;
 		MsgBox(summary)
 		result = summary
 		Dim parserInstCount As Integer
 		parserInstCount = pReturn(&quot;just something&quot;).id
 
 		msgbox(parserInstCount &amp; &quot; Parser instances&quot; _
-				&amp; chr(13) &amp; &quot;applyP_callCount: &quot; &amp; applyP_callCount _
-				&amp; chr(13) &amp; &quot;_applyP_callCount: &quot; &amp; _applyP_callCount(0) &amp; &quot;/&quot; &amp; _applyP_callCount(1) _
-				&amp; chr(13) &amp; &quot;applyP_str: &quot; &amp; applyP_str _
-				&amp; chr(13) &amp; &quot;applyP_choice: &quot; &amp; applyP_choice _
-				&amp; chr(13) &amp; &quot;applyP_item: &quot; &amp; applyP_item _
-				&amp; chr(13) &amp; &quot;applyP_end: &quot; &amp; applyP_end _
-				&amp; chr(13) &amp; &quot;applyP_bind: &quot; &amp; applyP_bind _
-				&amp; chr(13) &amp; &quot;  (applyP_bind_K_x: &quot; &amp; applyP_bind_K_x &amp; &quot;)&quot; _
-				&amp; chr(13) &amp; &quot;  (applyP_bind_K_return: &quot; &amp; applyP_bind_K_return &amp; &quot;)&quot; _
-				&amp; chr(13) &amp; &quot;  (applyP_bind_B_f_g: &quot; &amp; applyP_bind_B_f_g &amp; &quot;)&quot; _
-				&amp; chr(13) &amp; &quot;  (applyP_bind_B_return_g: &quot; &amp; applyP_bind_B_return_g &amp; &quot;)&quot; _
-				&amp; chr(13) &amp; &quot;applyP_return: &quot; &amp; applyP_return _
-				&amp; chr(13) &amp; &quot;applyP_seq: &quot; &amp; applyP_seq _
-				&amp; chr(13) &amp; &quot;applyP_skip: &quot; &amp; applyP_skip _
-				&amp; chr(13) &amp; &quot;applyP_sat: &quot; &amp; applyP_sat _
-				&amp; chr(13) &amp; &quot;applyP_zeroOrOne: &quot; &amp; applyP_zeroOrOne _
-				&amp; chr(13) &amp; &quot;applyP_many1: &quot; &amp; applyP_many1 _
-				&amp; chr(13) &amp; &quot;applyP_fail: &quot; &amp; applyP_fail _
-				&amp; chr(13) &amp; &quot;applyP_ind: &quot; &amp; applyP_ind _
-				&amp; chr(13) &amp; length(bindFns) &amp; &quot; bindFns: &quot; &amp; toString(bindFns))
+				&amp; CR &amp; &quot;applyP_callCount: &quot; &amp; applyP_callCount _
+				&amp; CR &amp; &quot;_applyP_callCount: &quot; &amp; _applyP_callCount(0) &amp; &quot;/&quot; &amp; _applyP_callCount(1) _
+				&amp; CR &amp; &quot;applyP_str: &quot; &amp; applyP_str _
+				&amp; CR &amp; &quot;applyP_choice: &quot; &amp; applyP_choice _
+				&amp; CR &amp; &quot;applyP_item: &quot; &amp; applyP_item _
+				&amp; CR &amp; &quot;applyP_end: &quot; &amp; applyP_end _
+				&amp; CR &amp; &quot;applyP_bind: &quot; &amp; applyP_bind _
+				&amp; CR &amp; &quot;  (applyP_bind_K_x: &quot; &amp; applyP_bind_K_x &amp; &quot;)&quot; _
+				&amp; CR &amp; &quot;  (applyP_bind_K_return: &quot; &amp; applyP_bind_K_return &amp; &quot;)&quot; _
+				&amp; CR &amp; &quot;  (applyP_bind_B_f_g: &quot; &amp; applyP_bind_B_f_g &amp; &quot;)&quot; _
+				&amp; CR &amp; &quot;  (applyP_bind_B_return_g: &quot; &amp; applyP_bind_B_return_g &amp; &quot;)&quot; _
+				&amp; CR &amp; &quot;applyP_return: &quot; &amp; applyP_return _
+				&amp; CR &amp; &quot;applyP_seq: &quot; &amp; applyP_seq _
+				&amp; CR &amp; &quot;applyP_skip: &quot; &amp; applyP_skip _
+				&amp; CR &amp; &quot;applyP_sat: &quot; &amp; applyP_sat _
+				&amp; CR &amp; &quot;applyP_zeroOrOne: &quot; &amp; applyP_zeroOrOne _
+				&amp; CR &amp; &quot;applyP_many1: &quot; &amp; applyP_many1 _
+				&amp; CR &amp; &quot;applyP_fail: &quot; &amp; applyP_fail _
+				&amp; CR &amp; &quot;applyP_ind: &quot; &amp; applyP_ind _
+				&amp; CR &amp; length(bindFns) &amp; &quot; bindFns: &quot; &amp; toString(bindFns))
 	Else
 		result = Join(Array(&quot;test_Parser(&quot; &amp; what &amp; &quot;):&quot;, tm, aCount), &quot; &quot;)
 	End If
@@ -1648,7 +1648,7 @@ End Function
 
 Function test_Parser_fail()
 	refute_parses(pFail, Array( _
-		&quot;&quot;,	&quot; &quot;, &quot;   &quot;, chr(13), chr(9), &quot;a&quot;, &quot;1&quot;, &quot;[]&quot;, &quot;asdf&quot; _
+		&quot;&quot;,	&quot; &quot;, &quot;   &quot;, CR, TAB, &quot;a&quot;, &quot;1&quot;, &quot;[]&quot;, &quot;asdf&quot; _
 	)).x
 End Function
 
@@ -1667,7 +1667,7 @@ Function test_Parser_return()
 	assert_parses(p, &quot;1&quot;,		&quot;bar&quot;, 1).x
 	assert_parses(p, &quot;[]&quot;,		&quot;bar&quot;, 1).x
 	assert_parses(p, &quot;abcd&quot;,	&quot;bar&quot;, 1).x
-	assert_parses(p, chr(13),	&quot;bar&quot;, 1).x
+	assert_parses(p, CR,	&quot;bar&quot;, 1).x
 
 	p = pReturn(4711)	
 	assert_parses(p, &quot;&quot;,		4711, 1).x
@@ -1676,7 +1676,7 @@ Function test_Parser_return()
 	assert_parses(p, &quot;1&quot;,		4711, 1).x
 	assert_parses(p, &quot;[]&quot;,		4711, 1).x
 	assert_parses(p, &quot;abcd&quot;,	4711, 1).x
-	assert_parses(p, chr(13),	4711, 1).x
+	assert_parses(p, CR,	4711, 1).x
 End Function
 
 Function test_Parser_item()
@@ -1689,8 +1689,8 @@ Function test_Parser_item()
 	assert_parses(p, &quot;1&quot;,		&quot;1&quot;, 2).x
 	assert_parses(p, &quot;[]&quot;,		&quot;[&quot;, 2).x
 	assert_parses(p, &quot;abcd&quot;,	&quot;a&quot;, 2).x
-	assert_parses(p, chr(13),	chr(13), 2).x
-	assert_parses(p, chr( 9),	chr( 9), 2).x
+	assert_parses(p, CR,	CR, 2).x
+	assert_parses(p, TAB,	TAB, 2).x
 End Function
 
 Function test_Parser_end()
@@ -1715,7 +1715,7 @@ Function test_Parser_str()
 	p = pStr(&quot;bar&quot;)
 	refute_parses(p, &quot;&quot;).x
 	refute_parses(p, &quot; &quot;).x
-	refute_parses(p, &quot; &quot; &amp; chr(13)).x
+	refute_parses(p, &quot; &quot; &amp; CR).x
 	refute_parses(p, &quot;asdf&quot;).x
 	refute_parses(p, &quot; bar&quot;).x
 	refute_parses(p, &quot;b&quot;).x
@@ -1725,10 +1725,10 @@ Function test_Parser_str()
 	assert_parses(p, &quot;barba&quot;,	&quot;bar&quot;, 4).x
 	assert_parses(p, &quot;barbar&quot;,	&quot;bar&quot;, 4).x
 
-	p = pStr(chr(13))
+	p = pStr(CR)
 	refute_parses(p, &quot;&quot;).x
 	refute_parses(p, &quot; &quot;).x
-	refute_parses(p, &quot; &quot; &amp; chr(13)).x
+	refute_parses(p, &quot; &quot; &amp; CR).x
 	refute_parses(p, &quot;asdf&quot;).x
 	refute_parses(p, &quot; bar&quot;).x
 	refute_parses(p, &quot;b&quot;).x
@@ -1737,10 +1737,10 @@ Function test_Parser_str()
 	refute_parses(p, &quot;barb&quot;).x
 	refute_parses(p, &quot;barba&quot;).x
 	refute_parses(p, &quot;barbar&quot;).x
-	assert_parses(p, chr(13),					&quot;\n&quot;, 2).x
-	assert_parses(p, chr(13) &amp; &quot;bar&quot;,			&quot;\n&quot;, 2).x
-	assert_parses(p, chr(13) &amp; chr(13),			&quot;\n&quot;, 2).x
-	assert_parses(p, chr(13) &amp; chr(13) &amp; &quot;bar&quot;,	&quot;\n&quot;, 2).x
+	assert_parses(p, CR,				CR, 2).x
+	assert_parses(p, CR &amp; &quot;bar&quot;,		CR, 2).x
+	assert_parses(p, CR &amp; CR,			CR, 2).x
+	assert_parses(p, CR &amp; CR &amp; &quot;bar&quot;,	CR, 2).x
 End Function
 
 Function test_Parser_choice()
@@ -1755,9 +1755,9 @@ Function test_Parser_choice()
 	assertEqual(arity(p),  1).x
 	p = apply(p, pReturn(7))
 		
-	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
-		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
-		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
+	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; CR, &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
+		&quot;barba&quot;, &quot;barbar&quot;, CR, CR &amp; &quot;bar&quot;, CR &amp; CR,_
+		CR &amp; CR &amp; &quot;bar&quot;_
 	)
 	p = pChoice(pFail, pFail)
 	refute_parses(p, data).x
@@ -1843,8 +1843,8 @@ Function test_Parser_sat()
 	refute_parses(p, &quot;1&quot;).x
 	refute_parses(p, &quot;[]&quot;).x
 	assert_parses(p, &quot;abcd&quot;,	&quot;a&quot;, 2).x
-	refute_parses(p, chr(13)).x
-	refute_parses(p, chr( 9)).x
+	refute_parses(p, CR).x
+	refute_parses(p, TAB).x
 End Function
 
 Function test_Parser_skip()
@@ -1857,8 +1857,8 @@ Function test_Parser_skip()
 	assert_parses(p, &quot;1&quot;,		Empty, 2).x
 	assert_parses(p, &quot;[]&quot;,		Empty, 2).x
 	assert_parses(p, &quot;abcd&quot;,	Empty, 2).x
-	assert_parses(p, chr(13),   Empty, 2).x
-	assert_parses(p, chr( 9),	Empty, 2).x
+	assert_parses(p, CR,   Empty, 2).x
+	assert_parses(p, TAB,	Empty, 2).x
 	
 	&apos; skip fail = fail
 	Set p = pSkip(pFail)
@@ -1868,8 +1868,8 @@ Function test_Parser_skip()
 	refute_parses(p, &quot;1&quot;).x
 	refute_parses(p, &quot;[]&quot;).x
 	refute_parses(p, &quot;abcd&quot;).x
-	refute_parses(p, chr(13)).x
-	refute_parses(p, chr( 9)).x
+	refute_parses(p, CR).x
+	refute_parses(p, TAB).x
 		
 	Set p = pSkip(pBind(pItem, fstArg(pItem)))
 	refute_parses(p, &quot;&quot;).x
@@ -1878,10 +1878,10 @@ Function test_Parser_skip()
 	refute_parses(p, &quot;1&quot;).x
 	assert_parses(p, &quot;[]&quot;,				Empty, 3).x
 	assert_parses(p, &quot;abcd&quot;,			Empty, 3).x
-	refute_parses(p, chr(13)).x
-	refute_parses(p, chr( 9)).x
-	assert_parses(p, chr(13) &amp; chr(13),	Empty, 3).x
-	assert_parses(p, chr( 9) &amp; chr( 9),	Empty, 3).x
+	refute_parses(p, CR).x
+	refute_parses(p, TAB).x
+	assert_parses(p, CR &amp; CR,	Empty, 3).x
+	assert_parses(p, TAB &amp; TAB,	Empty, 3).x
 
 	&apos; skip (return x) = return Empty
 	Set p = pSkip(pReturn(&quot;foo&quot;))
@@ -1891,8 +1891,8 @@ Function test_Parser_skip()
 	assert_parses(p, &quot;1&quot;,		Empty, 1).x
 	assert_parses(p, &quot;[]&quot;,		Empty, 1).x
 	assert_parses(p, &quot;abcd&quot;,	Empty, 1).x
-	assert_parses(p, chr(13),   Empty, 1).x
-	assert_parses(p, chr( 9),	Empty, 1).x
+	assert_parses(p, CR,   Empty, 1).x
+	assert_parses(p, TAB,	Empty, 1).x
 
 	&apos; skip (skip x) = skip x
 	Set p = pSkip(pSkip(pItem))
@@ -1903,8 +1903,8 @@ Function test_Parser_skip()
 	assert_parses(p, &quot;1&quot;,		Empty, 2).x
 	assert_parses(p, &quot;[]&quot;,		Empty, 2).x
 	assert_parses(p, &quot;abcd&quot;,	Empty, 2).x
-	assert_parses(p, chr(13),   Empty, 2).x
-	assert_parses(p, chr( 9),	Empty, 2).x
+	assert_parses(p, CR,   Empty, 2).x
+	assert_parses(p, TAB,	Empty, 2).x
 
 	Set p = pSkip(pStr(&quot;foo&quot;))
 	refute_parses(p, &quot;&quot;).x
@@ -1913,8 +1913,8 @@ Function test_Parser_skip()
 	refute_parses(p, &quot;1&quot;).x
 	refute_parses(p, &quot;[]&quot;).x
 	refute_parses(p, &quot;abcd&quot;).x
-	refute_parses(p, chr(13)).x
-	refute_parses(p, chr( 9)).x
+	refute_parses(p, CR).x
+	refute_parses(p, TAB).x
 	
 	assert_parses(p, &quot;foo&quot;,				Empty, 4).x
 	assert_parses(p, &quot;foo &quot;,			Empty, 4).x
@@ -1922,8 +1922,8 @@ Function test_Parser_skip()
 	assert_parses(p, &quot;foo1&quot;,			Empty, 4).x
 	assert_parses(p, &quot;foo[]&quot;,			Empty, 4).x
 	assert_parses(p, &quot;fooabcd&quot;,			Empty, 4).x
-	assert_parses(p, &quot;foo&quot; &amp; chr(13),   Empty, 4).x
-	assert_parses(p, &quot;foo&quot; &amp; chr( 9),	Empty, 4).x
+	assert_parses(p, &quot;foo&quot; &amp; CR,   Empty, 4).x
+	assert_parses(p, &quot;foo&quot; &amp; TAB,	Empty, 4).x
 	
 	Set p = pSkip(pSeq(Array(pStr(&quot;f&quot;), pStr(&quot;oo&quot;)), concat)
 	refute_parses(p, &quot;&quot;).x
@@ -1932,8 +1932,8 @@ Function test_Parser_skip()
 	refute_parses(p, &quot;1&quot;).x
 	refute_parses(p, &quot;[]&quot;).x
 	refute_parses(p, &quot;abcd&quot;).x
-	refute_parses(p, chr(13)).x
-	refute_parses(p, chr( 9)).x
+	refute_parses(p, CR).x
+	refute_parses(p, TAB).x
 	
 	assert_parses(p, &quot;foo&quot;,				Empty, 4).x
 	assert_parses(p, &quot;foo &quot;,			Empty, 4).x
@@ -1941,8 +1941,8 @@ Function test_Parser_skip()
 	assert_parses(p, &quot;foo1&quot;,			Empty, 4).x
 	assert_parses(p, &quot;foo[]&quot;,			Empty, 4).x
 	assert_parses(p, &quot;fooabcd&quot;,			Empty, 4).x
-	assert_parses(p, &quot;foo&quot; &amp; chr(13),   Empty, 4).x
-	assert_parses(p, &quot;foo&quot; &amp; chr( 9),	Empty, 4).x
+	assert_parses(p, &quot;foo&quot; &amp; CR,   Empty, 4).x
+	assert_parses(p, &quot;foo&quot; &amp; TAB,	Empty, 4).x
 	
 	Set p = pSkip(pZeroOrOne(pItem))
 	assert_parses(p, &quot;&quot;,		Empty, 1).x
@@ -1951,8 +1951,8 @@ Function test_Parser_skip()
 	assert_parses(p, &quot;1&quot;,		Empty, 2).x
 	assert_parses(p, &quot;[]&quot;,		Empty, 2).x &apos; reads at most one
 	assert_parses(p, &quot;abcd&quot;,	Empty, 2).x
-	assert_parses(p, chr(13),   Empty, 2).x
-	assert_parses(p, chr( 9),	Empty, 2).x
+	assert_parses(p, CR,   Empty, 2).x
+	assert_parses(p, TAB,	Empty, 2).x
 	
 	Set p = pSkip(pMany(pItem))
 &apos;	msgbox(toString(p))
@@ -1962,8 +1962,8 @@ Function test_Parser_skip()
 	assert_parses(p, &quot;1&quot;,		Empty, 2).x
 	assert_parses(p, &quot;[]&quot;,		Empty, 3).x
 	assert_parses(p, &quot;abcd&quot;,	Empty, 5).x
-	assert_parses(p, chr(13),   Empty, 2).x
-	assert_parses(p, chr( 9),	Empty, 2).x	
+	assert_parses(p, CR,   Empty, 2).x
+	assert_parses(p, TAB,	Empty, 2).x	
 	
 	Set p = pSkip(pMany1(pItem))
 	refute_parses(p, &quot;&quot;).x
@@ -1972,8 +1972,8 @@ Function test_Parser_skip()
 	assert_parses(p, &quot;1&quot;,		Empty, 2).x
 	assert_parses(p, &quot;[]&quot;,		Empty, 3).x
 	assert_parses(p, &quot;abcd&quot;,	Empty, 5).x
-	assert_parses(p, chr(13),   Empty, 2).x
-	assert_parses(p, chr( 9),	Empty, 2).x	
+	assert_parses(p, CR,   Empty, 2).x
+	assert_parses(p, TAB,	Empty, 2).x	
 
 	Set p = pSkip(pMany(pWhite))
 	assert_parses(p, &quot;&quot;,		Empty, 1).x
@@ -1986,8 +1986,8 @@ Function test_Parser_skip()
 	assert_parses(p, &quot;[]&quot;,		Empty, 1).x
 	assert_parses(p, &quot;abcd&quot;,	Empty, 1).x
 	assert_parses(p, &quot;   d&quot;,	Empty, 4).x
-	assert_parses(p, chr(13),   Empty, 1).x
-	assert_parses(p, chr( 9),	Empty, 2).x	
+	assert_parses(p, CR,   Empty, 1).x
+	assert_parses(p, TAB,	Empty, 2).x	
 	
 	Set p = pBind(pSkip(pMany(pWhite)), fstArg(pStr(&quot;xx&quot;))
 	refute_parses(p, &quot;&quot;).x
@@ -2002,11 +2002,11 @@ Function test_Parser_skip()
 	refute_parses(p, &quot;  x&quot;).x
 	assert_parses(p, &quot;  xx&quot;,	&quot;xx&quot;,  5).x
 	assert_parses(p, &quot;  xxx&quot;,	&quot;xx&quot;,  5).x
-	refute_parses(p, chr(9)).x
-	refute_parses(p, chr(9) &amp; &quot;  &quot;).x
-	refute_parses(p, chr(9) &amp; &quot;  x&quot;).x
-	assert_parses(p, chr(9) &amp; &quot;  xx&quot;,	&quot;xx&quot;,  6).x
-	assert_parses(p, chr(9) &amp; &quot;  xxx&quot;,	&quot;xx&quot;,  6).x
+	refute_parses(p, TAB).x
+	refute_parses(p, TAB &amp; &quot;  &quot;).x
+	refute_parses(p, TAB &amp; &quot;  x&quot;).x
+	assert_parses(p, TAB &amp; &quot;  xx&quot;,	&quot;xx&quot;,  6).x
+	assert_parses(p, TAB &amp; &quot;  xxx&quot;,	&quot;xx&quot;,  6).x
 	
 	Dim mkList1 As Object, mkList2 As Object, expected As Object
 	Set mkList1 = swap(cons, nil) &apos; \y.cons y nil
@@ -2146,9 +2146,9 @@ Function test_Parser_zeroOrOne()
 	zeroMatches = Empty
 	oneMatch    = &quot;x&quot;
 		
-	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
-		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
-		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
+	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; CR, &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
+		&quot;barba&quot;, &quot;barbar&quot;, CR, CR &amp; &quot;bar&quot;, CR &amp; CR,_
+		CR &amp; CR &amp; &quot;bar&quot;_
 	)
 
 	p = pZeroOrOne(pStr(&quot;x&quot;))
@@ -2196,9 +2196,9 @@ Function test_Parser_skip_zeroOrOne()
 	Dim p As Parser
 	Dim data As Variant
 			
-	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
-		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
-		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
+	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; CR, &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
+		&quot;barba&quot;, &quot;barbar&quot;, CR, CR &amp; &quot;bar&quot;, CR &amp; CR,_
+		CR &amp; CR &amp; &quot;bar&quot;_
 	)
 
 	p = pSkip(pZeroOrOne(pStr(&quot;x&quot;)))
@@ -2226,18 +2226,18 @@ Function test_Parser_white()
 	p = pWhite
 
 	refute_parses(p, &quot;&quot;).x
-	assert_parses(p, &quot; &quot;, 						&quot; &quot;, 2	).x
-	assert_parses(p, chr(9), 					&quot;\t&quot;, 2	).x
-	refute_parses(p, chr(13)).x
+	assert_parses(p, &quot; &quot;, 					&quot; &quot;, 2	).x
+	assert_parses(p, TAB, 					TAB, 2	).x
+	refute_parses(p, CR).x
 	refute_parses(p, &quot;asdf&quot;).x
-	assert_parses(p, &quot; asdf&quot;, 					&quot; &quot;, 2).x
-	assert_parses(p, chr(9) &amp; &quot;asdf&quot;, 			&quot;\t&quot;, 2).x
-	refute_parses(p, chr(13) &amp; &quot;asdf&quot;).x
-	assert_parses(p, &quot;  asdf&quot;, 					&quot; &quot;, 2).x
-	assert_parses(p, chr(9) &amp; chr(9) &amp; &quot;asdf&quot;, 	&quot;\t&quot;, 2).x
-	refute_parses(p, chr(13) &amp; chr(9) &amp; &quot;asdf&quot;).x
-	assert_parses(p, chr(9) &amp; chr(13) &amp; &quot;asdf&quot;, 	&quot;\t&quot;, 2).x
-	refute_parses(p, chr(13) &amp; chr(13) &amp; &quot;asdf&quot;).x
+	assert_parses(p, &quot; asdf&quot;, 				&quot; &quot;, 2).x
+	assert_parses(p, TAB &amp; &quot;asdf&quot;, 			TAB, 2).x
+	refute_parses(p, CR &amp; &quot;asdf&quot;).x
+	assert_parses(p, &quot;  asdf&quot;, 				&quot; &quot;, 2).x
+	assert_parses(p, TAB &amp; TAB &amp; &quot;asdf&quot;, 	TAB, 2).x
+	refute_parses(p, CR &amp; TAB &amp; &quot;asdf&quot;).x
+	assert_parses(p, TAB &amp; CR &amp; &quot;asdf&quot;, 	TAB, 2).x
+	refute_parses(p, CR &amp; CR &amp; &quot;asdf&quot;).x
 End Function
 
 Function test_Parser_range()
@@ -2258,7 +2258,7 @@ Function test_Parser_alphaLower()
 	Dim p As Parser
 	p = pAlphaLower
 
-	refute_parses(p, Array(&quot; &quot;, chr(9), chr(13), &quot;_&quot;, _
+	refute_parses(p, Array(&quot; &quot;, TAB, CR, &quot;_&quot;, _
 		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;, _
 		&quot;+&quot;, &quot;-&quot;, &quot;-&gt;&quot;, &quot;*&quot;, &quot;?&quot;, &quot;#&quot;,_
 		&quot;A&quot;, &quot;B&quot;, &quot;C&quot;, &quot;D&quot;, &quot;E&quot;, &quot;F&quot;, &quot;G&quot;, &quot;H&quot;, &quot;I&quot;, &quot;J&quot;, &quot;K&quot;, &quot;L&quot;, &quot;M&quot;, _
@@ -2297,7 +2297,7 @@ Function test_Parser_alphaUpper()
 	Dim p As Parser
 	p = pAlphaUpper
 
-	refute_parses(p, Array(&quot; &quot;, chr(9), chr(13), &quot;_&quot;, _
+	refute_parses(p, Array(&quot; &quot;, TAB, CR, &quot;_&quot;, _
 		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;, _
 		&quot;+&quot;, &quot;-&quot;, &quot;-&gt;&quot;, &quot;*&quot;, &quot;?&quot;, &quot;#&quot;,_
 		&quot;a&quot;, &quot;b&quot;, &quot;c&quot;, &quot;d&quot;, &quot;e&quot;, &quot;f&quot;, &quot;g&quot;, &quot;h&quot;, &quot;i&quot;, &quot;j&quot;, &quot;k&quot;, &quot;l&quot;, &quot;m&quot;, _
@@ -2360,7 +2360,7 @@ Function test_Parser_TypeVar()
 	Dim p As Parser
 	p = pTypeVar
 
-	refute_parses(p, Array(&quot; &quot;, chr(9), chr(13), &quot;_&quot;, _
+	refute_parses(p, Array(&quot; &quot;, TAB, CR, &quot;_&quot;, _
 		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;, _
 		&quot;+&quot;, &quot;-&quot;, &quot;-&gt;&quot;, &quot;*&quot;, &quot;?&quot;, &quot;#&quot;,_
 		&quot;A&quot;, &quot;B&quot;, &quot;C&quot;, &quot;D&quot;, &quot;E&quot;, &quot;F&quot;, &quot;G&quot;, &quot;H&quot;, &quot;I&quot;, &quot;J&quot;, &quot;K&quot;, &quot;L&quot;, &quot;M&quot;, _
@@ -2630,9 +2630,9 @@ Function test_Parser_many()
 	Dim zeroMatches As Variant
 	zeroMatches = nil
 	
-	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
-		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
-		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
+	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; CR, &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
+		&quot;barba&quot;, &quot;barbar&quot;, CR, CR &amp; &quot;bar&quot;, CR &amp; CR,_
+		CR &amp; CR &amp; &quot;bar&quot;_
 	)
 	p = pMany(pFail)
 	assert_parses(p, data, zeroMatches, 1).x
@@ -2642,13 +2642,14 @@ Function test_Parser_many()
 	p = pMany(pItem)
 	assert_parses(p, &quot;&quot;, 			zeroMatches, 1).x
 	assert_parses(p, &quot; &quot;, 			List(&quot; &quot;), 2).x
-	assert_parses(p, &quot; &quot; &amp; chr(13),	List(&quot; &quot;, &quot;\n&quot;), 3).x
+	assert_parses(p, &quot; &quot; &amp; CR,		List(&quot; &quot;, CR), 3).x
+	assert_parses(p, &quot; &quot; &amp; LF,		List(&quot; &quot;, LF), 3).x
 	assert_parses(p, &quot;asdf&quot;,		List(&quot;a&quot;, &quot;s&quot;, &quot;d&quot;, &quot;f&quot;), 5).x
 	
 	p = pMany(pStr(&quot; &quot;))
 	assert_parses(p, &quot;&quot;, 			zeroMatches, 1).x
 	assert_parses(p, &quot; &quot;, 			List(&quot; &quot;), 2).x
-	assert_parses(p, &quot; &quot; &amp; chr(13),	List(&quot; &quot;), 2).x
+	assert_parses(p, &quot; &quot; &amp; CR,		List(&quot; &quot;), 2).x
 	assert_parses(p, &quot;asdf&quot;,		zeroMatches, 1).x
 	assert_parses(p, &quot;  &quot;,			List(&quot; &quot;, &quot; &quot;), 3).x
 	assert_parses(p, &quot;   &quot;,			List(&quot; &quot;, &quot; &quot;, &quot; &quot;), 4).x
@@ -2668,9 +2669,9 @@ Function test_Parser_many1()
 	Dim p As Parser
 	Dim data As Variant
 	
-	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
-		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
-		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
+	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; CR, &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
+		&quot;barba&quot;, &quot;barbar&quot;, CR, CR &amp; &quot;bar&quot;, CR &amp; CR,_
+		CR &amp; CR &amp; &quot;bar&quot;_
 	)
 	p = pMany1(pFail)
 	refute_parses(p, data).x
@@ -2680,13 +2681,14 @@ Function test_Parser_many1()
 	p = pMany1(pItem)
 	refute_parses(p, &quot;&quot;).x
 	assert_parses(p, &quot; &quot;, 			List(&quot; &quot;), 2).x
-	assert_parses(p, &quot; &quot; &amp; chr(13),	List(&quot; &quot;, &quot;\n&quot;), 3).x
+	assert_parses(p, &quot; &quot; &amp; CR,		List(&quot; &quot;, CR), 3).x
+	assert_parses(p, &quot; &quot; &amp; LF,		List(&quot; &quot;, LF), 3).x
 	assert_parses(p, &quot;asdf&quot;,		List(&quot;a&quot;, &quot;s&quot;, &quot;d&quot;, &quot;f&quot;), 5).x
 	
 	p = pMany1(pStr(&quot; &quot;))
 	refute_parses(p, &quot;&quot;).x
 	assert_parses(p, &quot; &quot;, 			List(&quot; &quot;), 2).x
-	assert_parses(p, &quot; &quot; &amp; chr(13),	List(&quot; &quot;), 2).x
+	assert_parses(p, &quot; &quot; &amp; CR,		List(&quot; &quot;), 2).x
 	refute_parses(p, &quot;asdf&quot;).x
 	assert_parses(p, &quot;  &quot;,			List(&quot; &quot;, &quot; &quot;), 3).x
 	assert_parses(p, &quot;   &quot;,			List(&quot; &quot;, &quot; &quot;, &quot; &quot;), 4).x
@@ -2704,7 +2706,7 @@ Function test_Parser_many1()
 	p = pMany1(pSeqL(Array(pStr(&quot; &quot;)), id))
 	refute_parses(p, &quot;&quot;).x
 	assert_parses(p, &quot; &quot;, 			List(List(&quot; &quot;)), 2).x
-	assert_parses(p, &quot; &quot; &amp; chr(13),	List(List(&quot; &quot;)), 2).x
+	assert_parses(p, &quot; &quot; &amp; CR,	List(List(&quot; &quot;)), 2).x
 	refute_parses(p, &quot;asdf&quot;).x
 	assert_parses(p, &quot;  &quot;,			List(List(&quot; &quot;), List(&quot; &quot;)), 3).x
 	assert_parses(p, &quot;   &quot;,			List(List(&quot; &quot;), List(&quot; &quot;), List(&quot; &quot;)), 4).x
@@ -2718,9 +2720,9 @@ Function test_Parser_seq()
 	Dim p As Parser, f As Variant
 	Dim data As Variant
 	
-	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; chr(13), &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
-		&quot;barba&quot;, &quot;barbar&quot;, chr(13), chr(13) &amp; &quot;bar&quot;, chr(13) &amp; chr(13),_
-		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
+	data = Array(&quot;&quot;, &quot; &quot;, &quot; &quot; &amp; CR, &quot;asdf&quot;, &quot; bar&quot;, &quot;b&quot;, &quot;ba&quot;, &quot;bar&quot;, &quot;barb&quot;,_
+		&quot;barba&quot;, &quot;barbar&quot;, CR, CR &amp; &quot;bar&quot;, CR &amp; CR,_
+		CR &amp; CR &amp; &quot;bar&quot;_
 	)
 	f = Fn.asc
 	p = pSeq(Array(pFail), f)
@@ -2799,59 +2801,59 @@ Function test_Parser_toString()
 
 	&apos; pSeqL(..., id)
 	p = pSeqL(Array(pItem), id)
-	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot; return [a0]&quot; &amp; chr(13) &amp; chr(10) _
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; NL _
+				  &amp; &quot; return [a0]&quot; &amp; NL _
 				  &amp; &quot;)&quot;).x
 	p = pSeqL(Array(pItem, pItem), id)
-	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot;    a1 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot; return [a0, a1]&quot; &amp; chr(13) &amp; chr(10) _
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; NL _
+				  &amp; &quot;    a1 &lt;- item&quot; &amp; NL _
+				  &amp; &quot; return [a0, a1]&quot; &amp; NL _
 				  &amp; &quot;)&quot;).x
 	p = pSeqL(Array(pItem, pStr(&quot;x&quot;), pItem), id)
-	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot;    a1 &lt;- (str &apos;x&apos;)&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot;    a2 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot; return [a0, a1, a2]&quot; &amp; chr(13) &amp; chr(10) _
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; NL _
+				  &amp; &quot;    a1 &lt;- (str &apos;x&apos;)&quot; &amp; NL _
+				  &amp; &quot;    a2 &lt;- item&quot; &amp; NL _
+				  &amp; &quot; return [a0, a1, a2]&quot; &amp; NL _
 				  &amp; &quot;)&quot;).x
 	p = pSeqL(Array(pItem, pSkip(pStr(&quot;x&quot;)), pItem), id)
-	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot;     _ &lt;- (str &apos;x&apos;)&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot;    a1 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot; return [a0, a1]&quot; &amp; chr(13) &amp; chr(10) _
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; NL _
+				  &amp; &quot;     _ &lt;- (str &apos;x&apos;)&quot; &amp; NL _
+				  &amp; &quot;    a1 &lt;- item&quot; &amp; NL _
+				  &amp; &quot; return [a0, a1]&quot; &amp; NL _
 				  &amp; &quot;)&quot;).x
 
 	&apos; pSeqL(..., reverse)
 	p = pSeqL(Array(pItem), reverse)
-	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot; return (reverse [a0])&quot; &amp; chr(13) &amp; chr(10) _
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; NL _
+				  &amp; &quot; return (reverse [a0])&quot; &amp; NL _
 				  &amp; &quot;)&quot;).x
 	p = pSeqL(Array(pItem, pStr(&quot;x&quot;), pItem), reverse)
-	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot;    a1 &lt;- (str &apos;x&apos;)&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot;    a2 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot; return (reverse [a0, a1, a2])&quot; &amp; chr(13) &amp; chr(10) _
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; NL _
+				  &amp; &quot;    a1 &lt;- (str &apos;x&apos;)&quot; &amp; NL _
+				  &amp; &quot;    a2 &lt;- item&quot; &amp; NL _
+				  &amp; &quot; return (reverse [a0, a1, a2])&quot; &amp; NL _
 				  &amp; &quot;)&quot;).x
 	p = pSeqL(Array(pItem, pSkip(pStr(&quot;x&quot;)), pItem), reverse)
-	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot;     _ &lt;- (str &apos;x&apos;)&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot;    a1 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot; return (reverse [a0, a1])&quot; &amp; chr(13) &amp; chr(10) _
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; NL _
+				  &amp; &quot;     _ &lt;- (str &apos;x&apos;)&quot; &amp; NL _
+				  &amp; &quot;    a1 &lt;- item&quot; &amp; NL _
+				  &amp; &quot; return (reverse [a0, a1])&quot; &amp; NL _
 				  &amp; &quot;)&quot;).x
 
 	&apos; pSeq(..., id) &apos; NOT pSeqL!
 	p = pSeq(Array(pItem), id)
-	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot; return a0&quot; &amp; chr(13) &amp; chr(10) _
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; NL _
+				  &amp; &quot; return a0&quot; &amp; NL _
 				  &amp; &quot;)&quot;).x
 	p = pSeq(Array(pItem, pSkip(pItem)), id)
-	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot;     _ &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot; return a0&quot; &amp; chr(13) &amp; chr(10) _
+	assert_toStr(p, &quot;(do a0 &lt;- item&quot; &amp; NL _
+				  &amp; &quot;     _ &lt;- item&quot; &amp; NL _
+				  &amp; &quot; return a0&quot; &amp; NL _
 				  &amp; &quot;)&quot;).x
 	p = pSeq(Array(pSkip(pItem), pItem), id)
-	assert_toStr(p, &quot;(do  _ &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot;    a0 &lt;- item&quot; &amp; chr(13) &amp; chr(10) _
-				  &amp; &quot; return a0&quot; &amp; chr(13) &amp; chr(10) _
+	assert_toStr(p, &quot;(do  _ &lt;- item&quot; &amp; NL _
+				  &amp; &quot;    a0 &lt;- item&quot; &amp; NL _
+				  &amp; &quot; return a0&quot; &amp; NL _
 				  &amp; &quot;)&quot;).x
 	
 	assert_toStr(pFail, 							&quot;fail&quot;).x
@@ -2923,9 +2925,9 @@ Function test_Parser_hexNum()
 
 	refute_parses(p, &quot;&quot;).x
 		
-	data = Array(&quot; &quot;, &quot; &quot; &amp; chr(13), &quot;qasdf&quot;, &quot; bar&quot;, &quot;qb&quot;, &quot;qba&quot;, &quot;qbar&quot;, &quot;qbarb&quot;,_
-		&quot;qbarba&quot;, &quot;qbarbar&quot;, chr(13), chr(13) &amp; &quot;qbar&quot;, chr(13) &amp; chr(13),_
-		chr(13) &amp; chr(13) &amp; &quot;bar&quot;_
+	data = Array(&quot; &quot;, &quot; &quot; &amp; CR, &quot;qasdf&quot;, &quot; bar&quot;, &quot;qb&quot;, &quot;qba&quot;, &quot;qbar&quot;, &quot;qbarb&quot;,_
+		&quot;qbarba&quot;, &quot;qbarbar&quot;, CR, CR &amp; &quot;qbar&quot;, CR &amp; CR,_
+		CR &amp; CR &amp; &quot;bar&quot;_
 	)
 	refute_parses(p, data).x
 
@@ -2982,9 +2984,9 @@ Function test_Parser_hexLit()
 
 	refute_parses(p, &quot;&quot;).x
 		
-	data = Array(&quot; &quot;, &quot; &quot; &amp; chr(13), &quot;qasdf&quot;, &quot; bar&quot;, &quot;qb&quot;, &quot;qba&quot;, &quot;qbar&quot;, &quot;qbarb&quot;,_
-		&quot;qbarba&quot;, &quot;qbarbar&quot;, chr(13), chr(13) &amp; &quot;qbar&quot;, chr(13) &amp; chr(13),_
-		chr(13) &amp; chr(13) &amp; &quot;bar&quot;,_
+	data = Array(&quot; &quot;, &quot; &quot; &amp; CR, &quot;qasdf&quot;, &quot; bar&quot;, &quot;qb&quot;, &quot;qba&quot;, &quot;qbar&quot;, &quot;qbarb&quot;,_
+		&quot;qbarba&quot;, &quot;qbarbar&quot;, CR, CR &amp; &quot;qbar&quot;, CR &amp; CR,_
+		CR &amp; CR &amp; &quot;bar&quot;,_
 		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;,_
 		&quot;a&quot;, &quot;A&quot;, &quot;b&quot;, &quot;B&quot;, &quot;c&quot;, &quot;C&quot;, &quot;d&quot;, &quot;D&quot;, &quot;e&quot;, &quot;E&quot;, &quot;f&quot;, &quot;F&quot;,_
 		&quot;0x&quot;_

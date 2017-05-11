@@ -137,7 +137,7 @@ Function _TASN_toString( _
 			child = asnChild(n, i)
 			If (i = k) Then &apos; last child
 				result = result _
-					   &amp; chr(13) &amp; chr(10) _
+					   &amp; NL _
 					   &amp; _TASN_toString( _
 					   		child, _
 							prefixC &amp; &quot;└&quot; , _
@@ -145,7 +145,7 @@ Function _TASN_toString( _
 						 )
 			Else
 				result = result _
-					   &amp; chr(13) &amp; chr(10) _
+					   &amp; NL _
 					   &amp; _TASN_toString( _
 					   		child, _
 							prefixC &amp; &quot;├&quot; , _
@@ -392,7 +392,7 @@ Function _toDerivationP( _
 		Else
 			croak(&quot;toDerivationP/zeroOrOne: q.typ = &quot; _
 				&amp; toString(q.typ) _
-				&amp; chr(13) &amp; chr(10) &amp; toString(q) _
+				&amp; NL &amp; toString(q) _
 			)
 		End If
 		result = pZeroOrOne2(nil, q)
@@ -460,11 +460,18 @@ Function _toDerivationP( _
 					If q.typ = typ_Parser_ASN Then
 						q = pBind(q, compose(pReturn, swap(cons, nil)))
 					Else
-						r = pBind(rq, compose(pReturn, swap(cons, nil)))
+						r = pBind(r, compose(pReturn, swap(cons, nil)))
 					End If
 				End If
 				result = pChoice(q, r)
 				result.typ = q.typ
+			Case &quot;bind&quot; &apos; only certain variants supported here
+				f = p.st1
+				If isBreturn(f) Then
+					f = car(partialArgs(f))	&apos; get out B&apos;s 2nd arg (they&apos;re in reverse!)
+					q = p.st0
+					result = _toDerivationP(pSeq(Array(q), f), seen, options)
+				End If
 			Case &quot;seq&quot; &apos; only simple sequences supported here
 				&apos;result = Empty
 				qs = toList(p.st(0))
@@ -548,12 +555,12 @@ Function _toDerivationP( _
 							&apos; What we could do is make a big list with
 							&apos; the 2nd arg for cons &quot;flattened&quot; in
 							&apos;msgbox(&quot;pSeq(..., cons): &quot; &amp; toString(typs) _
-							&apos;&amp; chr(13) &amp; chr(10) &amp; toString(p))
+							&apos;&amp; NL &amp; toString(p))
 							result = _toDerivationP( _
 								pSeqL(p.st(0), id), _
 								seen, options)
 						End If
-					ElseIf fName = getFnName(Fn.foldl) Then
+					ElseIf (fName = getFnName(Fn.foldl)) Or (fName = getFnName(Fn.foldl1)) Then
 						f = car(partialArgs(f))
 						fName = getFnName(f)
 						If fName = getFnName(Fn.concat) Then
@@ -588,7 +595,7 @@ Function _toDerivationP( _
 				If isEmpty(result) Then
 					croak(&quot;toDerivationP/NYI: pSeq(..., &quot; _
 						 &amp; TFn_toString(p.st(1)) &amp; &quot;)&quot; _
-						 &amp; chr(13) &amp; chr(10) _
+						 &amp; NL _
 						 &amp; toString(p)_
 					)
 				End If
@@ -889,7 +896,7 @@ Function test_AST_toDerivationP_simple(opts As Integer)
 	p = pInd(&quot;Bar&quot;)
 	p = fixIndirection(p, pSeqL(Array(pItem, pStr(&quot;1&quot;)), id)
 	q = toDerivationP(p, opts)
-	&apos;msgbox(toString(p) &amp; chr(13) &amp; chr(13) &amp; toString(q))
+	&apos;msgbox(toString(p) &amp; CR &amp; CR &amp; toString(q))
 	refute_parses(q, &quot;&quot;, &quot;a&quot;, &quot;aa&quot;, &quot;a0&quot;, &quot;b&quot;, &quot;b1&quot;).x
 	x = mkDtNonterminal(getPIndName(p), List( _
 			mkDtCClass(&quot;(.)&quot;, &quot;a&quot;), mkDtTerminal(&quot;1&quot;) _

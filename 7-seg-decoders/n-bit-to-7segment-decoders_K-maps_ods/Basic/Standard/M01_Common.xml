@@ -177,8 +177,10 @@ Function toString(ByVal v As Variant) As String
 		Case &quot;String&quot;
 			Dim t As String
 			t = v &amp; &quot;&quot;
-			t = Join(Split(t, CR),  &quot;\n&quot;) &apos; TODO: fix toString \r vs \n
-			t = Join(Split(t, LF),  &quot;\r&quot;) &apos; TODO: fix toString \r vs \n
+			t = Join(Split(t, &quot;\&quot;), &quot;\\&quot;)
+			t = Join(Split(t, DQ), 	&quot;\&quot; &amp; DQ)
+			t = Join(Split(t, CR),  &quot;\r&quot;)
+			t = Join(Split(t, LF),  &quot;\n&quot;)
 			t = Join(Split(t, TAB), &quot;\t&quot;)
 			result = &quot;&apos;&quot; &amp; t &amp; &quot;&apos;&quot;
 		Case &quot;Empty&quot;
@@ -248,7 +250,7 @@ Function readHex(arg As Variant) As Long
 				Next i
 			End If
 		Case Else
-			croak(&quot;readHex: expected Array or String - got &quot; &amp; t &amp; &quot;:&quot; &amp; chr(13) &amp; toString(arg))
+			croak(&quot;readHex: expected Array or String - got &quot; &amp; t &amp; &quot;:&quot; &amp; CR &amp; toString(arg))
 	End Select
 	readHex = result
 	Exit Function
@@ -465,24 +467,38 @@ Function test_isString()
 End Function
 
 Function test_toString()
-	assertEqual(toString(&quot;&quot;),                  &quot;&apos;&apos;&quot;).x
-	assertEqual(toString(&quot; &quot;),                 &quot;&apos; &apos;&quot;).x
-	assertEqual(toString(&quot;abc&quot;),               &quot;&apos;abc&apos;&quot;).x
-	assertEqual(toString(0),                   &quot;0&quot;).x
-	assertEqual(toString(&quot;0&quot;),                 &quot;&apos;0&apos;&quot;).x
-	assertEqual(toString(1),                   &quot;1&quot;).x
-	assertEqual(toString(&quot;1&quot;),                 &quot;&apos;1&apos;&quot;).x
-	assertEqual(toString(&quot; 1&quot;),                &quot;&apos; 1&apos;&quot;).x
-	assertEqual(toString(&quot;01&quot;),                &quot;&apos;01&apos;&quot;).x
-	assertEqual(toString(01),                  &quot;1&quot;).x
-	assertEqual(toString(chr(13)),             &quot;&apos;\n&apos;&quot;).x
-	assertEqual(toString(chr( 9)),             &quot;&apos;\t&apos;&quot;).x
-	assertEqual(toString(chr( 9) &amp; &quot;x&quot;),       &quot;&apos;\tx&apos;&quot;).x
-	assertEqual(toString(&quot;x&quot; &amp; chr( 9)),       &quot;&apos;x\t&apos;&quot;).x
-	assertEqual(toString(&quot;x&quot; &amp; chr(13)),       &quot;&apos;x\n&apos;&quot;).x
-	assertEqual(toString(&quot;x&quot; &amp; chr( 9) &amp; &quot;y&quot;), &quot;&apos;x\ty&apos;&quot;).x
-	assertEqual(toString(&quot;x&quot; &amp; chr(13) &amp; &quot;y&quot;), &quot;&apos;x\ny&apos;&quot;).x
-	assertEqual(toString(chr(9) &amp; chr(13) &amp; &quot;y&quot;), &quot;&apos;\t\ny&apos;&quot;).x
+	assertEqual(toString(&quot;&quot;),               &quot;&apos;&apos;&quot;).x
+	assertEqual(toString(&quot; &quot;),              &quot;&apos; &apos;&quot;).x
+	assertEqual(toString(&quot;abc&quot;),            &quot;&apos;abc&apos;&quot;).x
+	assertEqual(toString(0),                &quot;0&quot;).x
+	assertEqual(toString(&quot;0&quot;),              &quot;&apos;0&apos;&quot;).x
+	assertEqual(toString(1),                &quot;1&quot;).x
+	assertEqual(toString(&quot;1&quot;),              &quot;&apos;1&apos;&quot;).x
+	assertEqual(toString(&quot; 1&quot;),             &quot;&apos; 1&apos;&quot;).x
+	assertEqual(toString(&quot;01&quot;),             &quot;&apos;01&apos;&quot;).x
+	assertEqual(toString(01),               &quot;1&quot;).x
+	assertEqual(toString(CR),             	&quot;&apos;\r&apos;&quot;).x
+	assertEqual(toString(LF),             	&quot;&apos;\n&apos;&quot;).x
+	assertEqual(toString(TAB),             	&quot;&apos;\t&apos;&quot;).x
+	assertEqual(toString(TAB &amp; &quot;x&quot;),       	&quot;&apos;\tx&apos;&quot;).x
+	assertEqual(toString(&quot;x&quot; &amp; TAB),       	&quot;&apos;x\t&apos;&quot;).x
+	assertEqual(toString(&quot;x&quot; &amp; CR),       	&quot;&apos;x\r&apos;&quot;).x
+	assertEqual(toString(&quot;x&quot; &amp; LF),       	&quot;&apos;x\n&apos;&quot;).x
+	assertEqual(toString(&quot;x&quot; &amp; TAB &amp; &quot;y&quot;), 	&quot;&apos;x\ty&apos;&quot;).x
+	assertEqual(toString(&quot;x&quot; &amp; CR &amp; &quot;y&quot;), 	&quot;&apos;x\ry&apos;&quot;).x
+	assertEqual(toString(&quot;x&quot; &amp; LF &amp; &quot;y&quot;), 	&quot;&apos;x\ny&apos;&quot;).x
+	assertEqual(toString(TAB &amp; CR &amp; &quot;y&quot;), 	&quot;&apos;\t\ry&apos;&quot;).x
+	assertEqual(toString(TAB &amp; LF &amp; &quot;y&quot;), 	&quot;&apos;\t\ny&apos;&quot;).x
+
+	assertEqual(toString(&quot;\&quot;),              &quot;&apos;\\&apos;&quot;).x
+	assertEqual(toString(&quot; \&quot;),             &quot;&apos; \\&apos;&quot;).x
+	assertEqual(toString(&quot;\ &quot;),             &quot;&apos;\\ &apos;&quot;).x
+	assertEqual(toString(&quot; \ &quot;),            &quot;&apos; \\ &apos;&quot;).x
+
+	assertEqual(toString(DQ),               &quot;&apos;\&quot; &amp; DQ &amp; &quot;&apos;&quot;).x
+	assertEqual(toString(&quot; &quot; &amp; DQ),         &quot;&apos; \&quot; &amp; DQ &amp; &quot;&apos;&quot;).x
+	assertEqual(toString(DQ &amp; &quot; &quot;),			&quot;&apos;\&quot; &amp; DQ &amp; &quot; &apos;&quot;).x
+	assertEqual(toString(&quot; &quot; &amp; DQ &amp; &quot; &quot;),   &quot;&apos; \&quot; &amp; DQ &amp; &quot; &apos;&quot;).x
 
 	Dim aLong As Long
 	aLong = 0

@@ -368,14 +368,14 @@ Function asFn(fn As Variant, Optional ByVal msg As String)
 	If isString(fn) Then
 		f = lookupFn(fn)
 		If isEmpty(f) Then
-			If isMissing(msg) Then : msg = &quot;&quot; : Else : msg = msg &amp; chr(13) : End If
+			If isMissing(msg) Then : msg = &quot;&quot; : Else : msg = msg &amp; CR : End If
 			croak(msg &amp; &quot;unknown function: &quot; &amp; toString(fn))
 		End If
 	Else
 		f = fn
 	End If
 	If Not(isFn(f)) Then
-		If isMissing(msg) Then : msg = &quot;&quot; : Else : msg = msg &amp; chr(13) : End If
+		If isMissing(msg) Then : msg = &quot;&quot; : Else : msg = msg &amp; CR : End If
 		croak(msg &amp; &quot;not a valid function: &quot; &amp; toString(f))
 	End If
 	asFn = f
@@ -582,7 +582,7 @@ Function applyToList(Optional ByVal f As Variant, Optional ByVal args As Object)
 	ElseIf isNil(args) Then
 		Dim fstr As String
 		fstr = toString(f)
-		croak(&quot;applyToList: empty args list for &quot; &amp; chr(13) &amp; fstr)
+		croak(&quot;applyToList: empty args list for &quot; &amp; CR &amp; fstr)
 	Else
 		&apos; applyToList = foldl apply1 f args
 		f = asFn(f, &quot;applyToList: invalid 1st arg&quot;)
@@ -614,7 +614,7 @@ End Function
 Function apply(ByVal fn As Variant, a0, Optional a1, Optional a2, Optional a3, Optional a4, Optional a5, Optional a6, Optional a7, Optional a8, Optional a9, Optional a10)
 	Dim args As Object
 	If Not(isFn(fn)) Then
-&apos;		croak(&quot;apply: invalid 1st arg:&quot; &amp; chr(13) &amp; toString(fn))
+&apos;		croak(&quot;apply: invalid 1st arg:&quot; &amp; CR &amp; toString(fn))
 	End If
 	fn = asFn(fn, &quot;apply: invalid 1st arg&quot;)
 	If isMissing(a1) Then
@@ -738,8 +738,8 @@ Function test_Fn()
 	fAsc = Fn.asc
 	assertEqual(arity(fAsc), 1).x
 	assertEqual(apply(fAsc, &quot; &quot;), 		Asc(&quot; &quot;)).x
-	assertEqual(apply(fAsc, Chr( 9)), 	       9).x
-	assertEqual(apply(fAsc, Chr(13)), 	      13).x
+	assertEqual(apply(fAsc, TAB), 	       9).x
+	assertEqual(apply(fAsc, CR), 	      13).x
 	assertEqual(apply(fAsc, &quot;0&quot;), 		Asc(&quot;0&quot;)).x
 	assertEqual(apply(fAsc, &quot;9&quot;), 		Asc(&quot;9&quot;)).x
 	assertEqual(apply(fAsc, &quot;A&quot;), 		Asc(&quot;A&quot;)).x
@@ -749,8 +749,8 @@ Function test_Fn()
 	Dim fChr As Variant
 	fChr = Fn.chr
 	assertEqual(arity(fChr), 1).x
-	assertEqual(apply(fChr,  9), 	Chr( 9)).x
-	assertEqual(apply(fChr, 13), 	Chr(13)).x
+	assertEqual(apply(fChr,  9), 	TAB).x
+	assertEqual(apply(fChr, 13), 	CR).x
 	assertEqual(apply(fChr, 32), 	Chr(32)).x
 	assertEqual(apply(fChr, 48), 	Chr(48)).x
 	assertEqual(apply(fChr, 65), 	Chr(65)).x
