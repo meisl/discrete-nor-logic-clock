@@ -380,7 +380,7 @@ Function _toDerivationP( _
 				&amp; chr(13) &amp; chr(10) &amp; toString(q) _
 			)
 		End If
-		result = pChoice(q, pReturn(nil))
+		result = pZeroOrOne2(nil, q)
 		If (options And dtOpt_implicitMult) &lt;&gt; 0 Then
 			result.typ = typ_Parser_List_ASN
 		Else

@@ -61,6 +61,7 @@ Type TFnObjs
 	pMany				As Object
 	pMany1				As Object
 	pZeroOrOne			As Object
+	pZeroOrOne2			As Object
 	mkTypeVar			As Object
 	maybeMakeArrowType	As Object
 	mkTypeCtor			As Object
@@ -132,6 +133,7 @@ Function Fn
 		result.pMany		= lookupFn(&quot;pMany&quot;)
 		result.pMany1		= lookupFn(&quot;pMany1&quot;)
 		result.pZeroOrOne	= lookupFn(&quot;pZeroOrOne&quot;)
+		result.pZeroOrOne2	= lookupFn(&quot;pZeroOrOne2&quot;)
 		result.mkTypeVar		  = lookupFn(&quot;mkTypeVar&quot;)
 		result.maybeMakeArrowType = lookupFn(&quot;maybeMakeArrowType&quot;)
 		result.mkTypeCtor		  = lookupFn(&quot;mkTypeCtor&quot;)
@@ -288,6 +290,7 @@ Function fnObjs()
 			newFn(&quot;pMany&quot;,				1, &quot;Parser a -&gt; Parser [a]&quot;), _
 			newFn(&quot;pMany1&quot;,				1, &quot;Parser a -&gt; Parser [a]&quot;), _
 			newFn(&quot;pZeroOrOne&quot;,			1, &quot;Parser a -&gt; Parser (Maybe a)&quot;), _
+			newFn(&quot;pZeroOrOne2&quot;,		2, &quot;Parser a -&gt; a -&gt; Parser a&quot;), _
 			newFn(&quot;mkTypeVar&quot;,			1, &quot;Char -&gt; Str&quot;), _
 			newFn(&quot;maybeMakeArrowType&quot;,	2, &quot;Typ -&gt; Maybe Typ -&gt; Typ&quot;), _
 			newFn(&quot;mkTypeCtor&quot;,			2, &quot;Str -&gt; [Typ] -&gt; Typ&quot;), _
@@ -483,6 +486,7 @@ applyLast_of_two:
 		Case &quot;mkParser&quot;:	result = mkParser(		a0, a1)
 		Case &quot;pBind&quot;:		result = pBind(			a0, a1)
 		Case &quot;pChoice&quot;:		result = pChoice(		a0, a1)
+		Case &quot;pZeroOrOne2&quot;:	result = pZeroOrOne2(	a0, a1)
 		Case &quot;maybeMakeArrowType&quot;: result = maybeMakeArrowType(a0, a1)
 		Case &quot;mkTypeCtor&quot;:	result = mkTypeCtor(	a0, a1)
 		Case &quot;mkTupleType&quot;:	result = mkTupleType(	a0, a1)

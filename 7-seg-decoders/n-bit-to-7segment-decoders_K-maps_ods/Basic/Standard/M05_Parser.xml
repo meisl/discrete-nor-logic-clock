@@ -29,6 +29,7 @@ Public applyP_bind_K_return As Integer
 Public applyP_bind_B_f_g As Integer
 Public applyP_bind_B_return_g As Integer
 Public applyP_choice As Integer
+Public applyP_zeroOrOne As Integer
 Public applyP_many1 As Integer
 Public applyP_str As Integer
 Public applyP_seq As Integer
@@ -91,8 +92,23 @@ Function _TParser_toString( _
 	ByRef seen As Object _
 )
 	Dim result As String, f As Object
+	Dim q As Object
 	If p.str &lt;&gt; &quot;&quot; Then
 		result = p.str
+	ElseIf isPZeroOrOne(p) Then
+		&apos; it has shape q +++ return Empty
+		&apos; so it&apos;s effectively &quot;zero-or-one&quot; q, 
+		&apos; which can be written as &quot;q?&quot;
+		q = p.st0
+		If (q.tp = &quot;choice&quot;) Or (q.tp = &quot;bind&quot;) Then
+			result = &quot;(&quot; &amp; _TParser_toString( _
+						q, k, indent &amp; &quot; &quot;, False, rules, seen) _
+				   &amp; &quot;)&quot;
+		Else
+			result = _TParser_toString( _
+						q, k, indent, False, rules, seen)
+		End If
+		result = result &amp; &quot;?&quot;
 	Else : Select Case p.tp
 		Case &quot;ind&quot;
 			Dim name As String
@@ -145,20 +161,7 @@ Function _TParser_toString( _
 			Dim altL As Object, altR As Object
 			altL = p.st0
 			altR = p.st1
-			If isPZeroOrOne(p) Then
-				&apos; it has shape p +++ return Empty
-				&apos; so it&apos;s effectively &quot;zero-or-one&quot; p, which can be written as &quot;p?&quot;
-				
-				If (altL.tp = &quot;choice&quot;) Or (altL.tp = &quot;bind&quot;) Then
-					result = &quot;(&quot; &amp; _TParser_toString( _
-								altL, k, indent &amp; &quot; &quot;, False, rules, seen) _
-						   &amp; &quot;)&quot;
-				Else
-					result = _TParser_toString( _
-								altL, k, indent, False, rules, seen)
-				End If
-				result = result &amp; &quot;?&quot;
-			ElseIf isPMany(p) Then
+			If isPMany(p) Then
 				&apos; it has shape many1 p +++ return nil
 				If (altL.st.tp = &quot;choice&quot;) Or (altL.st.tp = &quot;bind&quot;) Then
 					result = &quot;(&quot; &amp; _TParser_toString( _
@@ -198,7 +201,6 @@ Function _TParser_toString( _
 				End If
 			End If
 		Case &quot;bind&quot;
-			Dim q As Object
 			q = p.st(0)
 			f = p.st(1)
 			result = _TParser_toString(q, k, indent, False, rules, seen) _
@@ -593,10 +595,12 @@ Function pChoice(Optional p1 As Parser, Optional p2 As Parser)
 	pChoice = result
 End Function
 
-&apos; pattern-matches p against &quot;q +++ return Empty&quot; where q any parser
+&apos; pattern-matches p against &quot;q +++ return x&quot; where q :: Parser a and x :: a
 Function isPZeroOrOne(p As Parser)
 	Dim result As Boolean : result = False
-	If p.tp = &quot;choice&quot; Then
+	If p.tp = &quot;zeroOrOne&quot; Then
+		result = True
+	ElseIf p.tp = &quot;choice&quot; Then
 		Dim sndAlt As Object &apos; 2nd alternative
 		sndAlt = p.st(1)
 		&apos; check if it has shape p +++ return Empty (which is effectively &quot;zero-or-one&quot; p)
@@ -605,10 +609,41 @@ Function isPZeroOrOne(p As Parser)
 	isPZeroOrOne = result
 End Function
 
-&apos; never fails: if p fails than pZeroOrOne(p) returns Empty + same pos as result,
-&apos; otherwise returns whatever p returns as result (+ pos)
+&apos; never fails: if p fails then pZeroOrOne2(p) returns a constant value
+&apos; + same pos as result, otherwise returns whatever p returns as result (+ pos)
 &apos; matches at most once
+Function pZeroOrOne2(Optional v As Variant, Optional p As Parser)
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.pZeroOrOne2 : End If
+	Dim result As Variant
+	If isMissing(v) Then
+		result = oFn
+	ElseIf isMissing(p) Then
+		result = apply(oFn, v)
+	Else
+		If isPZeroOrOne(p) Then
+			result = pZeroOrOne2(v, p.st0)
+		Else
+			result = mkParser(&quot;zeroOrOne&quot;, Array(p, v))
+			result.st0 = p
+			result.st1 = v
+		End If
+	End If
+	pZeroOrOne2 = result
+End Function
+
+&apos; same as pZeroOrOne2(Empty, p)
 Function pZeroOrOne(Optional p As Parser)
+	Dim result As Variant
+	If isMissing(p) Then
+		result = pZeroOrOne2(Empty)
+	Else
+		result = pZeroOrOne2(Empty, p)
+	End If
+	pZeroOrOne = result
+End Function
+
+&apos; same as pZeroOrOne2(Empty, p)
+Function __pZeroOrOne(Optional p As Parser)
 	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.pZeroOrOne : End If
 	Dim result As Variant
 	If isMissing(p) Then
@@ -1184,6 +1219,16 @@ _applyP_begin:
 			If Not(isUnderSkip) Then
 				result = match
 			End If
+		Case &quot;zeroOrOne&quot;
+			result = _applyP(p.st0, s, pos, endPos, isUnderSkip)
+			If endPos &lt; 0 Then
+				endPos = pos
+				If isUnderSkip Then
+					result = Empty
+				Else
+					result = p.st1
+				End If
+			End If
 		Case &quot;choice&quot;	&apos; tail-recursive (in the 2nd alternative)
 _applyP_choiceL:
 			result = _applyP(p.st0, s, pos, endPos, isUnderSkip)
@@ -1427,6 +1472,8 @@ Function _applyP_stats( _
 			assertEqual(arity(p.st0), arity(p.st)).x
 			assertEqual(getFnName(p.st0), getFnName(p.st)).x
 			applyP_sat = applyP_sat + 1
+		Case &quot;zeroOrOne&quot;
+			applyP_zeroOrOne = applyP_zeroOrOne + 1
 		Case &quot;many1&quot;
 			applyP_many1 = applyP_many1 + 1
 		Case &quot;fail&quot;
@@ -1537,6 +1584,7 @@ end_of_Parser_tests:
 				&amp; chr(13) &amp; &quot;applyP_seq: &quot; &amp; applyP_seq _
 				&amp; chr(13) &amp; &quot;applyP_skip: &quot; &amp; applyP_skip _
 				&amp; chr(13) &amp; &quot;applyP_sat: &quot; &amp; applyP_sat _
+				&amp; chr(13) &amp; &quot;applyP_zeroOrOne: &quot; &amp; applyP_zeroOrOne _
 				&amp; chr(13) &amp; &quot;applyP_many1: &quot; &amp; applyP_many1 _
 				&amp; chr(13) &amp; &quot;applyP_fail: &quot; &amp; applyP_fail _
 				&amp; chr(13) &amp; &quot;applyP_ind: &quot; &amp; applyP_ind _

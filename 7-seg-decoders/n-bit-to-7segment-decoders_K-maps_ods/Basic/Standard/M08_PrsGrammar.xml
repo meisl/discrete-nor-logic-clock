@@ -11,11 +11,9 @@ Function derivationTree_prsGrammar( _
 	s As String, _
 	Optional ByVal options As Integer _
 )
-	Static p As Object
-	Dim result As Variant, parseResult As Variant
-	If isNull(p) Then
-		p = toDerivationP(pGrmGrammar, options)
-	End If
+	Dim p As Object, result As Variant, parseResult As Variant
+	p = toDerivationP(pGrmGrammar, options)
+	&apos;msgbox(toString(p))
 	parseResult = applyP(p, s)
 	If isParseFailure(parseResult) Then
 		result = &quot;!ParseFailure!&quot;
@@ -33,17 +31,11 @@ Function pGrmNewline()
 		result = pChoice( _
 			pSeq(Array( _
 				pStr(CR), _
-				pChoice( _
-					pStr(LF), _
-					pReturn(&quot;&quot;) _
-				) _
+				pZeroOrOne2(&quot;&quot;, pStr(LF)) _
 			), concat), _
 			pSeq(Array( _
 				pStr(LF), _
-				pChoice( _
-					pStr(CR), _
-					pReturn(&quot;&quot;) _
-				) _
+				pZeroOrOne2(&quot;&quot;, pStr(CR)) _
 			), concat) _
 		)
 		result = fixIndirection(pInd(&quot;nl&quot;), result)
@@ -74,7 +66,7 @@ Function pGrmIdent()
 						pAlpha, _
 						pMany(pAlphaNumDash), _
 					), foldl(concat))
-		result = fixIndirection(pInd(&quot;Ident&quot;), result)
+		&apos;result = fixIndirection(pInd(&quot;Ident&quot;), result)
 	End If
 	pGrmIdent = result
 End Function

@@ -7,14 +7,14 @@
  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="content.xml"/>
  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M02_Array.xml"/>
  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M0x_Scratch.xml"/>
- <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M00_Test.xml"/>
- <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M01_Common.xml"/>
  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M05_Parser.xml"/>
- <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M06_AST.xml"/>
+ <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M01_Common.xml"/>
+ <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M00_Test.xml"/>
  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/script-lb.xml"/>
- <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M04_Fn.xml"/>
- <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M07_PrsLogic.xml"/>
+ <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M06_AST.xml"/>
  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M08_PrsGrammar.xml"/>
+ <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M07_PrsLogic.xml"/>
+ <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M04_Fn.xml"/>
  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M03_List.xml"/>
  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/script-lc.xml"/>
  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="settings.xml"/>
