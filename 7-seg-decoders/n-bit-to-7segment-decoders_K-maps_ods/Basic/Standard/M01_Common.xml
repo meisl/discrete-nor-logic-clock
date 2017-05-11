@@ -18,8 +18,10 @@ Sub Main
 	test_Common()
 End Sub
 
-
-Function NL() : NL = Chr(13) &amp; Chr(10) : End Function
+Function CR()  : CR = Chr(13) : End Function
+Function LF()  : LF = Chr(10) : End Function
+Function NL()  : NL = CR &amp; LF : End Function
+Function TAB() : TAB = Chr(9) : End Function
 
 Function typeOf(x As Variant)
 	Dim result As String
@@ -170,9 +172,9 @@ Function toString(ByVal v As Variant) As String
 		Case &quot;String&quot;
 			Dim t As String
 			t = v &amp; &quot;&quot;
-			t = Join(Split(t, chr(13)), &quot;\n&quot;) &apos; TODO: fix toString \r vs \n
-			t = Join(Split(t, chr(10)), &quot;\r&quot;) &apos; TODO: fix toString \r vs \n
-			t = Join(Split(t, chr(9)), &quot;\t&quot;)
+			t = Join(Split(t, CR),  &quot;\n&quot;) &apos; TODO: fix toString \r vs \n
+			t = Join(Split(t, LF),  &quot;\r&quot;) &apos; TODO: fix toString \r vs \n
+			t = Join(Split(t, TAB), &quot;\t&quot;)
 			result = &quot;&apos;&quot; &amp; t &amp; &quot;&apos;&quot;
 		Case &quot;Empty&quot;
 			result = tp

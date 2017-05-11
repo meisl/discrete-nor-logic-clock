@@ -27,6 +27,30 @@ Function derivationTree_prsGrammar( _
 End Function
 
 
+Function pGrmNewline()
+	Static result As Object
+	If isNull(result) Then
+		result = pChoice( _
+			pSeq(Array( _
+				pStr(CR), _
+				pChoice( _
+					pStr(LF), _
+					pReturn(&quot;&quot;) _
+				) _
+			), concat), _
+			pSeq(Array( _
+				pStr(LF), _
+				pChoice( _
+					pStr(CR), _
+					pReturn(&quot;&quot;) _
+				) _
+			), concat) _
+		)
+		result = fixIndirection(pInd(&quot;nl&quot;), result)
+	End If
+	pGrmNewline = result	
+End Function
+
 Function pGrmIdent()
 	Static result As Object
 	If isNull(result) Then
@@ -58,9 +82,18 @@ End Function
 Function pGrmGrammar()
 	Static result As Object
 	If isNull(result) Then
-		result = fixIndirection(pInd(&quot;Grammar&quot;), _
-			pGrmRule _
-		)
+		result = pSeq(Array( _
+					pSkip(pMany(pWhite)), _
+					pGrmRule, _
+					pSkip(pMany(pWhite)), _
+					pMany( _
+						pSeq(Array( _
+							pSkip(pMany1(pGrmNewline)), _
+							pGrmRule _
+						), id) _
+					) _
+				 ), cons)
+		result = fixIndirection(pInd(&quot;Grammar&quot;), result)
 	End If
 	pGrmGrammar = result	
 End Function
@@ -94,12 +127,12 @@ Function pGrmAlt()
 	Static result As Object
 	If isNull(result) Then
 		result = pSeq(Array( _
-			pSkip(pMany(pWhite)), _
 			pGrmCon, _
 			pMany( _
 				pSeq(Array( _
-					pSkip(pStr(&quot;|&quot;)), _
+					pSkip(pZeroOrOne(pGrmNewline)), _
 					pSkip(pMany(pWhite)), _
+					pSkip(pStr(&quot;|&quot;)), _
 					pGrmCon _
 				), id) _
 			) _
@@ -114,17 +147,9 @@ Function pGrmCon()
 	If isNull(result) Then
 		Dim pCon As Object
 		pCon = pInd(&quot;Con&quot;)
-		result = pSeqL(Array( _
-			pGrmNonterminal, _
-			pZeroOrOne( _
-				pSeqL(Array( _
-					pSkip(pMany1(pWhite)), _
-					pCon _
-				), id) _
-			) _
-		), id)
 		result = pMany1( _
 			pSeq(Array( _
+				pSkip(pMany(pWhite)), _
 				pGrmNonterminal, _
 				pSkip(pMany(pWhite)) _
 			), id) _
@@ -143,6 +168,7 @@ Function pGrmNonterminal()
 	pGrmNonterminal = result
 End Function
 
+
 Function pGrmMult()
 	Static result As Object
 	If isNull(result) Then
@@ -159,21 +185,81 @@ End Function
 &apos;= tests ======================================================================
 
 Function test_PrsGrammar()
+	test_PrsGrammar_newline()
 	test_PrsGrammar_pGrmMult()
+
 	&apos; pGrmIdent, pGrmRuleName and pGrmNonterminal are essentially the same
 	test_PrsGrammar_ident(pGrmIdent)
 	test_PrsGrammar_ident(pGrmRuleName) 	&apos;    RuleName ::= ident
 	test_PrsGrammar_ident(pGrmNonterminal)	&apos; Nonterminal ::= ident
 End Function
 
-Function test_PrsGrammar_pGrmMult()
+
+Function test_PrsGrammar_newline()
 	Dim p As Object, x As Object
-	p = pGrmMult
+	p = pGrmNewline
 	
-	refute_parses(p, Array(&quot;&quot;, &quot;abc&quot;, &quot;.&quot;, &quot;:&quot;, &quot;=&quot;, &quot;_&quot;, &quot;(&quot;, &quot;)&quot;, &quot; &quot;, &quot;A&quot;, &quot;Z&quot;)).x
-	assert_parses(p, &quot;*&quot;, pMany, 2).x
-	assert_parses(p, &quot;+&quot;, pMany1, 2).x
-	assert_parses(p, &quot;?&quot;, pZeroOrOne, 2).x
+	refute_parses(p, Array( _
+		&quot;&quot;, &quot;*&quot;, &quot;+&quot;, &quot;?&quot;, &quot;=&quot;, &quot;:&quot;, &quot;.&quot;, &quot;|&quot;, &quot;-&quot;, &quot;_&quot;, _
+		&quot;(&quot;, &quot;)&quot;, &quot;[&quot;, &quot;]&quot;, &quot;{&quot;, &quot;}&quot;, _
+		&quot; &quot;, TAB, _
+		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;, _
+		&quot;a&quot;, &quot;b&quot;, &quot;c&quot;,   &quot;q&quot;,        &quot;x&quot;, &quot;y&quot;, &quot;z&quot;, _
+		&quot;A&quot;, &quot;B&quot;, &quot;C&quot;,        &quot;R&quot;,   &quot;X&quot;, &quot;Y&quot;, &quot;Z&quot; _
+	)).x
+	Dim sCR As String, sLF As String
+	sCR = &quot;\n&quot; &apos; TODO: fix toString \r vs \n
+	sLF = &quot;\r&quot; &apos; TODO: fix toString \r vs \n
+	
+	Dim CRLF As String,  LFCR As String
+	Dim sCRLF As String, sLFCR As String
+	CRLF = CR &amp; LF : sCRLF = sCR &amp; sLF
+	LFCR = LF &amp; CR : sLFCR = sLF &amp; sCR
+	
+	assert_parses(p, CR,		sCR, 2).x
+	assert_parses(p, LF, 		sLF, 2).x
+	assert_parses(p, CR &amp; &quot; &quot;,	sCR, 2).x
+	assert_parses(p, LF &amp; &quot; &quot;,	sLF, 2).x
+	assert_parses(p, CR &amp; CR,	sCR, 2).x &apos; consumes only one!
+	assert_parses(p, LF &amp; LF,	sLF, 2).x
+
+	assert_parses(p, CRLF, 		sCR &amp; sLF, 3).x &apos; consumes both!
+	assert_parses(p, LFCR, 		sLF &amp; sCR, 3).x
+	assert_parses(p, CRLF &amp; &quot; &quot;,	sCR &amp; sLF, 3).x
+	assert_parses(p, LFCR &amp; &quot; &quot;,	sLF &amp; sCR, 3).x
+	
+	assert_parses(p, CRLF &amp; CR, sCRLF, 3).x &apos; consumes only first two!
+	assert_parses(p, CRLF &amp; LF, sCRLF, 3).x
+	assert_parses(p, LFCR &amp; CR, sLFCR, 3).x
+	assert_parses(p, LFCR &amp; LF, sLFCR, 3).x
+	
+	p = pMany(p)
+	&apos; all the following yield exactly two strings:
+	assert_parses(p, CR &amp; CR,			List(sCR, sCR),		3).x
+	assert_parses(p, LF &amp; LF,			List(sLF, sLF),		3).x
+	assert_parses(p, CR &amp; CRLF,			List(sCR, sCRLF),	4).x
+	assert_parses(p, LF &amp; LFCR,			List(sLF, sLFCR),	4).x
+	assert_parses(p, CRLF &amp; CR,			List(sCRLF, sCR),	4).x
+	assert_parses(p, CRLF &amp; LF,			List(sCRLF, sLF),	4).x
+	assert_parses(p, LFCR &amp; CR,			List(sLFCR, sCR),	4).x
+	assert_parses(p, LFCR &amp; LF,			List(sLFCR, sLF),	4).x
+	assert_parses(p, CRLF &amp; CRLF,		List(sCRLF, sCRLF),	5).x
+	assert_parses(p, CRLF &amp; LFCR,		List(sCRLF, sLFCR),	5).x
+	assert_parses(p, LFCR &amp; CRLF,		List(sLFCR, sCRLF),	5).x
+	assert_parses(p, LFCR &amp; LFCR,		List(sLFCR, sLFCR),	5).x
+	&apos; again with an additional non-CR, non-LF character suffix:
+	assert_parses(p, CR &amp; CR &amp; &quot; &quot;,		List(sCR, sCR),		3).x
+	assert_parses(p, LF &amp; LF &amp; &quot; &quot;,		List(sLF, sLF),		3).x
+	assert_parses(p, CR &amp; CRLF &amp; &quot; &quot;,	List(sCR, sCRLF),	4).x
+	assert_parses(p, LF &amp; LFCR &amp; &quot; &quot;,	List(sLF, sLFCR),	4).x
+	assert_parses(p, CRLF &amp; CR &amp; &quot; &quot;,	List(sCRLF, sCR),	4).x
+	assert_parses(p, CRLF &amp; LF &amp; &quot; &quot;,	List(sCRLF, sLF),	4).x
+	assert_parses(p, LFCR &amp; CR &amp; &quot; &quot;,	List(sLFCR, sCR),	4).x
+	assert_parses(p, LFCR &amp; LF &amp; &quot; &quot;,	List(sLFCR, sLF),	4).x
+	assert_parses(p, CRLF &amp; CRLF &amp; &quot; &quot;,	List(sCRLF, sCRLF),	5).x
+	assert_parses(p, CRLF &amp; LFCR &amp; &quot; &quot;,	List(sCRLF, sLFCR),	5).x
+	assert_parses(p, LFCR &amp; CRLF &amp; &quot; &quot;,	List(sLFCR, sCRLF),	5).x
+	assert_parses(p, LFCR &amp; LFCR &amp; &quot; &quot;,	List(sLFCR, sLFCR),	5).x
 End Function
 
 Function test_PrsGrammar_ident(p As Object)
@@ -185,7 +271,7 @@ Function test_PrsGrammar_ident(p As Object)
 		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot; _
 	)).x
 	
-	msgbox(toString(p))
+	&apos;msgbox(toString(p))
 	
 	assert_parses(p, &quot;_&quot;, &quot;_&quot;, 2).x
 	assert_parses(p, &quot;A&quot;, &quot;A&quot;, 2).x
@@ -210,7 +296,17 @@ Function test_PrsGrammar_ident(p As Object)
 	assert_parses(p, &quot;aBc+&quot;, &quot;aBc&quot;, 4).x
 	assert_parses(p, &quot;b23?&quot;, &quot;b23&quot;, 4).x
 	assert_parses(p, &quot;zzx(&quot;, &quot;zzx&quot;, 4).x
-	
 End Function
+
+Function test_PrsGrammar_pGrmMult()
+	Dim p As Object, x As Object
+	p = pGrmMult
+	
+	refute_parses(p, Array(&quot;&quot;, &quot;abc&quot;, &quot;.&quot;, &quot;:&quot;, &quot;=&quot;, &quot;_&quot;, &quot;(&quot;, &quot;)&quot;, &quot; &quot;, &quot;A&quot;, &quot;Z&quot;)).x
+	assert_parses(p, &quot;*&quot;, pMany, 2).x
+	assert_parses(p, &quot;+&quot;, pMany1, 2).x
+	assert_parses(p, &quot;?&quot;, pZeroOrOne, 2).x
+End Function
+
 
 </script:module>

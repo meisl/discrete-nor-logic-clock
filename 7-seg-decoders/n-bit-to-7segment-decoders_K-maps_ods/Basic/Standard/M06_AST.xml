@@ -363,8 +363,6 @@ Function _toDerivationP( _
 	Dim qs As Object, rs As Object
 	If isPZeroOrOne(p) Then &apos; p is of shape q +++ (return Empty)
 		q = p.st0
-		s = dtMultLabel(&quot;?&quot;, q)
-		f = mkDtMult(s)
 		q = _toDerivationP(q, seen, options)
 		q = _wrapSkipWithDummyASN(q)
 		If q.typ = typ_Parser_ASN Then
@@ -386,6 +384,8 @@ Function _toDerivationP( _
 		If (options And dtOpt_implicitMult) &lt;&gt; 0 Then
 			result.typ = typ_Parser_List_ASN
 		Else
+			s = dtMultLabel(&quot;?&quot;, p.st0)
+			f = mkDtMult(s)
 			result = pBind(result, compose(pReturn, f))
 			result.typ = typ_Parser_ASN
 		End If
@@ -520,7 +520,7 @@ Function _toDerivationP( _
 						&apos; nothing else as arguments for cons.
 						&apos; So, if there are skips amongst the inner parsers
 						&apos; they must be hidden (dtOpt_hideSkipped).
-						&apos; Similarly, if there are multiplicity ops then
+						&apos; Similarly, if there are multiplicity ops then these
 						&apos; must not be made explicit (dtOpt_implicitMult).
 						&apos; However, we do not test those options here.
 						&apos; Rather we look at the .typ s of the transformed
@@ -564,11 +564,24 @@ Function _toDerivationP( _
 									mkDtTerminal))
 								result.typ = typ_Parser_ASN
 							Else
-								&apos; ignore the foldl concat and treat it
-								&apos; as a plain seqL id
+								&apos; ignore the foldl concat and show
+								&apos; results as a list:
 								result = _toDerivationP( _
 									pSeq(p.st(0), cons), seen, options)
 							End If
+						End If
+					ElseIf fName = getFnName(Fn.concat) Then
+						If (options And dtOpt_doFoldlConcat) Then
+							&apos; let it do its thing and package up
+							&apos; the result under a Terminal ASN
+							result = pBind(p, compose(pReturn, _
+								mkDtTerminal))
+							result.typ = typ_Parser_ASN
+						Else
+							&apos; ignore the concat and show
+							&apos; results as a list:
+							result = _toDerivationP( _
+								pSeqL(p.st(0), id), seen, options)
 						End If
 					End If		
 				End If

@@ -1285,7 +1285,8 @@ _applyP_bind_B_return:
 					_applyP(innerParsers(i), s, pos, endPos, True)
 					If endPos &lt; 0 Then : Exit Function : End If
 					pos = endPos
-				Next		
+				Next
+				result = Empty		
 			Else
 				lst = nil
 				For i = LBound(innerParsers) To UBound(innerParsers)
@@ -1361,9 +1362,12 @@ _applyP_parseSuccess:
 	assertEqual(endPos &gt; 0, True).x
 	If isUnderSkip Then
 		If Not(isEmpty(result)) Then
-			MsgBox(toString(p) _
-				&amp; chr(13) &amp; chr(10) &amp; toString(result) _
-				&amp; chr(13) &amp; chr(10) &amp; Len(toString(result)) _
+			MsgBox(&quot;isUnderSkip=True, so...&quot; &amp; NL _
+				&amp; NL &amp; toString(p) _
+				&amp; NL &amp; &quot;...should have yielded Empty but yielded &quot; _
+					 &amp; toString(result) _
+				&amp; NL &amp; &quot;(pos = &quot; &amp; pos &amp; &quot;; endPos = &quot; &amp; endPos &amp; &quot;)&quot;_
+				&amp; NL &amp; &quot;Mid(s, pos) = &quot; &amp; toString(Mid(s, pos)) _
 			)
 		End If
 		assertEqual(result, Empty).x
