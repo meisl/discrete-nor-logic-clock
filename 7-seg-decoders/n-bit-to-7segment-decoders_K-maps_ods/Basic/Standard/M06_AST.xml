@@ -361,7 +361,22 @@ Function _toDerivationP( _
 	Dim f As Object, s As String, fName As String
 	Dim q As Object, r As Object
 	Dim qs As Object, rs As Object
-	If isPZeroOrOne(p) Then &apos; p is of shape q +++ (return Empty)
+	If isPMany(p) Then &apos; p is of shape (many1 q)?
+		q = p.st0.st0
+		s = dtMultLabel(&quot;*&quot;, q)
+		f = mkDtMult(s)
+		q = _toDerivationP(q, seen, options)
+		If q.typ = typ_Parser_List_ASN Then
+			q = pBind(q, compose(pReturn, mkDtAnonCon))
+		End If
+		result = pMany(q)
+		If (options And dtOpt_implicitMult) &lt;&gt; 0 Then
+			result.typ = typ_Parser_List_ASN
+		Else
+			result = pBind(result, compose(pReturn, f))
+			result.typ = typ_Parser_ASN
+		End If
+	ElseIf isPZeroOrOne(p) Then
 		q = p.st0
 		q = _toDerivationP(q, seen, options)
 		q = _wrapSkipWithDummyASN(q)
@@ -386,21 +401,6 @@ Function _toDerivationP( _
 		Else
 			s = dtMultLabel(&quot;?&quot;, p.st0)
 			f = mkDtMult(s)
-			result = pBind(result, compose(pReturn, f))
-			result.typ = typ_Parser_ASN
-		End If
-	ElseIf isPMany(p) Then &apos; p is of shape (many1 q) +++ (return nil)
-		q = p.st0.st0
-		s = dtMultLabel(&quot;*&quot;, q)
-		f = mkDtMult(s)
-		q = _toDerivationP(q, seen, options)
-		If q.typ = typ_Parser_List_ASN Then
-			q = pBind(q, compose(pReturn, mkDtAnonCon))
-		End If
-		result = pMany(q)
-		If (options And dtOpt_implicitMult) &lt;&gt; 0 Then
-			result.typ = typ_Parser_List_ASN
-		Else
 			result = pBind(result, compose(pReturn, f))
 			result.typ = typ_Parser_ASN
 		End If

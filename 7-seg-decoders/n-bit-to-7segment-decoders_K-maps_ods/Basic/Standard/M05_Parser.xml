@@ -95,10 +95,19 @@ Function _TParser_toString( _
 	Dim q As Object
 	If p.str &lt;&gt; &quot;&quot; Then
 		result = p.str
+	ElseIf isPMany(p) Then
+		&apos; it has shape (many1 q)?
+		q = p.st0.st0
+		If (q.tp = &quot;choice&quot;) Or (q.tp = &quot;bind&quot;) Then
+			result = &quot;(&quot; &amp; _TParser_toString( _
+						q, k, indent &amp; &quot; &quot;, False, rules, seen) _
+				   &amp; &quot;)&quot;
+		Else
+			result = _TParser_toString( _
+						q, k, indent, False, rules, seen)
+		End If
+		result = result &amp; &quot;*&quot;
 	ElseIf isPZeroOrOne(p) Then
-		&apos; it has shape q +++ return Empty
-		&apos; so it&apos;s effectively &quot;zero-or-one&quot; q, 
-		&apos; which can be written as &quot;q?&quot;
 		q = p.st0
 		If (q.tp = &quot;choice&quot;) Or (q.tp = &quot;bind&quot;) Then
 			result = &quot;(&quot; &amp; _TParser_toString( _
@@ -161,44 +170,31 @@ Function _TParser_toString( _
 			Dim altL As Object, altR As Object
 			altL = p.st0
 			altR = p.st1
-			If isPMany(p) Then
-				&apos; it has shape many1 p +++ return nil
-				If (altL.st.tp = &quot;choice&quot;) Or (altL.st.tp = &quot;bind&quot;) Then
-					result = &quot;(&quot; &amp; _TParser_toString( _
-								altL.st, k, indent &amp; &quot; &quot;, False, rules, seen) _
-						   &amp; &quot;)&quot;
-				Else
-					result = _TParser_toString( _
-								altL.st, k, indent, False, rules, seen)
-				End If
-				result = result &amp; &quot;*&quot;
+			Dim altLStr As String, altRStr As String
+			If isNewLines Then
+				altLStr = _TParser_toString( _
+							altL, k, indent, isNewLines, rules, seen)
+				altRStr = _TParser_toString( _
+							altR, k, indent, isNewLines, rules, seen)	
+				result = altLStr _
+					   &amp; chr(13) &amp; chr(10) _
+					   &amp; space(len(indent) - 2) _
+					   &amp; &quot;| &quot; _
+					   &amp; altRStr
 			Else
-				Dim altLStr As String, altRStr As String
-				If isNewLines Then
-					altLStr = _TParser_toString( _
-								altL, k, indent, isNewLines, rules, seen)
-					altRStr = _TParser_toString( _
-								altR, k, indent, isNewLines, rules, seen)	
-					result = altLStr _
-						   &amp; chr(13) &amp; chr(10) _
-						   &amp; space(len(indent) - 2) _
-						   &amp; &quot;| &quot; _
-						   &amp; altRStr
-				Else
-					altLStr = _TParser_toString( _
-								altL, k, indent, isNewLines, rules, seen)
-					altRStr = _TParser_toString( _
-								altR, k, indent, isNewLines, rules, seen)
-					If altL.tp = &quot;bind&quot; Then
-						altLStr = &quot;(&quot; &amp; altLStr &amp; &quot;)&quot;
-					End If
-					If altR.tp = &quot;bind&quot; Then
-						altRStr = &quot;(&quot; &amp; altRStr &amp; &quot;)&quot;
-					End If
-					result = altLStr _
-						   &amp; &quot; | &quot; _
-						   &amp; altRStr
+				altLStr = _TParser_toString( _
+							altL, k, indent, isNewLines, rules, seen)
+				altRStr = _TParser_toString( _
+							altR, k, indent, isNewLines, rules, seen)
+				If altL.tp = &quot;bind&quot; Then
+					altLStr = &quot;(&quot; &amp; altLStr &amp; &quot;)&quot;
 				End If
+				If altR.tp = &quot;bind&quot; Then
+					altRStr = &quot;(&quot; &amp; altRStr &amp; &quot;)&quot;
+				End If
+				result = altLStr _
+					   &amp; &quot; | &quot; _
+					   &amp; altRStr
 			End If
 		Case &quot;bind&quot;
 			q = p.st(0)
@@ -552,10 +548,6 @@ Function pStr(Optional t As String)
 	End If
 End Function
 
-&apos;Function pSat(predicate)
-&apos;	pBind(pItem, ite(predicate, pReturn, fstArg(pFail))
-&apos;End Function
-
 &apos; succeeds if either p1 succeeds (then returning p1&apos;s result and pos)
 &apos; or (and only if p1 fails) if p2 succeeds, returns p2&apos;s result and pos.
 &apos; fails if both, p1 and p2 fail
@@ -567,6 +559,13 @@ Function pChoice(Optional p1 As Parser, Optional p2 As Parser)
 	ElseIf isMissing(p2) Then
 		result = apply(oFn, p1)
 	Else
+		&apos;If p2.tp = &quot;return&quot; Then
+		&apos;	&apos;msgBox(&quot;choice ... &quot; &amp; toString(p2) _
+		&apos;	&apos;	&amp; NL &amp; NL &amp; toString(p1))
+		&apos;	pChoice = pZeroOrOne2(p2.st, p1)
+		&apos;	Exit Function
+		&apos;End If
+	
 		&apos; TODO: @pChoice: strip out always failing parsers
 		&apos; TODO: @pChoice: if p1 always succeeds strip out p2
 		&apos; linearize choice of choice:
@@ -595,20 +594,15 @@ Function pChoice(Optional p1 As Parser, Optional p2 As Parser)
 	pChoice = result
 End Function
 
-&apos; pattern-matches p against &quot;q +++ return x&quot; where q :: Parser a and x :: a
 Function isPZeroOrOne(p As Parser)
 	Dim result As Boolean : result = False
 	If p.tp = &quot;zeroOrOne&quot; Then
 		result = True
-	ElseIf p.tp = &quot;choice&quot; Then
-		Dim sndAlt As Object &apos; 2nd alternative
-		sndAlt = p.st(1)
-		&apos; check if it has shape p +++ return Empty (which is effectively &quot;zero-or-one&quot; p)
-		result = ((sndAlt.tp = &quot;return&quot;) And isEmpty(sndAlt.st))
 	End If
 	isPZeroOrOne = result
 End Function
 
+&apos; Equivalent to pChoice(p, pReturn(v))
 &apos; never fails: if p fails then pZeroOrOne2(p) returns a constant value
 &apos; + same pos as result, otherwise returns whatever p returns as result (+ pos)
 &apos; matches at most once
@@ -642,22 +636,6 @@ Function pZeroOrOne(Optional p As Parser)
 	pZeroOrOne = result
 End Function
 
-&apos; same as pZeroOrOne2(Empty, p)
-Function __pZeroOrOne(Optional p As Parser)
-	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.pZeroOrOne : End If
-	Dim result As Variant
-	If isMissing(p) Then
-		result = oFn
-	Else
-		If isPZeroOrOne(p) Then
-			result = p
-		Else
-			result = pChoice(p, pReturn(Empty))
-		End If
-	End If
-	pZeroOrOne = result
-End Function
-
 Function isPMany1(p As Parser) As Boolean
 	isPMany1 = (p.tp = &quot;many1&quot;)
 End Function
@@ -665,23 +643,15 @@ End Function
 Function isPMany(p As Parser) As Boolean
 	Dim result As Boolean
 	result = False
-	If p.tp = &quot;many&quot; Then
-		result = True
-	ElseIf p.tp = &quot;choice&quot; Then
-		Dim sndAlt As Object
-		sndAlt = p.st(1)
-		&apos; check if it has shape p +++ return Empty (which is effectively &quot;zero-or-one&quot; p)
-		If (sndAlt.tp = &quot;return&quot;) And isObject(sndAlt.st) Then
-			If isNil(sndAlt.st) Then
-				result = isPMany1(p.st(0))
-			End If
-		End If
+	If isPZeroOrOne(p) Then
+		result = isPMany1(p.st0)
 	End If
 	isPMany = result
 End Function
 
-&apos; pMany: never fails: if p fails then pMany(p) returns nil + same pos as result,
-&apos; otherwise returns a of p results (in the order as in the parsed string) + last pos
+&apos; pMany: equivalent to pZeroOrOne2(nil, pMany1(p))
+&apos; pMany never fails: if p fails then pMany(p) returns nil + same pos as result,
+&apos; otherwise returns a list of p results (in the order as in the parsed string) + last pos
 &apos; matches as many as possible
 Function pMany(Optional p As Parser)
 	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.pMany : End If
@@ -691,7 +661,7 @@ Function pMany(Optional p As Parser)
 		&apos; result = compose(swap(pChoice, pReturn(nil)), pMany1)
 	Else
 		&apos; Note: direct impl might give a little more perf (not worth it)
-		result = pChoice(pMany1(p), pReturn(nil))
+		result = pZeroOrOne2(nil, pMany1(p))
 	End If
 	pMany = result
 End Function
