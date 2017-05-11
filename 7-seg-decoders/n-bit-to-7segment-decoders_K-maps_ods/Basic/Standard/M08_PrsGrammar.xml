@@ -4,7 +4,7 @@
 Option Explicit
 
 Sub Main
-	test_PrsGrammar
+	[test_PrsGrammar======================================]
 End Sub
 
 Function derivationTree_prsGrammar( _
@@ -69,6 +69,24 @@ Function pGrmIdent()
 		&apos;result = fixIndirection(pInd(&quot;Ident&quot;), result)
 	End If
 	pGrmIdent = result
+End Function
+
+Function pGrmEscQ()
+	Static result As Object
+	If isNull(result) Then
+		result = pSeq(Array( _
+					pSkip(pStr(&quot;\&quot;)), _
+					foldl1(pChoice, List( _
+						pBind(pStr(&quot;r&quot;), fstArg(pReturn(CR))), _
+						pBind(pStr(&quot;n&quot;), fstArg(pReturn(LF))), _
+						pBind(pStr(&quot;t&quot;), fstArg(pReturn(TAB))), _
+						pStr(&quot;\&quot;), _
+						pStr(DQ) _
+					) ) _
+				 ), id)
+		result = fixIndirection(pInd(&quot;escQ&quot;), result)
+	End If
+	pGrmEscQ = result
 End Function
 
 Function pGrmGrammar()
@@ -142,13 +160,35 @@ Function pGrmCon()
 		result = pMany1( _
 			pSeq(Array( _
 				pSkip(pMany(pWhite)), _
-				pGrmNonterminal, _
+				pGrmAtom, _
 				pSkip(pMany(pWhite)) _
 			), id) _
 		)
 		result = fixIndirection(pCon, result)
 	End If
 	pGrmCon = result
+End Function
+
+Function pGrmAtom()
+	Static result As Object
+	If isNull(result) Then
+		result = pInd(&quot;Atom&quot;)
+		Dim pAtom As Object
+		&apos; building up the implementation will call pGrmAtom again
+		&apos; (via pGramAlt), but that&apos;s fine since we have already set
+		&apos; result to the (yet uninitialized indirection).
+		pAtom = foldl1(pChoice, List( _
+			pSeq(Array( _
+				pSkip(pStr(&quot;(&quot;)), _
+				pGrmAlt, _
+				pSkip(pStr(&quot;)&quot;)) _
+			), id), _
+			pGrmNonterminal, _
+			pGrmTerminal _
+		))
+		result = fixIndirection(result, pAtom)
+	End If
+	pGrmAtom = result
 End Function
 
 Function pGrmNonterminal()
@@ -158,6 +198,24 @@ Function pGrmNonterminal()
 		result = fixIndirection(pInd(&quot;Nonterminal&quot;), result)
 	End If
 	pGrmNonterminal = result
+End Function
+
+Function pGrmTerminal()
+	Static result As Object
+	If isNull(result) Then
+		result = pSeq(Array( _
+					pSkip(pStr(DQ)), _
+					pBind(pMany1( _
+						pChoice( _
+							pGrmEscQ, _
+							pSat( ite(neq(DQ), neq(&quot;\&quot;), fstArg(False)) ) _
+						) _
+					), compose(pReturn, foldl1(concat))), _
+					pSkip(pStr(DQ)) _
+				 ), id)
+		result = fixIndirection(pInd(&quot;Terminal&quot;), result)
+	End If
+	pGrmTerminal = result
 End Function
 
 
@@ -176,8 +234,9 @@ End Function
 
 &apos;= tests ======================================================================
 
-Function test_PrsGrammar()
+Function [test_PrsGrammar======================================]()
 	test_PrsGrammar_newline()
+	test_PrsGrammar_terminal()
 	test_PrsGrammar_pGrmMult()
 
 	&apos; pGrmIdent, pGrmRuleName and pGrmNonterminal are essentially the same
@@ -192,9 +251,9 @@ Function test_PrsGrammar_newline()
 	p = pGrmNewline
 	
 	refute_parses(p, Array( _
-		&quot;&quot;, &quot;*&quot;, &quot;+&quot;, &quot;?&quot;, &quot;=&quot;, &quot;:&quot;, &quot;.&quot;, &quot;|&quot;, &quot;-&quot;, &quot;_&quot;, _
-		&quot;(&quot;, &quot;)&quot;, &quot;[&quot;, &quot;]&quot;, &quot;{&quot;, &quot;}&quot;, _
-		&quot; &quot;, TAB, _
+		&quot;&quot;, &quot;*&quot;, &quot;+&quot;, &quot;?&quot;, &quot;=&quot;, &quot;:&quot;, &quot;.&quot;, &quot;|&quot;, &quot;-&quot;, &quot;_&quot;, &quot;\&quot;, &quot;/&quot;, _
+		&quot;(&quot;, &quot;)&quot;, &quot;[&quot;, &quot;]&quot;, &quot;{&quot;, &quot;}&quot;, DQ, _
+		&quot; &quot;,           TAB, _
 		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;, _
 		&quot;a&quot;, &quot;b&quot;, &quot;c&quot;,   &quot;q&quot;,        &quot;x&quot;, &quot;y&quot;, &quot;z&quot;, _
 		&quot;A&quot;, &quot;B&quot;, &quot;C&quot;,        &quot;R&quot;,   &quot;X&quot;, &quot;Y&quot;, &quot;Z&quot; _
@@ -254,12 +313,49 @@ Function test_PrsGrammar_newline()
 	assert_parses(p, LFCR &amp; LFCR &amp; &quot; &quot;,	List(sLFCR, sLFCR),	5).x
 End Function
 
+Function _dq(s As String) : _dq = DQ &amp; s &amp; DQ : End Function
+
+Function test_PrsGrammar_terminal()
+	Dim p As Object, x As Object
+	p = pGrmTerminal
+	
+	refute_parses(p, Array( _
+		&quot;&quot;, &quot;*&quot;, &quot;+&quot;, &quot;?&quot;, &quot;=&quot;, &quot;:&quot;, &quot;.&quot;, &quot;|&quot;, &quot;-&quot;, &quot;_&quot;, &quot;\&quot;, &quot;/&quot;, _
+		&quot;(&quot;, &quot;)&quot;, &quot;[&quot;, &quot;]&quot;, &quot;{&quot;, &quot;}&quot;, DQ, _
+		_dq(&quot;&quot;), _
+		&quot; &quot;, CR, LF, TAB, _
+		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;, _
+		&quot;a&quot;, &quot;b&quot;, &quot;c&quot;,   &quot;q&quot;,        &quot;x&quot;, &quot;y&quot;, &quot;z&quot;, _
+		&quot;A&quot;, &quot;B&quot;, &quot;C&quot;,        &quot;R&quot;,   &quot;X&quot;, &quot;Y&quot;, &quot;Z&quot;, _
+		_dq(&quot;\&quot;), _dq(&quot;\-&quot;), _dq(&quot;\[&quot;), _dq(&quot;\]&quot;) _
+	)).x
+	dim a as Variant
+
+	assert_parses(p, _dq(&quot;\\&quot;),     &quot;\&quot;,   5).x
+	assert_parses(p, _dq(&quot;\&quot; &amp; DQ), DQ,    5).x
+	assert_parses(p, _dq(&quot;\t&quot;),		TAB,   5).x
+	assert_parses(p, _dq(&quot;\r&quot;),		CR,    5).x
+	assert_parses(p, _dq(&quot;\n&quot;),		LF,    5).x
+	assert_parses(p, _dq(&quot;\r\n&quot;),	CR &amp; LF, 7).x
+	assert_parses(p, _dq(&quot;\n\r&quot;),	LF &amp; CR, 7).x
+	
+	assert_parses(p, _dq(&quot; &quot;), &quot; &quot;, 4).x
+	assert_parses(p, _dq(TAB), TAB, 4).x
+	assert_parses(p, _dq(&quot;a&quot;), &quot;a&quot;, 4).x
+	assert_parses(p, _dq(&quot;b&quot;), &quot;b&quot;, 4).x
+	assert_parses(p, _dq(&quot;c&quot;), &quot;c&quot;, 4).x
+	assert_parses(p, _dq(&quot;z&quot;), &quot;z&quot;, 4).x
+
+	assert_parses(p, DQ &amp; CR  &amp; DQ, CR,  4).x
+	assert_parses(p, DQ &amp; LF  &amp; DQ, LF,  4).x
+End Function
+
 Function test_PrsGrammar_ident(p As Object)
 	Dim x As Object
 	refute_parses(p, Array( _
-		&quot;&quot;, &quot;*&quot;, &quot;+&quot;, &quot;?&quot;, &quot;=&quot;, &quot;.&quot;, &quot;|&quot;, &quot;-&quot;, _
-		&quot;(&quot;, &quot;)&quot;, &quot;[&quot;, &quot;]&quot;, &quot;{&quot;, &quot;}&quot;, _
-		&quot; &quot;, chr(9), chr(10), chr(13), _
+		&quot;&quot;, &quot;*&quot;, &quot;+&quot;, &quot;?&quot;, &quot;=&quot;, &quot;.&quot;, &quot;|&quot;, &quot;-&quot;,      &quot;\&quot;, &quot;/&quot;, _
+		&quot;(&quot;, &quot;)&quot;, &quot;[&quot;, &quot;]&quot;, &quot;{&quot;, &quot;}&quot;, DQ, _
+		&quot; &quot;, CR, LF, TAB, _
 		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot; _
 	)).x
 	

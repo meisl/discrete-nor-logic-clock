@@ -30,6 +30,7 @@ Type TFnObjs
 	concat		As Object
 	readHex		As Object
 	equ			As Object
+	neq			As Object
 	inRange		As Object
 	
 	TFn_toString	As Object
@@ -102,6 +103,7 @@ Function Fn
 		result.concat	= lookupFn(&quot;concat&quot;)
 		result.readHex	= lookupFn(&quot;readHex&quot;)
 		result.equ		= lookupFn(&quot;equ&quot;)
+		result.neq		= lookupFn(&quot;neq&quot;)
 		result.inRange	= lookupFn(&quot;inRange&quot;)
 		
 		result.TFn_toString = lookupFn(&quot;TFn_toString&quot;)
@@ -250,6 +252,7 @@ Function fnObjs()
 			newFn(&quot;mul&quot;,			2, &quot;Long -&gt; Long -&gt; Long&quot;), _
 			newFn(&quot;inRange&quot;,		3, &quot;Long -&gt; Long -&gt; Long -&gt; Bool&quot;), _
 			newFn(&quot;equ&quot;,			2, &quot;a -&gt; a -&gt; Bool&quot;), _
+			newFn(&quot;neq&quot;,			2, &quot;a -&gt; a -&gt; Bool&quot;), _
 			newFn(&quot;concat&quot;,			2, &quot;Str -&gt; Str -&gt; Str&quot;), _
 			newFn(&quot;asc&quot;,			1, &quot;Char -&gt; Int&quot;), _
 			newFn(&quot;chr&quot;,			1, &quot;Int -&gt; Char&quot;), _
@@ -476,6 +479,7 @@ applyLast_of_two:
 		Case &quot;mul&quot;:			result = CLng(a0 * a1)
 		Case &quot;concat&quot;:		result = a0 &amp; a1
 		Case &quot;equ&quot;:			result = equ(			a0, a1)
+		Case &quot;neq&quot;:			result = Not(equ(		a0, a1))
 		Case &quot;applyToList&quot;:	result = applyToList(	a0, a1)
 		Case &quot;cons&quot;:		result = cons(			a0, a1)
 		Case &quot;map&quot;:			result = map(			a0, a1)

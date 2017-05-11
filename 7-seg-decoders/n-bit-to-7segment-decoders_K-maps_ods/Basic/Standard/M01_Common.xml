@@ -22,6 +22,7 @@ Function CR()  : CR = Chr(13) : End Function
 Function LF()  : LF = Chr(10) : End Function
 Function NL()  : NL = CR &amp; LF : End Function
 Function TAB() : TAB = Chr(9) : End Function
+Function DQ()  : DQ = Chr(34) : End Function &apos; double quote &quot;
 
 Function typeOf(x As Variant)
 	Dim result As String
@@ -113,6 +114,10 @@ End Function
 
 Function mul(Optional a As Long, Optional b As Long)
 	mul = _apply(Fn.mul, a, b)
+End Function
+
+Function neq(Optional a As Variant, Optional b As Variant)
+	neq = _apply(Fn.neq, a, b)
 End Function
 
 Function inRange(Optional lo As Long, Optional hi As Long, Optional x As Long)

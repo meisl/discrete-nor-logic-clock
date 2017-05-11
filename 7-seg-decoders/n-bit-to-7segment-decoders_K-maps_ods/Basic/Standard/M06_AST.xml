@@ -630,7 +630,10 @@ Function _toDerivationP( _
 					result.typ = typ_Parser_ASN
 				End If
 			Case Else
-				croak(&quot;toDerivationP: cannot handle .tp=&quot; &amp; toString(p.tp))
+				croak(&quot;toDerivationP: cannot handle .tp=&quot; _
+					&amp; toString(p.tp) _
+					&amp; NL &amp; toString(p) _
+				)
 		End Select
 	End If
 	_toDerivationP = result
