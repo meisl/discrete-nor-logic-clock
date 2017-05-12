@@ -213,9 +213,11 @@ Function TFn_toString(ByVal f)
 				&apos;result = &quot;\a&quot; &amp; k &amp; &quot;.&quot; &amp; TFn_toString(car(t)) &amp; &quot; (&quot; &amp; TFn_toString(cadr(t)) &amp; &quot; a&quot; &amp; k &amp; &quot;)&quot;
 				&apos;k = k + 1
 				result = TFn_toString(car(t)) &amp; &quot; ° &quot; &amp; TFn_toString(cadr(t))
-				result = &quot;(&quot; &amp; result &amp; &quot;)&quot;
+				&apos;result = &quot;(&quot; &amp; result &amp; &quot;)&quot;
 			Else &apos; r = 2
-				croak(&quot;TFn_toString/NYI: compose partially applied to just 1 arg&quot;)
+				result = n &amp; TFn_toString(car(t))
+				result = &quot;(&quot; &amp; result &amp; &quot;)&quot;
+				&apos;croak(&quot;TFn_toString/NYI: compose partially applied to just 1 arg&quot;)
 			End If
 		ElseIf (n = &quot;swap&quot;) And (r = 1) Then
 			Dim g As Object, x As Object
@@ -261,7 +263,7 @@ Function fnObjs()
 			newFn(&quot;toString&quot;,		1, &quot;Any -&gt; Str&quot;), _
 			newFn(&quot;id&quot;,				1, &quot;a -&gt; a&quot;), _
 			newFn(&quot;fstArg&quot;,			2, &quot;a -&gt; b -&gt; a&quot;), _
-			newFn(&quot;sndArg&quot;,			2, &quot;a -&gt; b -&gt; b&quot;), _
+			newFn(&quot;sndArg&quot;,			1, &quot;a -&gt; b -&gt; b&quot;), _
 			newFn(&quot;swap&quot;,			3, &quot;(b -&gt; a -&gt; c) -&gt; a -&gt; b -&gt; c&quot;), _
 			newFn(&quot;compose&quot;,		3, &quot;(b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c&quot;), _
 			newFn(&quot;ite&quot;,			4, &quot;(a -&gt; Bool) -&gt; (a -&gt; b) -&gt; (a -&gt; b) -&gt; a -&gt; b&quot;), _
@@ -454,6 +456,7 @@ applyLast_of_one:
 	a0 = arg
 	Select Case name
 		Case &quot;id&quot;: 			result = a0
+		Case &quot;sndArg&quot;:		result = sndArg(	a0)
 		Case &quot;asc&quot;:			result = Asc(		a0)
 		Case &quot;chr&quot;:			result = Chr(		a0)
 		Case &quot;isString&quot;:	result = isString(	a0)
@@ -491,7 +494,6 @@ applyLast_of_two:
 	a1 = arg
 	Select Case name
 		Case &quot;fstArg&quot;:		result = a0
-		Case &quot;sndArg&quot;:		result = a1
 		Case &quot;add&quot;:			result = CLng(a0 + a1)
 		Case &quot;mul&quot;:			result = CLng(a0 * a1)
 		Case &quot;concat&quot;:		result = a0 &amp; a1
@@ -526,7 +528,7 @@ applyLast_of_three:
 	a2 = arg
 	Select Case name
 		Case &quot;swap&quot;:		result = apply(a0, a2, a1)
-		Case &quot;compose&quot;:		result = apply(a0, apply(a1, a2))
+		Case &quot;compose&quot;:		result = _compose(a0, a1, a2)	&apos;	apply(a0, apply(a1, a2))	&apos;
 		Case &quot;inRange&quot;:		result = CBool( (a0 &lt;= a2) And (a2 &lt;= a1) )
 		Case &quot;foldl&quot;:		result = foldl(		a0, a1, a2)
 		Case &quot;foldr&quot;:		result = foldr(		a0, a1, a2)

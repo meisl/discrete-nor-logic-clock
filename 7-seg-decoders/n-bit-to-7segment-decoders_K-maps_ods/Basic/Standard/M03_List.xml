@@ -18,7 +18,7 @@ End Sub
 Function TList_toString(xs As TList)
 &apos;	concat &quot;[&quot; (concat (foldl1 (\acc.(concat acc) ° (concat &quot;, &quot;))) &quot;[&quot; (map toString xs)) &quot;]&quot;
 	Dim result As String
-	result = &quot;[&quot; &amp; Join(toArray(map(&quot;toString&quot;, xs)), &quot;, &quot;) &amp; &quot;]&quot;
+	result = &quot;[&quot; &amp; Join(toArray(map(Fn.toString, xs)), &quot;, &quot;) &amp; &quot;]&quot;
 	TList_toString = result
 End Function
 

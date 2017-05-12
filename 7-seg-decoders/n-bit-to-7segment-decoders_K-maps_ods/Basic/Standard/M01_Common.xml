@@ -24,6 +24,10 @@ Function NL()  : NL = CR &amp; LF : End Function
 Function TAB() : TAB = Chr(9) : End Function
 Function DQ()  : DQ = Chr(34) : End Function &apos; double quote &quot;
 
+Function show(x As Variant)
+	MsgBox(toString(x))
+End Function
+
 Function typeOf(x As Variant)
 	Dim result As String
 	result = TypeName(x)
@@ -79,7 +83,15 @@ End Function
 &apos; K I = (\b x.b) (\y.y) = \x.\y.y = \x y.y
 &apos;     :: a -&gt; b -&gt; b
 Function sndArg(Optional x As Variant, Optional y As Variant)
-	sndArg = _apply(Fn.sndArg, x, y)
+	Dim out As Variant
+	If isMissing(x) Then
+		out = Fn.sndArg
+	ElseIf isMissing(y) Then
+		out = Fn.id
+	Else
+		out = y
+	End If
+	sndArg = out
 End Function
 
 &apos;\f y x.f x y
@@ -91,8 +103,94 @@ End Function
 &apos; B = \f g x.f (g x)
 &apos;   :: (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c  =  (b -&gt; c) -&gt; (a -&gt; b) -&gt; (a -&gt; c)
 Function compose(Optional ByVal f, Optional ByVal g, Optional x)
-	compose = _apply(Fn.compose, f, g, x)
+	&apos;compose = _apply(Fn.compose, f, g, x)
+	compose = _compose(f, g, x)
 End Function
+
+Function _compose(Optional ByVal f, Optional ByVal g, Optional x)
+	Dim out As Variant
+	If isMissing(f) Then
+		out = Fn.compose
+	Else
+		Dim fName As String, h As Object, i As Object
+		fName = getFnName(f)
+		If isMissing(g) Then
+			If fName = getFnName(Fn.id) Then
+				out = f
+			ElseIf fName = getFnName(Fn.fstArg) Then
+				If arity(f) = 1 Then &apos; f = K v
+					out = f
+				Else &apos; f = K
+					out = _apply(Fn.compose, f)
+				End If
+			ElseIf fName = getFnName(Fn.sndArg) Then
+				out = Fn.sndArg
+			ElseIf fName = getFnName(Fn.compose) Then
+				If arity(f) = 1 Then &apos; f = B h i, so B f = B (B h i) = B h (B i)
+					h = cadr(partialArgs(f)) &apos; they&apos;re backwards!
+					i = car(partialArgs(f))   &apos; they&apos;re backwards!
+					out = _compose(h, _compose(i))
+				Else
+					out = _apply(Fn.compose, f)
+				End If
+			Else
+				out = _apply(Fn.compose, f)
+			End If
+		Else
+			Dim gName As String
+			gName = getFnName(g)
+			If gName = getFnName(Fn.id) Then
+				out = _apply(f, x)
+			ElseIf isMissing(x) Then
+				If fName = getFnName(Fn.id) Then
+					out = g
+				ElseIf fName = getFnName(Fn.sndArg) Then
+					out = f
+				ElseIf fName = getFnName(Fn.fstArg) Then
+					If arity(f) = 1 Then &apos; f = K v
+						out = f
+					Else &apos; f = K
+						out = _apply(Fn.compose, f, g)
+					End If
+				ElseIf fName = getFnName(Fn.compose) Then
+					If arity(f) = 1 Then &apos; f = B h i, so B f g = B (B h i) g = (h ° i) ° g = h ° (i ° g)
+						h = cadr(partialArgs(f)) &apos; they&apos;re backwards!
+						i = car(partialArgs(f))   &apos; they&apos;re backwards!
+						out = _compose(h, _compose(i, g))
+					Else
+						out = _apply(Fn.compose, f, g)
+					End If
+				Else
+					out = _apply(Fn.compose, f, g)
+				End If
+			Else
+				If fName = getFnName(Fn.id) Then
+					out = _apply(g, x)
+				ElseIf fName = getFnName(Fn.sndArg) Then
+					out = x
+				ElseIf fName = getFnName(Fn.fstArg) Then
+					If arity(f) = 1 Then &apos; f = K v
+						out = car(partialArgs(f))
+					Else &apos; f = K
+						out = apply1(f, apply1(g, x))
+					End If
+				ElseIf fName = getFnName(Fn.compose) Then
+					If arity(f) = 1 Then &apos; f = B h i, so B f g x = B (B h i) g x = h (i (g x))
+						h = cadr(partialArgs(f)) &apos; they&apos;re backwards!
+						i = car(partialArgs(f))   &apos; they&apos;re backwards!
+						out = apply1(h, apply1(i, apply1(g, x)))
+					Else
+						out = apply1(f, apply1(g, x))
+					End If
+				Else
+					out = apply1(f, apply1(g, x))
+				End If
+			End If
+		End If
+	End If		
+	_compose = out
+End Function
+
 
 &apos;\c t e x.if (c x) then (t x) else (e x)
 &apos;   :: (a -&gt; Bool) -&gt; (a -&gt; b) -&gt; (a -&gt; b) -&gt; a -&gt; b
@@ -273,9 +371,9 @@ Function test_Common()
 	test_fstArg()
 	test_sndArg()
 	test_swap()
-	test_compose()
 	test_add()
 	test_mul()
+	test_compose() &apos; tests use add and mul and toString
 	test_inRange()
 	test_equ()
 	test_readHex()
@@ -542,7 +640,7 @@ Function test_fstArg()
 End Function
 
 Function test_sndArg()
-	assertEqual(arity(Fn.sndArg), 2).x
+	&apos;assertEqual(arity(Fn.sndArg), 2).x	&apos; well, not so sure...
 
 	assertEqual(sndArg(1, 2), 2).x
 	assertEqual(sndArg(2, 1), 1).x
@@ -588,48 +686,6 @@ Function test_swap()
 	assertEqual(apply(f, 2), 1).x
 End Function
 
-Function test_compose()
-	assertEqual(arity(Fn.compose), 3).x
-
-	Dim f As Variant
-	
-	f = compose
-	assertEqual(isFn(f), True).x
-	assertEqual(arity(f), 3).x
-	
-	f = compose(compose, compose)
-	assertEqual(isFn(f), True).x
-	assertEqual(arity(f), 1).x
-
-	f = compose(fstArg(5), fstArg(7))
-	assertEqual(isFn(f), True).x
-	assertEqual(arity(f), 1).x
-	assertEqual(apply(f, 42), 5).x
-	
-	assertEqual(compose(id, id, &quot;asdf&quot;), &quot;asdf&quot;).x
-
-	assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;, id, 42)).x
-	assertThrows(&quot;compose&quot;, Array(Nothing, 		  id, 42)).x
-	assertThrows(&quot;compose&quot;, Array(Empty, 		  id, 42)).x
-	assertThrows(&quot;compose&quot;, Array(4711, 		  id, 42)).x
-	
-	&apos;&apos;assertThrows doesn&apos;t really work with partial app
-	&apos;assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;, id)).x	
-	&apos;assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;)).x
-
-	assertThrows(&quot;compose&quot;, Array(id, &quot;i-dont-exist&quot;, 42)).x
-	assertThrows(&quot;compose&quot;, Array(id, Nothing, 		  42)).x
-	assertThrows(&quot;compose&quot;, Array(id, Empty, 		  42)).x
-	assertThrows(&quot;compose&quot;, Array(id, 4711, 		  42)).x
-	&apos;&apos;assertThrows doesn&apos;t really work with partial app
-	&apos;assertThrows(&quot;compose&quot;, Array(id, &quot;i-dont-exist&quot;)).x
-
-	assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;, &quot;i-dont-exist-either&quot;, 42)).x
-	&apos;&apos;assertThrows doesn&apos;t really work with partial app
-	&apos;assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;, &quot;i-dont-exist-either&quot;)).x
-
-End Function
-
 Function test_add()
 	assertEqual(typeOf(add( 0,  0)),  &quot;Long&quot;).x
 	assertEqual(add( 0,  0),  0).x
@@ -665,6 +721,201 @@ Function test_mul()
 	assertEqual(mul(42, 4711),		CLng(42 * 4711)).x
 	assertEqual(mul(65535, 32767),  CLng(65535 * 32767)).x	&apos; not limited to 16 bit
 End Function
+
+Function assert_compose_equals(f As Object, g As Object, x As Object)
+	assert_compose_equals = assertEqual(toString(compose(f, g)), toString(x))
+End Function
+
+Function assert_compApp_equals( _
+	f As Object, _
+	g As Object, _
+	v As Variant, _
+	x As Variant _
+)
+	assert_compApp_equals = assert_toString_equals( _
+		apply(compose(f, g), v), _
+		x)
+End Function
+
+Function test_compose()
+	assertEqual(arity(Fn.compose),	3).x
+	assertEqual(arity(compose), 	3).x
+
+	Dim f As Variant, g As Variant, h As Variant, x As Variant
+	
+	f = compose
+	assertEqual(isFn(f), True).x
+	assertEqual(arity(f), 3).x
+	
+	f = compose(compose, compose)
+	assertEqual(isFn(f), True).x
+	assertEqual(arity(f), 1).x
+
+	f = compose(fstArg(5), fstArg(7))
+	assertEqual(isFn(f), True).x
+	assertEqual(arity(f), 1).x
+	assertEqual(apply(f, 42), 5).x
+	
+	assertEqual(compose(id, id, &quot;asdf&quot;), &quot;asdf&quot;).x
+
+	assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;, id, 42)).x
+	assertThrows(&quot;compose&quot;, Array(Nothing, 		  id, 42)).x
+	assertThrows(&quot;compose&quot;, Array(Empty, 		  id, 42)).x
+	assertThrows(&quot;compose&quot;, Array(4711, 		  id, 42)).x
+	
+	&apos;&apos;assertThrows doesn&apos;t really work with partial app
+	&apos;&apos;that is because it uses applyToList, which doesn&apos;t do
+	&apos;&apos;an actual call until more args come in
+	&apos;assertThrows(&quot;compose&quot;, Array(Nothing, Fn.id)).x	
+	&apos;assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;)).x
+
+	assertThrows(&quot;compose&quot;, Array(id, &quot;i-dont-exist&quot;, 42)).x
+	assertThrows(&quot;compose&quot;, Array(id, Nothing, 		  42)).x
+	assertThrows(&quot;compose&quot;, Array(id, Empty, 		  42)).x
+	assertThrows(&quot;compose&quot;, Array(id, 4711, 		  42)).x
+	&apos;&apos;assertThrows doesn&apos;t really work with partial app
+	&apos;assertThrows(&quot;compose&quot;, Array(id, &quot;i-dont-exist&quot;)).x
+
+	assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;, &quot;i-dont-exist-either&quot;, 42)).x
+	&apos;&apos;assertThrows doesn&apos;t really work with partial app
+	&apos;assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;, &quot;i-dont-exist-either&quot;)).x
+
+	test_compose_left_id()   &apos; not passing when delaying until 3rd arg
+	test_compose_right_id()  &apos; not passing when delaying until 3rd arg
+	test_compose_left_K()
+	test_compose_left_K_v()  &apos; not passing when delaying until 3rd arg
+	
+	
+	g = fstArg  &apos; again not too special: f ° K = \x.f (K x)
+	&apos; so we&apos;ll do the partial app in a first step but also
+	&apos; test what the result of that behaves like
+	&apos;--------------------------------------------------------------
+	&apos;f = fstArg    &apos; f ° g = K ° K; covered by test_compose_left_K
+	&apos;f = fstArg(3) &apos; f ° g = (K 3) ° K; covered by test_compose_left_K_v
+	&apos;f = add       &apos; f ° g = add ° K = \x.add (K x) - wouldn&apos;t type check
+	f = sndArg     &apos; f ° g = sndArg ° K = \x.sndArg (K x)
+	&apos;                      = \x.id = sndArg
+	assert_toString_equals( _
+		apply(compose(f, g), &quot;foo&quot;, &quot;bar&quot;), _
+		&quot;bar&quot; _
+	)
+	&apos; stronger assertion (ie sndArg actually simplifies partial app):
+	assert_compApp_equals(f, g, &quot;foo&quot;, id).x
+	&apos; even stronger assertion: simplification already done in compose:
+	assert_compose_equals(f, g, sndArg).x	
+	
+	f = add(7)
+	g = mul(11)
+	h = add(5)
+	&apos; fn composition is both, left and right associative, 
+	&apos; ie it doesn&apos;t really matter.
+	&apos; Note: the following assertion might pass because 
+	&apos;       of two independent reasons:
+	&apos;       a) string repr: passes if parentheses are omitted there
+	&apos;       b) partial app repr: passes if that is canonicalized
+	assert_compose_equals(compose(f, g), h, compose(f, compose(g, h))).x 
+	x = compose(compose(f, g), h)
+	assertEqual(arity(x), 1).x
+	assertEqual(isPartialApp(x), True).x
+	&apos; We want fn composition to be represented as right-associative
+	&apos; (right-leaning tree, ie. left arg is never a composition)
+	assert_toString_equals(cadr(partialArgs(x)), f).x
+	assert_toString_equals(car(partialArgs(x)), compose(g, h)).x
+End Function	
+	
+Function test_compose_left_id()
+	Dim f As Object, g As Object
+	f = id  &apos; I ° g = \x.I (g x) = \x.g x = g
+	&apos;----------------------------------------
+	g = id						: assert_compose_equals(f, g, g).x
+	g = fstArg					: assert_compose_equals(f, g, g).x
+	g = fstArg(5)				: assert_compose_equals(f, g, g).x
+	g = add						: assert_compose_equals(f, g, g).x
+	g = add(7)					: assert_compose_equals(f, g, g).x
+	g = mul						: assert_compose_equals(f, g, g).x
+	g = mul(11)					: assert_compose_equals(f, g, g).x
+	g = compose					: assert_compose_equals(f, g, g).x
+	g = compose(add)			: assert_compose_equals(f, g, g).x
+	g = compose(mul)			: assert_compose_equals(f, g, g).x
+	g = compose(add(7), mul(11)): assert_compose_equals(f, g, g).x
+	g = compose(mul(11), add(7)): assert_compose_equals(f, g, g).x
+End Function
+
+Function test_compose_right_id()
+	Dim f As Object, g As Object
+	g = id  &apos; f ° I = \x.f (I x) = \x.f x = f
+	&apos;----------------------------------------
+	f = fstArg					: assert_compose_equals(f, g, f).x
+	f = fstArg(5)				: assert_compose_equals(f, g, f).x
+	f = add						: assert_compose_equals(f, g, f).x
+	f = add(7)					: assert_compose_equals(f, g, f).x
+	f = mul						: assert_compose_equals(f, g, f).x
+	f = mul(11)					: assert_compose_equals(f, g, f).x
+	f = compose					: assert_compose_equals(f, g, f).x
+	f = compose(add)			: assert_compose_equals(f, g, f).x
+	f = compose(mul)			: assert_compose_equals(f, g, f).x
+	f = compose(add(7), mul(11)): assert_compose_equals(f, g, f).x
+	f = compose(mul(11), add(7)): assert_compose_equals(f, g, f).x
+End Function
+
+Function test_compose_left_K()	
+	Dim f As Object, g As Object
+	f = fstArg	&apos; nothing too special here: K ° g = \x.K (g x) = \x _.g x
+	&apos; so we&apos;ll do the partial app in a first step but also
+	&apos; test what the result of that behaves like
+	&apos;----------------------------------------------------------------
+	g = fstArg &apos; f ° g = K ° K, so (K ° K) x = K (K x)
+	assert_compApp_equals(f, g, &quot;foo&quot;, fstArg(fstArg(&quot;foo&quot;))).x
+	g = fstArg(5) &apos; so (K ° (K 5)) x = K (K 5 x) = K 5 = g
+	assert_compApp_equals(f, g, &quot;foo&quot;, g).x
+	g = add &apos; f ° g = K ° add, so (K ° add) x = K (add x)
+	assert_compApp_equals(f, g, 5, fstArg(add(5))).x
+	g = add(7) &apos; f ° g = K ° (add 7), so (K ° (add 7)) x = K (add 7 x)
+	assert_compApp_equals(f, g, 5, fstArg(5 + 7)).x
+	g = mul &apos; f ° g = K ° mul, so (K ° mul) x = K (mul x)
+	assert_compApp_equals(f, g, 5, fstArg(mul(5))).x
+	g = mul(11) &apos; f ° g = K ° (mul 11), so (K ° (mul 11)) x = K (mul 11 x)
+	assert_compApp_equals(f, g, 5, fstArg(5 * 11)).x
+	g = compose &apos; f ° g = K ° B, so (K ° B) h = K (B h)
+	assert_compApp_equals(f, g, isString, fstArg(compose(isString))).x
+	g = compose(add) &apos; f ° g = K ° (B add), 
+					 &apos; so (K ° (B add)) h = K (add ° h)
+	&apos; Note: we only assert *same behaviour* of
+	&apos; K ° (B add)  and  \h.K (add ° h)
+	assert_compApp_equals(f, g, mul, fstArg(compose(add, mul))).x
+	g = compose(add(7)) &apos; f ° g = K ° (B (add 7)), 
+						&apos; so (K ° (B (add 7))) h = K ((add 7) ° h)
+	assert_compApp_equals(f, g, mul, fstArg(compose(add(7), mul))).x
+	assert_compApp_equals(f, g, mul(11), fstArg(compose(add(7), mul(11)))).x
+	g = compose(add(7), mul(11)) &apos; f ° g = K ° ((add 7) ° (mul 11)), 
+	&apos; so K ° ((add 7) ° (mul 11)) x = K ((add 7) ((mul 11) x))
+	&apos;                               = K (7 + (11 * x))
+	assert_compApp_equals(f, g, 3, fstArg(7 + (11 * 3))).x
+	g = compose(mul(11), add(7)) &apos; f ° g = K ° ((mul 11) ° (add 7)), 
+	&apos; so K ° ((mul 11) ° (add 7)) x = K ((mul 11) ((add 7) x))
+	&apos;                               = K (11 * (7 * x))
+	assert_compApp_equals(f, g, 3, fstArg(11 * (7 + 3))).x
+End Function
+
+Function test_compose_left_K_v()
+	Dim f As Object, g As Object	
+	f = fstArg(5)  &apos; (K v) ° g = \x.(\_.v) (g x) = \x.v = (K v) = f
+	&apos;--------------------------------------------------------------
+	g = fstArg					: assert_compose_equals(f, g, f).x
+	g = fstArg(3)				: assert_compose_equals(f, g, f).x
+	g = add						: assert_compose_equals(f, g, f).x
+	g = add(7)					: assert_compose_equals(f, g, f).x
+	g = mul						: assert_compose_equals(f, g, f).x
+	g = mul(11)					: assert_compose_equals(f, g, f).x
+	g = compose					: assert_compose_equals(f, g, f).x
+	g = compose(add)			: assert_compose_equals(f, g, f).x
+	g = compose(add(7))			: assert_compose_equals(f, g, f).x
+	g = compose(mul)			: assert_compose_equals(f, g, f).x
+	g = compose(mul(11))		: assert_compose_equals(f, g, f).x
+	g = compose(add(7), mul(11)): assert_compose_equals(f, g, f).x
+	g = compose(mul(11), add(7)): assert_compose_equals(f, g, f).x
+End Function
+
 
 Function test_inRange()
 	dim actual as Boolean

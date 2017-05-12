@@ -211,6 +211,10 @@ assertEqual_passed:
 	Exit Function
 End Function
 
+Function assert_toString_equals(actual As Variant, expected As Variant)
+	 assert_toString_equals = assertEqual(toString(actual), toString(expected))
+End Function
+
 Function assertPasses(assertionName As String, args As Array)
 	assertionCount = assertionCount + 1
 	Dim result As Object, innerResult As Object

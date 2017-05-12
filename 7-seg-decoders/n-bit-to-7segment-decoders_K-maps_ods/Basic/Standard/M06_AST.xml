@@ -1241,6 +1241,7 @@ Function test_AST_match_mkDtTerminal()
 	p = pSeq(Array(pStr(&quot;x&quot;)), id)
 	q = toDerivationP(p, dtOpt_hideSkipped)
 	msgBox(toString(q) &amp; NL &amp; &quot;:: &quot; &amp; q.typ)
+	MsgBox(parserStats)
 	assertEqual(match_mkDtTerminal(q), True).x
 End Function
 

@@ -20,7 +20,7 @@ Function derivationTree_prsGrammar( _
 	Else
 		result = toString(parseResult(0))
 	End If
-			
+	MsgBox(parserStats)	
 	derivationTree_prsGrammar = result
 End Function
 
