@@ -210,11 +210,28 @@ Function TFn_toString(ByVal f)
 		t = reverse(partialArgs(f))
 		If n = &quot;compose&quot; Then
 			If r = 1 Then
-				result = &quot;\a&quot; &amp; k &amp; &quot;.&quot; &amp; TFn_toString(car(t)) &amp; &quot; (&quot; &amp; TFn_toString(cadr(t)) &amp; &quot; a&quot; &amp; k &amp; &quot;)&quot;
-				
-				k = k + 1
+				&apos;result = &quot;\a&quot; &amp; k &amp; &quot;.&quot; &amp; TFn_toString(car(t)) &amp; &quot; (&quot; &amp; TFn_toString(cadr(t)) &amp; &quot; a&quot; &amp; k &amp; &quot;)&quot;
+				&apos;k = k + 1
+				result = TFn_toString(car(t)) &amp; &quot; ° &quot; &amp; TFn_toString(cadr(t))
+				result = &quot;(&quot; &amp; result &amp; &quot;)&quot;
 			Else &apos; r = 2
-				croak(&quot;TFn_toString: compose partially applied to just 1 arg&quot;)
+				croak(&quot;TFn_toString/NYI: compose partially applied to just 1 arg&quot;)
+			End If
+		ElseIf (n = &quot;swap&quot;) And (r = 1) Then
+			Dim g As Object, x As Object
+			g = car(t)
+			x = cadr(t)
+			If getFnName(g) = &quot;cons&quot; Then
+				If isNil(x) Then
+					result =  &quot;\a&quot; &amp; k &amp; &quot;.[a&quot; &amp; k &amp; &quot;]&quot;
+					k = k + 1
+				Else
+					result =  &quot;\a&quot; &amp; k &amp; &quot;.cons a&quot; &amp; k &amp; &quot; &quot; &amp; toString(x)
+					k = k + 1
+				EndIf
+			Else
+				result =  &quot;\a&quot; &amp; k &amp; &quot;.&quot; &amp; TFn_toString(g) &amp; &quot; a&quot; &amp; k &amp; &quot; &quot; &amp; toString(x)
+				k = k + 1
 			End If
 		Else
 			result = &quot;(&quot; &amp; n &apos;&amp; &quot;_&quot; &amp; r

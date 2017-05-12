@@ -445,12 +445,12 @@ Function _toDerivationP( _
 					result = p &apos; so when applying p it&apos;ll return Empty
 				Else
 					q = _toDerivationP(p.st0, seen, options)
-					f = mkDtNonterminal(&quot;(skip)&quot;)
+					f = mkDtMult(dtMultLabel(&quot;/&quot;, pItem))
 					If q.typ = typ_Parser_ASN Then
 						f = compose(f, swap(cons, nil))
 					End If
-					&apos;q = pBind(q, compose(pReturn, f))
-					&apos;q.typ = typ_Parser_ASN
+					q = pBind(q, compose(pReturn, f))
+					q.typ = typ_Parser_ASN
 					result = q
 				End If
 			Case &quot;item&quot;
@@ -667,6 +667,9 @@ End Function
 &apos;= tests ======================================================================
 
 Function test_AST()
+	test_AST_toDerivationP_typ(0)
+	&apos;test_AST_toDerivationP_typ(dtOpt_hideSkipped)
+	
 	test_AST_match_mkDtTerminal()
 		
 	test_AST_toDerivationP_skip(0)
@@ -1115,7 +1118,6 @@ Function test_AST_toDerivationP_mult(opts As Integer)
 	assert_parses(r, &quot;zzy&quot;, List(List(&quot;z&quot;), List(&quot;z&quot;)), 3).x
 	assert_parses(q, &quot;zz&quot;,  x, 3).x
 	assert_parses(q, &quot;zzy&quot;, x, 3).x
-	
 End Function
 
 Function test_AST_toDerivationP_skip(opts As Integer)
@@ -1195,6 +1197,34 @@ Function test_AST_toDerivationP_skip(opts As Integer)
 	assert_parses(q, &quot; z&quot;,  x, 3).x
 	assert_parses(q, &quot; z &quot;, x, 3).x
 	assert_parses(q, &quot; zz&quot;, x, 3).x
+End Function
+
+Function test_AST_toDerivationP_typ(opts As Integer)
+	Dim p As Object, q As Object, x As Variant
+	Dim hideSkipped As Boolean
+	hideSkipped = (opts And dtOpt_hideSkipped)
+	
+	p = pItem
+	q = toDerivationP(p, opts)
+	assertEqual(q.typ, typ_Parser_ASN).x
+	
+	p = pStr(&quot;x&quot;)
+	q = toDerivationP(p, opts)
+	assertEqual(q.typ, typ_Parser_ASN).x
+	
+	p = pSat(equ(&quot;x&quot;))
+	q = toDerivationP(p, opts)
+	assertEqual(q.typ, typ_Parser_ASN).x
+	
+	p = pSkip(pItem)
+	q = toDerivationP(p, opts)
+	msgbox(toString(q))
+	assertEqual(q.typ, IIf(hideSkipped, &quot;&quot;, typ_Parser_ASN)).x
+	
+	p = pSkip(pStr(&quot;x&quot;))
+	q = toDerivationP(p, opts)
+	assertEqual(q.typ, IIf(hideSkipped, &quot;&quot;, typ_Parser_ASN)).x
+	
 End Function
 
 Function test_AST_match_mkDtTerminal()
