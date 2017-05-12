@@ -322,9 +322,28 @@ Function dtMultLabel(m As String, p As Object)
 		Case Else
 			croak(&quot;dtMultLabel: cannot handle .tp=&quot; &amp; toString(p.tp))
 	End Select
-	dtMultLabel = &quot;(&quot; &amp; m &amp; &quot;):&quot; &amp; t
+	dtMultLabel = &quot;■(&quot; &amp; m &amp; &quot;)&quot; &amp; t
 End Function
 
+Function match_mkDtTerminal(q)
+	Dim result As Boolean
+	result = False
+	If q.tp = &quot;bind&quot; Then
+		Dim f As Object
+		f = q.st1
+		If isBreturn(f) Then
+			If arity(f) = 1 Then
+				f = car(partialArgs(f)) &apos; partial args are backwards!
+				If (getFnName(f) = getFnName(Fn.mkDtTerminal)) _
+					And (arity(f) = 1) _
+				Then
+					result = True
+				End If
+			End If
+		End If
+	End If
+	match_mkDtTerminal = result
+End Function
 
 Function toDerivationP(p As Object, options As Integer)
 	Dim result As Object
@@ -517,9 +536,7 @@ Function _toDerivationP( _
 						Else
 							result = _toDerivationP( _
 								pSeqL(p.st(0), id), _
-								seen, _
-								options _
-							)
+								seen, options)
 						End If
 					ElseIf fName = getFnName(Fn.cons) Then
 						&apos; For this to take effect in the derivation tree
@@ -532,30 +549,35 @@ Function _toDerivationP( _
 						&apos; However, we do not test those options here.
 						&apos; Rather we look at the .typ s of the transformed
 						&apos; inner parsers.
-						Dim typs As Object
-						typs = nil
+						Dim intendedInTyps As Object
+						Dim intendedOutTyp As String
+						Dim actualInTyps As Object
+						&apos; ATTENTION: actualTyps will be backwards!
+						intendedInTyps = List( _
+							typ_Parser_List_ASN, _
+							typ_Parser_ASN _
+						)
+						intendedOutTyp = typ_Parser_List_ASN
+						actualInTyps = nil
 						While Not(isNil(qs))
 							q = car(qs)
 							q = _toDerivationP(q, seen, options)
 							If Not(isPSkip(q)) Then
-								typs = cons(q.typ, typs)
+								actualInTyps = cons(q.typ, actualInTyps)
 							End If
 							rs = cons(q, rs)
 							qs = cdr(qs)
 						Wend
 						&apos; ATTENTION: typs is backwards
-						If equ(typs, List( _
-								typ_Parser_List_ASN, _
-								typ_Parser_ASN _
-							)) _
-						Then
+						If equ(actualInTyps, intendedInTyps) Then
 							result = pSeq(toArray(reverse(rs)), cons)
-							result.typ = typ_Parser_List_ASN
+							result.typ = intendedOutTyp
 						Else
-							&apos; What we could do is make a big list with
-							&apos; the 2nd arg for cons &quot;flattened&quot; in
-							&apos;msgbox(&quot;pSeq(..., cons): &quot; &amp; toString(typs) _
-							&apos;&amp; NL &amp; toString(p))
+							&apos; Otherwise just treat it as a list
+							&apos; and return that
+							&apos;msgbox(&quot;pSeq(..., &quot; &amp; fName &amp; &quot;): &quot; _
+							&apos;	&amp; toString(actualTyps) _
+							&apos;	&amp; NL &amp; toString(p))
 							result = _toDerivationP( _
 								pSeqL(p.st(0), id), _
 								seen, options)
@@ -591,13 +613,6 @@ Function _toDerivationP( _
 								pSeqL(p.st(0), id), seen, options)
 						End If
 					End If		
-				End If
-				If isEmpty(result) Then
-					croak(&quot;toDerivationP/NYI: pSeq(..., &quot; _
-						 &amp; TFn_toString(p.st(1)) &amp; &quot;)&quot; _
-						 &amp; NL _
-						 &amp; toString(p)_
-					)
 				End If
 			Case &quot;ind&quot;
 				If p.st2 Then &apos; seen before
@@ -637,11 +652,14 @@ Function _toDerivationP( _
 					result.typ = typ_Parser_ASN
 				End If
 			Case Else
-				croak(&quot;toDerivationP: cannot handle .tp=&quot; _
-					&amp; toString(p.tp) _
-					&amp; NL &amp; toString(p) _
-				)
+				result = Empty				
 		End Select
+	End If
+	If isEmpty(result) Then
+		croak(&quot;toDerivationP: cannot handle .tp=&quot; _
+			&amp; toString(p.tp) _
+			&amp; NL &amp; NL &amp; toString(p) _
+		)
 	End If
 	_toDerivationP = result
 End Function
@@ -649,6 +667,8 @@ End Function
 &apos;= tests ======================================================================
 
 Function test_AST()
+	test_AST_match_mkDtTerminal()
+		
 	test_AST_toDerivationP_skip(0)
 	test_AST_toDerivationP_skip(dtOpt_hideSkipped)
 
@@ -663,6 +683,8 @@ Function test_AST()
 
 	test_AST_toDerivationP_skip(0)
 	test_AST_toDerivationP_skip(dtOpt_hideSkipped)
+	
+
 End Function 
 
 Function test_AST_mkASN()
@@ -1173,7 +1195,24 @@ Function test_AST_toDerivationP_skip(opts As Integer)
 	assert_parses(q, &quot; z&quot;,  x, 3).x
 	assert_parses(q, &quot; z &quot;, x, 3).x
 	assert_parses(q, &quot; zz&quot;, x, 3).x
-
 End Function
+
+Function test_AST_match_mkDtTerminal()
+	Dim p As Object, q As Object
+	
+	p = pStr(&quot;x&quot;)
+	q = toDerivationP(p, 0)
+	assertEqual(match_mkDtTerminal(q), True).x
+	
+	p = pItem	&apos; really?
+	q = toDerivationP(p, 0)
+		assertEqual(match_mkDtTerminal(q), False).x
+
+	p = pSeq(Array(pStr(&quot;x&quot;)), id)
+	q = toDerivationP(p, dtOpt_hideSkipped)
+	msgBox(toString(q) &amp; NL &amp; &quot;:: &quot; &amp; q.typ)
+	assertEqual(match_mkDtTerminal(q), True).x
+End Function
+
 
 </script:module>
