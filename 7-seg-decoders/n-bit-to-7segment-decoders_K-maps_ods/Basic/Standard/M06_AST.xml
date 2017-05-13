@@ -633,6 +633,13 @@ Function _toDerivationP( _
 					If (options And dtOpt_promoteSingleTerminal) _
 						And (q.typ = typ_Parser_ASN) _
 					Then &apos; TODO: do the work at transformation time rather than parse time
+						If q.tp = &quot;bind&quot; Then
+							f = q.st1
+							&apos;show(f)
+						Else
+							&apos;show(q)
+						End If
+						
 						f = swap(mkASN(s), nil)
 						f = ite(compose(Fn.isEmpty, asnLabel), _
 								compose(f, asnValue), _

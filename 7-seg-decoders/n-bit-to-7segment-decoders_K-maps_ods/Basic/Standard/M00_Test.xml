@@ -223,22 +223,32 @@ Function assertPasses(assertionName As String, args As Array)
 			testLevel = testLevel + 1
 			innerResult = assertEqual(args(0), args(1))
 			testLevel = testLevel - 1
-			If innerResult.isFail Then
-				Dim a As Object, x As String
-				a = innerResult
-				x = &quot;pass&quot;
-				Set result = mkFail(a, x, _
-					&quot;expected &quot; &amp; assertionName &amp; &quot; to pass on args &quot; _
-						&amp; CR &amp; &quot;  &quot; &amp; _argsStr(assertionName, args) _
-						&amp; CR &amp; &quot;but it failed:&quot; _
-						&amp; CR &amp; a.msg _
-				)
+		Case &quot;assertThrows&quot;
+			If UBound(args) = 1 Then
+				testLevel = testLevel + 1
+				innerResult = assertThrows(args(0), args(1))
+				testLevel = testLevel - 1
 			Else
-				Set result = mkPass()
+				testLevel = testLevel + 1
+				innerResult = assertThrows(args(0), args(1), args(2))
+				testLevel = testLevel - 1
 			End If
 		Case Else
 			croak(&quot;assertPasses: unknown assertion &apos;&quot; &amp; assertionName &amp; &quot;&apos;&quot;)
 	End Select
+	If innerResult.isFail Then
+		Dim a As Object, x As String
+		a = innerResult
+		x = &quot;pass&quot;
+		Set result = mkFail(a, x, _
+			&quot;expected &quot; &amp; assertionName &amp; &quot; to pass on args &quot; _
+				&amp; NL &amp; &quot;  &quot; &amp; _argsStr(assertionName, args) _
+				&amp; NL &amp; &quot;but it failed:&quot; _
+				&amp; NL &amp; a.msg _
+		)
+	Else
+		Set result = mkPass()
+	End If
 	assertPasses = result
 End Function
 
@@ -250,21 +260,31 @@ Function assertFails(assertionName As String, args As Array)
 			testLevel = testLevel + 1
 			innerResult = assertEqual(args(0), args(1))
 			testLevel = testLevel - 1
-			If Not(innerResult.isFail) Then
-				Dim a As Object, x As String
-				a = innerResult
-				x = &quot;fail&quot;
-				Set result = mkFail(a, x, _
-					&quot;expected &quot; &amp; assertionName &amp; &quot; to fail on args &quot; _
-						&amp; CR &amp; &quot;  &quot; &amp; _argsStr(assertionName, args) _
-						&amp; CR &amp; &quot;but it passed.&quot; _
-				)
+		Case &quot;assertThrows&quot;
+			If UBound(args) = 1 Then
+				testLevel = testLevel + 1
+				innerResult = assertThrows(args(0), args(1))
+				testLevel = testLevel - 1
 			Else
-				Set result = mkPass()
+				testLevel = testLevel + 1
+				innerResult = assertThrows(args(0), args(1), args(2))
+				testLevel = testLevel - 1
 			End If
 		Case Else
 			croak(&quot;assertFails: unknown assertion &apos;&quot; &amp; assertionName &amp; &quot;&apos;&quot;)
 	End Select
+	If Not(innerResult.isFail) Then
+		Dim a As Object, x As String
+		a = innerResult
+		x = &quot;fail&quot;
+		Set result = mkFail(a, x, _
+			&quot;expected &quot; &amp; assertionName &amp; &quot; to fail on args &quot; _
+				&amp; NL &amp; &quot;  &quot; &amp; _argsStr(assertionName, args) _
+				&amp; NL &amp; &quot;but it passed.&quot; _
+		)
+	Else
+		Set result = mkPass()
+	End If
 	assertFails = result
 End Function
 

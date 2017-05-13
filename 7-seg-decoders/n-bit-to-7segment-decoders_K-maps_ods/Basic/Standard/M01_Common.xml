@@ -202,6 +202,7 @@ Function concat(Optional a As String, Optional b As String)
 	concat = _apply(Fn.concat, a, b)
 End Function
 
+&apos; TODO: startsWith ~&gt; isPrefixOf, add isSuffixOf (&quot;endsWith&quot;)
 Function startsWith(s As String, prefix As String) 
 	startsWith = ((Len(prefix) &lt;= Len(s)) And (Mid(s, 1, Len(prefix)) = prefix))
 End Function

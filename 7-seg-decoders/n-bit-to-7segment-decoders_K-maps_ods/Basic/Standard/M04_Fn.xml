@@ -22,6 +22,8 @@ Type TFnObjs
 	ite			As Object
 	asc			As Object
 	chr			As Object
+	ucase		As Object
+	lcase		As Object
 	add			As Object
 	mul			As Object
 	isString	As Object
@@ -95,6 +97,8 @@ Function Fn
 		result.ite 		= lookupFn(&quot;ite&quot;)
 		result.asc 		= lookupFn(&quot;asc&quot;)
 		result.chr 		= lookupFn(&quot;chr&quot;)
+		result.ucase	= lookupFn(&quot;ucase&quot;)
+		result.lcase	= lookupFn(&quot;lcase&quot;)
 		result.add 		= lookupFn(&quot;add&quot;)
 		result.mul 		= lookupFn(&quot;mul&quot;)
 		result.isString	= lookupFn(&quot;isString&quot;)
@@ -275,6 +279,8 @@ Function fnObjs()
 			newFn(&quot;concat&quot;,			2, &quot;Str -&gt; Str -&gt; Str&quot;), _
 			newFn(&quot;asc&quot;,			1, &quot;Char -&gt; Int&quot;), _
 			newFn(&quot;chr&quot;,			1, &quot;Int -&gt; Char&quot;), _
+			newFn(&quot;ucase&quot;,			1, &quot;Str -&gt; Str&quot;), _
+			newFn(&quot;lcase&quot;,			1, &quot;Str -&gt; Str&quot;), _
 			newFn(&quot;readHex&quot;,		1, &quot;Str -&gt; Long&quot;), _
 			_
 			newFn(&quot;TFn_toString&quot;,	1, &quot;(a -&gt; b) -&gt; Str&quot;), _
@@ -459,6 +465,8 @@ applyLast_of_one:
 		Case &quot;sndArg&quot;:		result = sndArg(	a0)
 		Case &quot;asc&quot;:			result = Asc(		a0)
 		Case &quot;chr&quot;:			result = Chr(		a0)
+		Case &quot;ucase&quot;:		result = UCase(		a0)
+		Case &quot;lcase&quot;:		result = LCase(		a0)
 		Case &quot;isString&quot;:	result = isString(	a0)
 		Case &quot;isEmpty&quot;:		result = isEmpty(	a0)
 		Case &quot;toString&quot;:	result = toString(	a0)

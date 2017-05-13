@@ -3,6 +3,7 @@
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M05_Parser" script:language="StarBasic">REM  *****  BASIC  *****
 Option Explicit
 
+Const TParser_tyname = &quot;TParser&quot;
 
 Type Parser
 	tyname As String
@@ -18,25 +19,26 @@ Type Parser
 	typ As String
 End Type
 
-Public applyP_callCount As Integer
-Public _applyP_callCount(0 To 1) As Integer
-Public applyP_return As Integer
-Public applyP_fail As Integer
-Public applyP_item As Integer
-Public applyP_bind As Integer
-Public applyP_bind_K_x As Integer
-Public applyP_bind_K_return As Integer
-Public applyP_bind_B_f_g As Integer
-Public applyP_bind_B_return_g As Integer
-Public applyP_choice As Integer
-Public applyP_zeroOrOne As Integer
-Public applyP_many1 As Integer
-Public applyP_str As Integer
-Public applyP_seq As Integer
-Public applyP_skip As Integer
-Public applyP_sat As Integer
-Public applyP_end As Integer
-Public applyP_ind As Integer
+Public applyP_callCount 			As Integer
+Public _applyP_callCount(0 To 1) 	As Integer
+Public applyP_return 				As Integer
+Public applyP_fail 					As Integer
+Public applyP_item 					As Integer
+Public applyP_bind 					As Integer
+Public applyP_bind_K_x 				As Integer
+Public applyP_bind_K_return 		As Integer
+Public applyP_bind_B_f_g 			As Integer
+Public applyP_bind_B_return_g 		As Integer
+Public applyP_bind_other 			As Integer
+Public applyP_choice 				As Integer
+Public applyP_zeroOrOne 			As Integer
+Public applyP_many1 				As Integer
+Public applyP_str 					As Integer
+Public applyP_seq 					As Integer
+Public applyP_skip 					As Integer
+Public applyP_sat 					As Integer
+Public applyP_end 					As Integer
+Public applyP_ind 					As Integer
 
 Sub Main
 	test_Parser()
@@ -55,6 +57,11 @@ Sub Main
 End Sub
 
 &apos;==================================================================
+
+Function isParser(x As Variant)
+	isParser = (typeOf(x) = typeOf(pFail))
+End Function
+
 
 &apos; TODO: TParser_toString: seriously work out where to put parens and where not
 Function TParser_toString(Optional ByVal p As Variant)
@@ -300,7 +307,7 @@ Function mkParser(Optional tp As String, Optional st As Variant)
 		End If
 	Else
 		Set result = New Parser
-		result.tyname = &quot;TParser&quot;
+		result.tyname = TParser_tyname
 		result.id = instId
 		instId = instId + 1
 		result.tp = tp
@@ -332,14 +339,20 @@ End Function
 &apos; always succeeds by returning the provided value; without increasing pos
 Function pReturn(Optional v As Variant)
 	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.pReturn : End If
-	Static returnEmpty As Object : If isNull(returnEmpty) Then : returnEmpty = mkParser(&quot;return&quot;, Empty) : End If
-	If isMissing(v) Then
-		pReturn = oFn
-	ElseIf isEmpty(v) Then
-		pReturn = returnEmpty
-	Else
-		pReturn = mkParser(&quot;return&quot;, v)
+	Static returnEmpty As Object : If isNull(returnEmpty) Then
+		returnEmpty = mkParser(&quot;return&quot;, Empty)
+		returnEmpty.st0 = Empty
 	End If
+	Dim out As Variant
+	If isMissing(v) Then
+		out = oFn
+	ElseIf isEmpty(v) Then
+		out = returnEmpty
+	Else
+		out = mkParser(&quot;return&quot;, v)
+		out.st0 = v
+	End If
+	pReturn = out
 End Function
 
 &apos; monadic bind, aka &quot;&gt;&gt;=&quot;
@@ -363,34 +376,37 @@ Function pBind(Optional ByVal p As Parser, Optional ByVal f As Object)
 	&apos;            = K v
 	&apos;        and: f ° (K v)
 	&apos;            = K (f v)
-	&apos; Also: fail &gt;&gt;= f
-	&apos;       = fail
-	&apos;  and: (return v) &gt;&gt;= f
-	&apos;       = f v
 		Dim q As Object, g As Object, v As Object	
-		If p.tp = &quot;bind&quot; Then
-			If p.st2 = 3 Then &apos; p has shape q &gt;&gt;= return ° g
-				&apos;q = p.st0	  &apos; so ((q &gt;&gt;= return ° g) &gt;&gt;= f) = (q &gt;&gt;= f ° g)
-				&apos;g = p.st3
-				If isKsomething(f) Then &apos; f = K v  so  f ° g = (K v) ° g = K v = f
-					p = p.st0		&apos; hence p &gt;&gt;= f  =  q &gt;&gt;= f ° g  is just  q &gt;&gt;= f
-				ElseIf isBsomething(f) Then &apos; f = h ° i  so  f ° g = (h ° i) ° g = h ° (i ° g)
-					g = compose(car(partialArgs(f)), p.st3) &apos; get out B&apos;s 2nd arg (they&apos;re in reverse!)
-					f = compose(cadr(partialArgs(f)), g) &apos; get out B&apos;s 1st arg (they&apos;re in reverse!)
-					p = p.st0
-				Else &apos; general: p &gt;&gt;= f  =  q &gt;&gt;= f ° g
-					f = compose(f, p.st3)
-					p = p.st0
-				End If
-			ElseIf p.st2 = 2 Then &apos; p has shape q &gt;&gt;= K (return v)
-				croak(&quot;pBind (q &gt;&gt;= K (return v)) &quot;)
-			ElseIf p.st2 = 1 Then &apos; p has shape q &gt;&gt;= K v  [where v is a Parser]
-				croak(&quot;pBind (q &gt;&gt;= K r)&quot;)
+		If p.tp = &quot;fail&quot; Then &apos;   fail &gt;&gt;= f
+			pBind = p         &apos; = fail        
+			Exit Function
+		ElseIf p.tp = &quot;return&quot; Then &apos;  (return v) &gt;&gt;= f
+			pBind = apply(f, p.st0) &apos; = (f v)
+			Exit Function
+		ElseIf p.tp = &quot;bind&quot; Then
+			If p.st2 = 3 Then &apos;  (q &gt;&gt;= return ° g) &gt;&gt;= f
+							  &apos; = q &gt;&gt;= f ° g
+				f = compose(f, p.st3) &apos; the g has been stored in p.st3
+				p = p.st0
+			ElseIf p.st2 = 2 Then
+				&apos;  (q &gt;&gt;= K (return v)) &gt;&gt;= f
+				&apos; = q &gt;&gt;= K (f v)
+				f = fstArg(apply(f, p.st3)) &apos; the v has been stored in p.st3
+				p = p.st0
+			ElseIf p.st2 = 1 Then
+				&apos;  (q &gt;&gt;= K r) &gt;&gt;= f  [where r is a Parser]
+				&apos; = q &gt;&gt;= K (r &gt;&gt;= f)
+				f = fstArg(pBind(p.st3, f)) &apos; the r has been stored in p.st3
+				p = p.st0
 			Else &apos; p has general shape q &gt;&gt;= g
-				croak(&quot;pBind (q &gt;&gt;= g)&quot;)
+				q = p.st0
+				g = p.st1
+				croak(&quot;NYI: p = pBind (q &gt;&gt;= g) f; p.st2: &quot; &amp; p.st2 _
+					&amp; NL &amp; NL &amp; &quot;q: &quot; &amp; toString(q) _
+					&amp; NL &amp; NL &amp; &quot;g: &quot; &amp; toString(g) _
+					&amp; NL &amp; NL &amp; &quot;f: &quot; &amp; toString(f) _
+				)
 			End If
-		ElseIf p.tp = &quot;return&quot; Then
-			croak(&quot;pBind ((return x) &gt;&gt;= g)&quot;)
 		End If
 
 		bindStats(p, f)
@@ -846,7 +862,8 @@ Function pDecDigit()
 		Dim f as Object
 		&apos;Set f = compose(add(-Asc(&quot;0&quot;)), Fn.asc)
 		&apos;MsgBox(TFn_toString(f))
-		Set f = compose(ite(inRange(Asc(&quot;0&quot;), Asc(&quot;9&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail)), Fn.asc)
+		f = ite(inRange(Asc(&quot;0&quot;), Asc(&quot;9&quot;)), compose(pReturn, add(-Asc(&quot;0&quot;))), fstArg(pFail))
+		f = compose(f, Fn.Asc)
 		result = pBind(pItem, f)
 	End If
 	pDecDigit = result
@@ -1444,8 +1461,13 @@ Function _applyP_stats( _
 		Case &quot;choice&quot;	&apos; tail-recursive
 			applyP_choice = applyP_choice + 1
 		Case &quot;item&quot;
-			applyP_item = applyP_item + 1
+			applyP_item = applyP_item + 1 
 		Case &quot;return&quot;
+			&apos;Dim tmp As Variant
+			&apos;tmp = assertFails(&quot;assertThrows&quot;, Array(&quot;assertEqual&quot;, Array(p.st, p.st0)))
+			&apos;If Not(tmp.isFail) Then
+			&apos;	show(p)
+			&apos;End If
 			applyP_return = applyP_return + 1
 		Case &quot;bind&quot;	&apos; tail-recursive
 			applyP_bind = applyP_bind + 1
@@ -1464,17 +1486,18 @@ Function _applyP_stats( _
 					assertEqual(p.st2, 3).x
 				End If
 			Else
+				applyP_bind_other = applyP_bind_other + 1
 				assertEqual(p.st2, 0).x
 			End If
 		Case &quot;seq&quot;
 			applyP_seq = applyP_seq + 1
 		Case &quot;skip&quot;	&apos; tail-recursive
-			assertEqual(typeOf(p.st(0)), typeOf(p.st0)).x
-			assertEqual(typeOf(p.st0), typeOf(pFail)).x
+			assertEqual(isParser(p.st(0)), True).x
+			assertEqual(isParser(p.st0),   True).x
 			assertEqual(p.st0.id, p.st(0).id).x
 			applyP_skip = applyP_skip + 1
 		Case &quot;sat&quot;
-			assertEqual(isFn(p.st), True).x
+			assertEqual(isFn(p.st),  True).x
 			assertEqual(isFn(p.st0), True).x
 			assertEqual(arity(p.st0), arity(p.st)).x
 			assertEqual(getFnName(p.st0), getFnName(p.st)).x
@@ -1490,8 +1513,8 @@ Function _applyP_stats( _
 			If isNull(p.st0) Then
 				assertEqual(p.st(0), p.st0).x
 			Else
-				assertEqual(typeOf(p.st(0)), typeOf(p.st0)).x
-				assertEqual(typeOf(p.st0), typeOf(pFail)).x
+				assertEqual(isParser(p.st(0)), True).x
+				assertEqual(isParser(p.st0),   True).x
 				assertEqual(p.st0.id, p.st(0).id).x
 			End If
 		Case &quot;end&quot;
@@ -1527,6 +1550,7 @@ Function test_Parser(Optional what)
 		test_Parser_str()
 		test_Parser_choice()
 		test_Parser_bind()
+		test_Parser_bind_simplify()
 		test_Parser_sat()
 		test_Parser_skip()
 	End If
@@ -1584,16 +1608,19 @@ Function parserStats()
 	Dim msg As String
 	msg = pReturn(GetSystemTicks()).id &amp; &quot; Parser instances&quot; _
 			&amp; NL &amp; &quot;applyP_callCount: &quot; &amp; applyP_callCount _
-			&amp; NL &amp; &quot;_applyP_callCount: &quot; &amp; _applyP_callCount(0) &amp; &quot;/&quot; &amp; _applyP_callCount(1) _
+			&amp; NL &amp; &quot;_applyP_callCount: &quot; _
+					&amp; toString(toList(_applyP_callCount)) _
+					&amp; &quot; / &quot; &amp; toString(List(&quot;ttl&quot;, &quot;underSkip&quot;)) _
 			&amp; NL &amp; &quot;applyP_str: &quot; &amp; applyP_str _
 			&amp; NL &amp; &quot;applyP_choice: &quot; &amp; applyP_choice _
 			&amp; NL &amp; &quot;applyP_item: &quot; &amp; applyP_item _
 			&amp; NL &amp; &quot;applyP_end: &quot; &amp; applyP_end _
 			&amp; NL &amp; &quot;applyP_bind: &quot; &amp; applyP_bind _
 			&amp; NL &amp; &quot;  (applyP_bind_K_x: &quot; &amp; applyP_bind_K_x &amp; &quot;)&quot; _
-			&amp; NL &amp; &quot;  (applyP_bind_K_return: &quot; &amp; applyP_bind_K_return &amp; &quot;)&quot; _
+			&amp; NL &amp; &quot;    (applyP_bind_K_return: &quot; &amp; applyP_bind_K_return &amp; &quot;)&quot; _
 			&amp; NL &amp; &quot;  (applyP_bind_B_f_g: &quot; &amp; applyP_bind_B_f_g &amp; &quot;)&quot; _
-			&amp; NL &amp; &quot;  (applyP_bind_B_return_g: &quot; &amp; applyP_bind_B_return_g &amp; &quot;)&quot; _
+			&amp; NL &amp; &quot;    (applyP_bind_B_return_g: &quot; &amp; applyP_bind_B_return_g &amp; &quot;)&quot; _
+			&amp; NL &amp; &quot;  (applyP_bind_other: &quot; &amp; applyP_bind_other &amp; &quot;)&quot; _
 			&amp; NL &amp; &quot;applyP_return: &quot; &amp; applyP_return _
 			&amp; NL &amp; &quot;applyP_seq: &quot; &amp; applyP_seq _
 			&amp; NL &amp; &quot;applyP_skip: &quot; &amp; applyP_skip _
@@ -1647,45 +1674,53 @@ refute_parses_failed:
 End Function
 
 Function assert_parses(p As Parser, ByVal ss As Variant, expVal As Variant, expPos As Integer)
-&apos;	assertEqual(typeOf(p), &quot;Object/TParser&quot;).x
-	Dim actual As Variant, testResult As Variant
-	Dim actualS As String, expectedS As String
-	
-	If isArray(ss) Then
-		Dim i As Integer
-		For i = LBound(ss) To UBound(ss)
-			actual = applyP(p, ss(i), 1)
-			testResult = assertEqual(actual(1), expPos)
-			If (testResult.isFail) Then
-				MsgBox(toString(actual))
-				Goto assert_parse_failed
-			End If
-			testResult = assertEqual(toString(actual(0)), toString(expVal))
-			If (testResult.isFail) Then
-				Goto assert_parse_failed
-			End If
-		Next i
-	Else
-		actual = applyP(p, ss, 1)
-		testResult = assertEqual(actual(1), expPos)
-		If (testResult.isFail) Then
-			Goto assert_parse_failed
-		End If
-		testResult = assertEqual(toString(actual(0)), toString(expVal))
-		If (testResult.isFail) Then
-			Goto assert_parse_failed
-		End If
+	assertEqual(isParser(p), True).x
+	Dim actual As Variant, expected As Variant
+	Dim msg As String
+	Dim actVal As Variant
+	Dim actPos As Integer
+	Dim actTyp As String, expTyp As String
+	Dim actStr As String, expStr As String
+	Dim gotArray As Boolean
+	gotArray = isArray(ss)
+	If Not(gotArray) Then
+		ss = Array(ss)
 	End If
-	assert_parses = testResult
+	Dim i As Integer
+	For i = LBound(ss) To UBound(ss)
+		actual = applyP(p, ss(i), 1)
+		actVal = actual(0)
+		actPos = actual(1)
+		actTyp = typeOf(actVal)
+		expTyp = typeOf(expVal)
+		actStr = toString(actVal)
+		expStr = toString(expVal)
+		
+		If isObject(expVal) Then
+			If assertEqual(actPos, expPos).isFail _
+			Or assertEqual(actTyp, expTyp).isFail _
+			Or assertEqual(actStr, expStr).isFail _
+			Then : Goto assert_parse_failed : End If
+		Else
+			If assertEqual(actPos, expPos).isFail _
+			Or assertEqual(actVal, expVal).isFail _
+			Then : Goto assert_parse_failed : End If
+		End If
+	Next i
+	assert_parses = mkPass()
 	Exit Function
 assert_parse_failed:
-	actualS = toString(actual)
-	expectedS = toString(Array(expVal, expPos))
-	testResult = assertEqual(actualS, expectedS)
-	If isArray(ss) Then
-		MsgBox(&quot;at index &quot; &amp; i &amp; &quot;: &quot; &amp; toString(ss(i)))
+	actual   = List(actPos, actTyp, actStr)
+	expected = List(expPos, expTyp, expStr)
+	msg = &quot;actual &quot; _
+		&amp; NL &amp; NL &amp; &quot;  &quot; &amp; toString(actual) _
+		&amp; NL &amp; NL &amp; &quot;expected to equal:&quot; _
+		&amp; NL &amp; NL &amp; &quot;  &quot; &amp; toString(expected)
+	If gotArray Then
+		msg = &quot;at index &quot; &amp; i &amp; &quot;: &quot; &amp; toString(ss(i)) _
+			&amp; NL &amp; msg
 	End If
-	assert_parses = testResult
+	assert_parses = mkFail(actual, expected, msg)
 End Function
 
 &apos;= actual tests ===============================================================
@@ -1833,6 +1868,7 @@ End Function
 
 Function test_Parser_bind()
 	Dim p As Object
+	
 	p = pBind
 	assertEqual(isFn(p), True).x
 	assertEqual(arity(p),   2).x
@@ -1874,6 +1910,144 @@ Function test_Parser_bind()
 	assert_parses(p, &quot;yx&quot;,		Empty, 2).x	&apos; succeeds but skips result
 	assert_parses(p, &quot;yy&quot;,		Empty, 2).x	&apos; succeeds but skips result
 	refute_parses(p, &quot; yabcd&quot;).x
+End Function
+
+Function test_Parser_bind_simplify()
+	Dim p As Object, q As Object, r As Object, x As Object
+	Dim f As Object, g As Object, h As Object, i As Object
+	Dim v As Variant
+	
+	&apos; pBind( pFail, ...)
+	&apos;===================
+	&apos; p = fail &gt;&gt;= f
+	&apos;   = fail
+	q = pFail
+	f = fstArg(pStr(&quot;x&quot;))
+	p = pBind(q, f)
+	refute_parses(p, Array(&quot;&quot;, &quot;x&quot;, &quot;xx&quot;)).x
+	&apos; So it&apos;s behaving like pFail. But is pBind actually doing the simplification?
+	assert_toString_equals(p, pFail).x
+	
+	&apos; pBind( (pReturn v), ...)
+	&apos;=========================
+	&apos; p = (return v) &gt;&gt;= f
+	&apos;   = (f v)
+	v = &quot;foobar&quot;
+	q = pReturn(v)
+	assert_parses(q, &quot;&quot;, v, 1).x
+	f = pStr
+	p = pBind(q, f) &apos; long-winded way of building pStr(&quot;foobar&quot;)
+	refute_parses(p, Array(&quot;&quot;, &quot;foo&quot;, &quot;bar&quot;, &quot;fooBAR&quot;, &quot;FOObar&quot;)).x
+	assert_parses(p, v, v, Len(v) + 1).x
+	x = apply(f, v)
+	refute_parses(x, Array(&quot;&quot;, &quot;foo&quot;, &quot;bar&quot;, &quot;fooBAR&quot;, &quot;FOObar&quot;)).x
+	assert_parses(x, v, v, Len(v) + 1).x
+	&apos; assert that pBind does the simplification:
+	assert_toString_equals(p, x).x
+
+
+	&apos; pBind( (pBind ...), ...)
+	&apos;=========================
+	
+	&apos; p = (q &gt;&gt;= return ° g) &gt;&gt;= f
+	&apos;-----------------------------
+	&apos;   = q &gt;&gt;= f ° g
+	q = pStr(&quot;foo&quot;)
+	g = concat(&quot;bar&quot;)
+	r = pBind(q, compose(pReturn, g))	&apos; r = (str &quot;bar&quot;) &gt;&gt;= (return ° (concat &quot;bar&quot;))
+	f = pStr
+	p = pBind(r, f) &apos;  p = ((str &quot;bar&quot;) &gt;&gt;= (return ° (concat &quot;bar&quot;)) ) &gt;&gt;= pStr
+	&apos;...which matches &quot;foo&quot; then &quot;barfoo&quot; and returns the latter
+	refute_parses(p, Array(&quot;foo&quot;, &quot;foobar&quot;, &quot;foofoobar&quot;, &quot;foobarbar&quot;)).x
+	assert_parses(p, &quot;foobarfoo&quot;, &quot;barfoo&quot;, 10).x
+	&apos; But this can be simplified to p = (str &quot;bar&quot;) &gt;&gt;= pStr ° (concat &quot;bar&quot;)
+	&apos; In general: ((q &gt;&gt;= return ° g) &gt;&gt;= f) = (q &gt;&gt;= f ° g)
+	p = pBind(q, compose(f, g))
+	refute_parses(p, Array(&quot;foo&quot;, &quot;foobar&quot;, &quot;foofoobar&quot;, &quot;foobarbar&quot;)).x
+	assert_parses(p, &quot;foobarfoo&quot;, &quot;barfoo&quot;, 10).x
+	&apos; assert that pBind actually does this simplification:
+	assert_toString_equals(pBind(r, f), pBind(q, compose(f, g))).x
+	
+	&apos; p = (q &gt;&gt;= return ° g) &gt;&gt;= f  where f = (K r)
+	&apos;----------------------------------------------
+	&apos;   = q &gt;&gt;= (K r) ° g
+	&apos;   = q &gt;&gt;= (K r)
+	&apos;   = q &gt;&gt;= f
+	q = pStr(&quot;foo&quot;)
+	g = concat(&quot;bar&quot;)
+	r = pStr(&quot;qmbl&quot;)
+	f = fstArg(r)
+	p = pBind( pBind(q, compose(pReturn, g)), f )
+	refute_parses(p, Array(&quot;foo&quot;, &quot;foobar&quot;, &quot;foobarqmbl&quot;)).x
+	assert_parses(p, &quot;fooqmbl&quot;, &quot;qmbl&quot;, 8).x
+	&apos; simplified: q &gt;&gt;= f
+	refute_parses(pBind(q, f), Array(&quot;foo&quot;, &quot;foobar&quot;, &quot;foobarqmbl&quot;)).x
+	assert_parses(pBind(q, f), &quot;fooqmbl&quot;, &quot;qmbl&quot;, 8).x
+	&apos; pBind actually does simplify it:
+	assert_toString_equals(p, pBind(q, f)).x
+	
+	&apos; p = (q &gt;&gt;= return ° g) &gt;&gt;= f  where f = h ° i
+	&apos;----------------------------------------------
+	&apos;   = q &gt;&gt;= (h ° i) ° g
+	&apos;   = q &gt;&gt;= h ° (i ° g)
+	q = pStr(&quot;foo&quot;)
+	g = concat(&quot;bar&quot;)
+	h = pStr
+	i = Fn.UCase &apos; turns a string into all upper-case
+	f = compose(h, i)
+	r = pBind(q, compose(pReturn, g))
+	p = pBind(r, f) &apos; p = (str &quot;foo&quot;) &gt;&gt;= return ° (concat &quot;bar&quot;)) &gt;&gt;= (pStr ° ucase)
+	&apos; p matches &quot;foo&quot;, then &quot;BARFOO&quot; and returns the latter
+	&apos;show(p)
+	refute_parses(p, Array(&quot;foo&quot;, &quot;foobar&quot;, &quot;foobarfoo&quot;, &quot;fooBARfoo&quot;, &quot;FOOBARfoo&quot;)).x
+	assert_parses(p, &quot;fooBARFOO&quot;, &quot;BARFOO&quot;, 10).x
+	&apos; simplified: x = q &gt;&gt;= h ° (i ° g)
+	x = pBind(q, compose(h, compose(i, g)))
+	refute_parses(x, Array(&quot;foo&quot;, &quot;foobar&quot;, &quot;foobarfoo&quot;, &quot;fooBARfoo&quot;, &quot;FOOBARfoo&quot;)).x
+	assert_parses(x, &quot;fooBARFOO&quot;, &quot;BARFOO&quot;, 10).x
+	&apos; pBind actually does simplify it:
+	assert_toString_equals(p, x).x
+	&apos; Note: fn composition is associative, ie (h ° i) ° g = h ° (i ° g)
+	&apos;       So semantically they&apos;re the same. However, from an implementation
+	&apos;       point of view - in pBind - we would like it to be represented as
+	&apos;       right-associative (as on rhs of the equality), so we can easily
+	&apos;       spot pReturn ° (...)
+
+	 
+	&apos; p = (q &gt;&gt;= K r) &gt;&gt;= f
+	&apos;----------------------
+	&apos;   = q &gt;&gt;= K (r &gt;&gt;= f)
+	q = pStr(&quot;foo&quot;)
+	r = pStr(&quot;bar&quot;)
+	f = compose(pStr, Fn.ucase)
+	p = pBind( pBind(q, fstArg(r)), f )
+	refute_parses(p, &quot;&quot;, &quot;foo&quot;, &quot;bar&quot;, &quot;foobarbar&quot;, &quot;fooBARbar&quot;, &quot;fooBARBAR&quot;).x
+	assert_parses(p, &quot;foobarBAR&quot;, &quot;BAR&quot;, 10).x
+	x = pBind(q, fstArg(pBind(r, f)))	
+	refute_parses(x, &quot;&quot;, &quot;foo&quot;, &quot;bar&quot;, &quot;foobarbar&quot;, &quot;fooBARbar&quot;, &quot;fooBARBAR&quot;).x
+	assert_parses(x, &quot;foobarBAR&quot;, &quot;BAR&quot;, 10).x
+	&apos; assert that pBind actually does the simplification:
+	assert_toString_equals(p, x).x
+	
+	
+	&apos; p = (q &gt;&gt;= K (return v)) &gt;&gt;= f
+	&apos;-------------------------------
+	&apos;   = q &gt;&gt;= K (f v)
+	&apos; This is a special of the above and should be covered
+	&apos; by it plus the (return v) &gt;&gt;= f  ~&gt;  (f v) simplification
+	q = pStr(&quot;foo&quot;)
+	v = &quot;bar&quot;
+	f = compose(pStr, Fn.ucase)
+	r = pBind(q, fstArg(pReturn(v)))
+	p = pBind(r, f)
+	refute_parses(p, &quot;&quot;, &quot;foo&quot;, &quot;bar&quot;, &quot;foobar&quot;).x
+	assert_parses(p, &quot;fooBAR&quot;, &quot;BAR&quot;, 7).x
+	x = pBind(q, fstArg(apply(f, v)))
+	refute_parses(x, &quot;&quot;, &quot;foo&quot;, &quot;bar&quot;, &quot;foobar&quot;).x
+	assert_parses(x, &quot;fooBAR&quot;, &quot;BAR&quot;, 7).x
+	&apos; assert that pBind actually does the simplification:
+	assert_toString_equals(p, x).x
+
 End Function
 
 Function test_Parser_sat()
