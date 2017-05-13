@@ -24,8 +24,16 @@ Function NL()  : NL = CR &amp; LF : End Function
 Function TAB() : TAB = Chr(9) : End Function
 Function DQ()  : DQ = Chr(34) : End Function &apos; double quote &quot;
 
-Function show(x As Variant)
-	MsgBox(toString(x))
+Function show(a As Variant, b As Variant)
+	If isMissing(b) Then
+		MsgBox(toString(a))
+	Else
+		If isString(a) Then
+			MsgBox(a &amp; NL &amp; NL &amp; toString(b))
+		Else
+			MsgBox(toString(a) &amp; NL &amp; NL &amp; toString(b))
+		End If
+	End If
 End Function
 
 Function typeOf(x As Variant)

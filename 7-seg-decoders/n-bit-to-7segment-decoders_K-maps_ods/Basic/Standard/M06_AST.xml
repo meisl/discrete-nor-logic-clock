@@ -297,9 +297,9 @@ Function mkDtMult( _
 End Function
 
 Function mkDtSkip(p As Object)
-	Dim result As Variant
-	result = mkASN(dtMultLabel(&quot;skip&quot;, p), Empty, nil)
-	mkDtSkip = result
+	Dim out As Variant
+	out = mkDtMult(dtMultLabel(&quot;/&quot;, pItem))
+	mkDtSkip = out
 End Function
 
 Function dtMultLabel(m As String, p As Object)
@@ -445,7 +445,7 @@ Function _toDerivationP( _
 					result = p &apos; so when applying p it&apos;ll return Empty
 				Else
 					q = _toDerivationP(p.st0, seen, options)
-					f = mkDtMult(dtMultLabel(&quot;/&quot;, pItem))
+					f = mkDtSkip(q)
 					If q.typ = typ_Parser_ASN Then
 						f = compose(f, swap(cons, nil))
 					End If
@@ -633,11 +633,15 @@ Function _toDerivationP( _
 					If (options And dtOpt_promoteSingleTerminal) _
 						And (q.typ = typ_Parser_ASN) _
 					Then &apos; TODO: do the work at transformation time rather than parse time
-						If q.tp = &quot;bind&quot; Then
-							f = q.st1
-							&apos;show(f)
-						Else
-							&apos;show(q)
+						If False Then
+							If q.tp = &quot;bind&quot; Then
+								f = q.st1
+								show(&quot;@&quot; &amp; s &amp; &quot;/bind :: &quot; &amp; q.typ, f)
+							ElseIf q.tp = &quot;seq&quot; Then
+								show(&quot;@&quot; &amp; s &amp; &quot;/seq :: &quot; &amp; q.typ &amp; &quot; / (return) &quot; &amp; toString(q.st(1)), q)
+							Else
+								show(&quot;@&quot; &amp; s &amp; &quot;/&quot; &amp; q.tp &amp; &quot; :: &quot; &amp; q.typ &amp; &quot; (?)&quot;, q)
+							End If
 						End If
 						
 						f = swap(mkASN(s), nil)
@@ -646,8 +650,6 @@ Function _toDerivationP( _
 								compose(mkDtNonterminal(s), swap(cons, nil)) _
 							)
 						q = pBind(q, compose(pReturn, f))
-						&apos;s = toString(p.st0) &amp; &quot; :: &quot; &amp; toString(p.st0.typ)
-						&apos;msgbox(s &amp; NL &amp; toString(q))
 					Else
 						f = mkDtNonterminal(s)
 						If q.typ = typ_Parser_ASN Then
@@ -675,9 +677,9 @@ End Function
 
 Function test_AST()
 	test_AST_toDerivationP_typ(0)
-	&apos;test_AST_toDerivationP_typ(dtOpt_hideSkipped)
+	test_AST_toDerivationP_typ(dtOpt_hideSkipped)
 	
-	test_AST_match_mkDtTerminal()
+	&apos;test_AST_match_mkDtTerminal()
 		
 	test_AST_toDerivationP_skip(0)
 	test_AST_toDerivationP_skip(dtOpt_hideSkipped)

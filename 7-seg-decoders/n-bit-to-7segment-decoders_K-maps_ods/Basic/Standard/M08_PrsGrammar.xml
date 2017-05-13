@@ -11,9 +11,9 @@ Function derivationTree_prsGrammar( _
 	s As String, _
 	Optional ByVal options As Integer _
 )
-	Dim p As Object, result As Variant, parseResult As Variant
+	Dim p As Object
+	Dim result As Variant, parseResult As Variant
 	p = toDerivationP(pGrmGrammar, options)
-	&apos;msgbox(toString(p))
 	parseResult = applyP(p, s)
 	If isParseFailure(parseResult) Then
 		result = &quot;!ParseFailure!&quot;
@@ -101,22 +101,22 @@ Function pGrmEscQ()
 End Function
 
 Function pGrmGrammar()
-	Static result As Object
-	If isNull(result) Then
-		result = pSeq(Array( _
-					pSkip(pMany(pWhite)), _
-					pGrmRule, _
-					pSkip(pMany(pWhite)), _
-					pMany( _
-						pSeq(Array( _
-							pSkip(pMany1(pGrmNewline)), _
-							pGrmRule _
-						), id) _
-					) _
-				 ), cons)
-		result = fixIndirection(pInd(&quot;Grammar&quot;), result)
+	Static out As Object
+	If isNull(out) Then
+		out = pSeq(Array( _
+				pSkip(pMany(pWhite)), _
+				pGrmRule, _
+				pSkip(pMany(pWhite)), _
+				pMany( _
+					pSeq(Array( _
+						pSkip(pMany1(pGrmNewline)), _
+						pGrmRule _
+					), id) _
+				) _
+			 ), cons)
+		out = fixIndirection(pInd(&quot;Grammar&quot;), out)
 	End If
-	pGrmGrammar = result	
+	pGrmGrammar = out	
 End Function
 
 Function pGrmRule()
