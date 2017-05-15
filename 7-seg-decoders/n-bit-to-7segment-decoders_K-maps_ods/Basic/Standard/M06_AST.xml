@@ -255,7 +255,9 @@ End Function
 
 &apos; Abstract Syntax Node representing an anonymous alternation
 Function mkDtAnonAlt(Optional children As Object)
-	Static oFn As Object : If isNull(oFn) Then : oFn = mkASN(dtAnonAltLabel, Empty) : End If
+	Static oFn As Object : If isNull(oFn) Then
+		oFn = mkASN(dtAnonAltLabel, Empty)
+	End If
 	Dim result As Variant
 	If isMissing(children) Then
 		result = oFn
@@ -267,7 +269,9 @@ End Function
 
 &apos; Abstract Syntax Node representing an anonymous concatenation
 Function mkDtAnonCon(Optional children As Object)
-	Static oFn As Object : If isNull(oFn) Then : oFn = mkASN(dtAnonConLabel, Empty) : End If
+	Static oFn As Object : If isNull(oFn) Then 
+		oFn = mkASN(dtAnonConLabel, Empty)
+	End If
 	Dim result As Variant
 	If isMissing(children) Then
 		result = oFn
@@ -296,14 +300,28 @@ Function mkDtMult( _
 	mkDtMult = result
 End Function
 
-Function mkDtSkip(p As Object)
+Function mkDtSkip( _
+	p As Object, _
+	Optional children As Object _
+)
 	Dim out As Variant
-	out = mkDtMult(dtMultLabel(&quot;/&quot;, pItem))
+	If isMissing(children) Then
+		out = mkDtMult(dtMultLabel(&quot;/&quot;, p))
+	Else
+		out = mkDtMult(dtMultLabel(&quot;/&quot;, p), children)
+	End If
 	mkDtSkip = out
 End Function
 
 Function dtMultLabel(m As String, p As Object)
 	Dim t As String
+	If isPMany(p) Then
+		dtMultLabel = dtMultLabel(m &amp; &quot;°*&quot;, p.st0.st0)
+		Exit Function
+	ElseIf isPZeroOrOne(p) Then
+		dtMultLabel = dtMultLabel(m &amp; &quot;°?&quot;, p.st0.st0)
+		Exit Function
+	End If
 	Select Case p.tp
 		Case &quot;item&quot;	:	t = &quot;.&quot; 
 		Case &quot;str&quot;:		t = toString(p.st(0))
@@ -313,6 +331,9 @@ Function dtMultLabel(m As String, p As Object)
 		Case &quot;skip&quot;:	
 			dtMultLabel = dtMultLabel(m &amp; &quot;°skip&quot;, p.st0)
 			Exit Function
+		Case &quot;many1&quot;:	
+			dtMultLabel = dtMultLabel(m &amp; &quot;°+&quot;, p.st0)
+			Exit Function
 		Case &quot;sat&quot;
 			If p.str &lt;&gt; &quot;&quot; Then
 				t = &quot;(&quot; &amp; p.str &amp; &quot;)&quot;
@@ -320,7 +341,11 @@ Function dtMultLabel(m As String, p As Object)
 				t = &quot;(&quot; &amp; TFn_toString(p.st0) &amp; &quot;)&quot;
 			End If
 		Case Else
-			croak(&quot;dtMultLabel: cannot handle .tp=&quot; &amp; toString(p.tp))
+			croak(&quot;dtMultLabel: cannot handle .tp=&quot; _
+				&amp; toString(p.tp) _
+				&amp; NL &amp; &quot;m: &quot; &amp; toString(m) _
+				&amp; NL &amp; &quot;p: &quot; &amp; toString(p) _
+			)
 	End Select
 	dtMultLabel = &quot;■(&quot; &amp; m &amp; &quot;)&quot; &amp; t
 End Function
@@ -363,7 +388,9 @@ Function _wrapSkipWithDummyASN(p As Object)
 	Dim result As Object
 	If isPSkip(p) Then &apos; it&apos;ll return Empty on success
 		&apos; so when we still need an ASN, we wrap it with a dummy
-		result = pBind(p, fstArg(pReturn(mkDtSkip(p.st0))))
+		result = pBind(p, fstArg(pReturn( _
+			mkDtSkip(p.st0, nil) _
+		)))
 		result.typ = typ_Parser_ASN
 	Else
 		result = p
@@ -444,8 +471,9 @@ Function _toDerivationP( _
 				If (options And dtOpt_hideSkipped) Then
 					result = p &apos; so when applying p it&apos;ll return Empty
 				Else
-					q = _toDerivationP(p.st0, seen, options)
+					q = p.st0
 					f = mkDtSkip(q)
+					q = _toDerivationP(p.st0, seen, options)
 					If q.typ = typ_Parser_ASN Then
 						f = compose(f, swap(cons, nil))
 					End If
@@ -655,6 +683,7 @@ Function _toDerivationP( _
 						If q.typ = typ_Parser_ASN Then
 							f = compose(f, swap(cons, nil))
 						End If
+						On local error goto fuck
 						q = pBind(q, compose(pReturn, f))
 					End If
 					result = fixIndirection(p.st3, q)
@@ -671,6 +700,10 @@ Function _toDerivationP( _
 		)
 	End If
 	_toDerivationP = result
+	Exit Function
+fuck:
+	show(&quot;fuck &quot; &amp; Err$, f)
+	show(&quot;fuck &quot; &amp; Err$, q)
 End Function
 
 &apos;= tests ======================================================================
@@ -1148,7 +1181,7 @@ Function test_AST_toDerivationP_skip(opts As Integer)
 	If hideSkipped Then
 		x = Empty
 	Else
-		x = mkDtCClass(&quot;(.)&quot;, &quot;y&quot;)
+		x = mkDtSkip(p, List(mkDtCClass(&quot;(.)&quot;, &quot;y&quot;)))
 	End If
 	assert_parses(q, &quot;y&quot;, x, 2).x
 	assert_parses(q, &quot;yz&quot;, x, 2).x
@@ -1159,9 +1192,14 @@ Function test_AST_toDerivationP_skip(opts As Integer)
 	q = toDerivationP(p, opts)
 	refute_parses(q, &quot;&quot;).x
 	If hideSkipped Then
-		x = mkDtNonterminal(&quot;P&quot;, List(mkDtSkip(pItem) ))
+		&apos; even with hideSkipped it&apos;ll show up because it&apos;s under pInd
+		x = mkDtNonterminal(&quot;P&quot;, List(mkDtSkip(pItem, _
+				nil _
+			)))
 	Else
-		x = mkDtNonterminal(&quot;P&quot;, List(mkDtCClass(&quot;(.)&quot;, &quot;y&quot;)
+		x = mkDtNonterminal(&quot;P&quot;, List(mkDtSkip(pItem, _
+				List(mkDtCClass(&quot;(.)&quot;, &quot;y&quot;)) _
+			)))
 	End If
 	&apos;TODO: handle empty pSeq/pSeqL (ie maybe all innerParsers are skip)
 	assert_parses(q, &quot;y&quot;, x, 2).x
@@ -1175,15 +1213,21 @@ Function test_AST_toDerivationP_skip(opts As Integer)
 	assert_parses(q, &quot;&quot;, x, 1).x
 	If hideSkipped Then
 		&apos; even with hideSkipped it&apos;ll show up because it&apos;s under pZeroOrOne
-		x = mkDtMult(dtMultLabel(&quot;?&quot;, p), List(mkDtSkip(p.st0)))
+		x = mkDtMult(dtMultLabel(&quot;?&quot;, p), List(mkDtSkip(p.st0, _
+				nil _
+			)))
 	Else
-		x = mkDtMult(dtMultLabel(&quot;?&quot;, p), List(mkDtCClass(&quot;(.)&quot;, &quot;y&quot;)))
+		x = mkDtMult(dtMultLabel(&quot;?&quot;, p), List(mkDtSkip(p.st0, _
+				List(mkDtCClass(&quot;(.)&quot;, &quot;y&quot;)) _
+			)))
 	End If		
 	assert_parses(q, &quot;y&quot;, x, 2).x
 	assert_parses(q, &quot;yz&quot;, x, 2).x
 
 	If Not(hideSkipped) Then
-		x = mkDtMult(dtMultLabel(&quot;?&quot;, p), List(mkDtCClass(&quot;(.)&quot;, &quot;z&quot;)))
+		x = mkDtMult(dtMultLabel(&quot;?&quot;, p), List(mkDtSkip(p.st0, _
+				List(mkDtCClass(&quot;(.)&quot;, &quot;z&quot;)) _
+			)))
 	End If		
 	assert_parses(q, &quot;z&quot;, x, 2).x
 	assert_parses(q, &quot;zz&quot;, x, 2).x	&apos; reads at most one
@@ -1200,7 +1244,10 @@ Function test_AST_toDerivationP_skip(opts As Integer)
 	If hideSkipped Then
 		x = mkDtTerminal(&quot;z&quot;)
 	Else
-		x = List(mkDtTerminal(&quot; &quot;), mkDtTerminal(&quot;z&quot;))
+		x = List( _
+			mkDtSkip(pStr(&quot; &quot;), List(mkDtTerminal(&quot; &quot;))), _
+			mkDtTerminal(&quot;z&quot;) _
+		)
 	End If
 	refute_parses(q, Array(&quot;&quot;, &quot;z&quot;, &quot; &quot;, &quot;zz&quot;, &quot;  &quot;)).x
 	assert_parses(q, &quot; z&quot;,  x, 3).x
@@ -1227,13 +1274,12 @@ Function test_AST_toDerivationP_typ(opts As Integer)
 	
 	p = pSkip(pItem)
 	q = toDerivationP(p, opts)
-	msgbox(toString(q))
+	&apos;show(q)
 	assertEqual(q.typ, IIf(hideSkipped, &quot;&quot;, typ_Parser_ASN)).x
 	
 	p = pSkip(pStr(&quot;x&quot;))
 	q = toDerivationP(p, opts)
 	assertEqual(q.typ, IIf(hideSkipped, &quot;&quot;, typ_Parser_ASN)).x
-	
 End Function
 
 Function test_AST_match_mkDtTerminal()

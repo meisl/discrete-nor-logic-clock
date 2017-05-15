@@ -420,8 +420,6 @@ Function pBind(Optional ByVal p As Parser, Optional ByVal f As Object)
 			v = car(partialArgs(f)) &apos; peel off K	
 			If isKreturn(f) Then
 				result.st2 = 2
-				Dim inner As String
-				inner = toString(v)
 				result.st3 = v.st &apos; peel off pReturn
 			Else
 				result.st2 = 1
