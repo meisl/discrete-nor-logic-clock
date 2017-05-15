@@ -77,20 +77,19 @@ Function pGrmEscQ()
 		result = pSeq(Array( _
 					pSkip(pStr(&quot;\&quot;)), _
 					foldl1(pChoice, List( _
-						pBind(pStr(&quot;r&quot;), fstArg(pReturn(CR))), _
-						pBind(pStr(&quot;n&quot;), fstArg(pReturn(LF))), _
-						pBind(pStr(&quot;t&quot;), fstArg(pReturn(TAB))), _
-						pStr(&quot;\&quot;), _
-						pStr(DQ) _
-					) ) _
-				 ), id)
-		
-		result = pSeq(Array( _
-					pSkip(pStr(&quot;\&quot;)), _
-					foldl1(pChoice, List( _
 						pStr(&quot;r&quot;), _
 						pStr(&quot;n&quot;), _
 						pStr(&quot;t&quot;), _
+						pStr(&quot;\&quot;), _
+						pStr(DQ) _
+					) ) _
+				 ), id)	
+		result = pSeq(Array( _
+					pSkip(pStr(&quot;\&quot;)), _
+					foldl1(pChoice, List( _
+						pBind(pStr(&quot;r&quot;), fstArg(pReturn(CR))), _
+						pBind(pStr(&quot;n&quot;), fstArg(pReturn(LF))), _
+						pBind(pStr(&quot;t&quot;), fstArg(pReturn(TAB))), _
 						pStr(&quot;\&quot;), _
 						pStr(DQ) _
 					) ) _
@@ -230,14 +229,14 @@ Function pGrmTerminal()
 		badQ.str = &quot;[-&quot; &amp; DQ &amp; &quot;\r\n\t\\]&quot;
 		result = pSeq(Array( _
 					pSkip(pStr(DQ)), _
-					pBind(pMany1( _
+					pMany1( _
 						pChoice( _
 							pGrmEscQ, _
 							badQ _
 						) _
-					), compose(pReturn, foldl1(concat))), _
+					), _
 					pSkip(pStr(DQ)) _
-				 ), id)
+				 ), foldl1(concat))
 		result = fixIndirection(pInd(&quot;Terminal&quot;), result)
 	End If
 	pGrmTerminal = result

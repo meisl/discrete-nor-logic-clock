@@ -16,6 +16,7 @@ Sub Main
 	test_AST()
 End Sub
 
+Const dtReturnLabel = &quot;(◄─)&quot;	&apos;	&quot;◄┘&quot;	&apos;	
 Const dtAnonConLabel = &quot;(. . .)&quot;
 Const dtAnonAltLabel = &quot;(..|..)&quot;
 Const typ_Parser_ASN = &quot;Parser ASN&quot;
@@ -216,6 +217,17 @@ Function asnChild(n As Object, ByVal i As Integer)
 	asnChild = result
 End Function
 
+Function mkDtReturn(Optional value As String)
+	Dim oFn As Object : If isNull(oFn) Then
+		oFn = swap(mkASN(dtReturnLabel), nil)
+	End If
+	If isMissing(value) Then
+		mkDtReturn = oFn
+	Else
+		mkDtReturn = apply(oFn, value)
+	End If
+End Function
+
 Function mkDtTerminal(Optional value As String)
 	If isMissing(value) Then
 		mkDtTerminal = Fn.mkDtTerminal
@@ -403,7 +415,8 @@ Function _toDerivationP( _
 	ByRef seen As Object, _
 	ByVal options As Integer _
 )
-	Dim result As Variant
+	Dim result As Object
+	result = Nothing
 	Dim f As Object, s As String, fName As String
 	Dim q As Object, r As Object
 	Dim qs As Object, rs As Object
@@ -467,6 +480,34 @@ Function _toDerivationP( _
 					result = pBind(result, compose(pReturn, f))
 					result.typ = typ_Parser_ASN
 				End If
+			Case &quot;return&quot;
+				result = pReturn(mkDtReturn(p.st0))
+				result.typ = typ_Parser_ASN
+			Case &quot;item&quot;
+				f = mkDtCClass(&quot;(.)&quot;)
+				result = pBind(p, compose(pReturn, f))
+				&apos;result = pSeq(Array(p),f)
+				result.typ = typ_Parser_ASN
+			Case &quot;str&quot;
+				f = mkDtTerminal
+				result = pBind(p, compose(pReturn, f))
+				&apos;result = pSeq(Array(p), f)
+				result.typ = typ_Parser_ASN
+			Case &quot;bind&quot; &apos; only certain variants supported here
+				f = p.st1
+				If isBreturn(f) Then
+					f = car(partialArgs(f))	&apos; get out B&apos;s 2nd arg (they&apos;re in reverse!)
+					q = p.st0
+					result = _toDerivationP(pSeq(Array(p.st0), f), seen, options)
+				ElseIf isKreturn(f) Then
+					q = car(partialArgs(f)) &apos; peel off the K
+					result = _toDerivationP( _
+						pSeq(Array( _
+							pSkip(p.st0), _
+							q _
+						), id), _
+					seen, options)
+				End If
 			Case &quot;skip&quot;
 				If (options And dtOpt_hideSkipped) Then
 					result = p &apos; so when applying p it&apos;ll return Empty
@@ -481,16 +522,6 @@ Function _toDerivationP( _
 					q.typ = typ_Parser_ASN
 					result = q
 				End If
-			Case &quot;item&quot;
-				f = mkDtCClass(&quot;(.)&quot;)
-				result = pBind(p, compose(pReturn, f))
-				&apos;result = pSeq(Array(p),f)
-				result.typ = typ_Parser_ASN
-			Case &quot;str&quot;
-				f = mkDtTerminal
-				result = pBind(p, compose(pReturn, f))
-				&apos;result = pSeq(Array(p), f)
-				result.typ = typ_Parser_ASN
 			Case &quot;sat&quot;
 				If p.str &lt;&gt; &quot;&quot; Then
 					f = mkDtCClass(&quot;(&quot; &amp; p.str &amp; &quot;)&quot;
@@ -512,13 +543,6 @@ Function _toDerivationP( _
 				End If
 				result = pChoice(q, r)
 				result.typ = q.typ
-			Case &quot;bind&quot; &apos; only certain variants supported here
-				f = p.st1
-				If isBreturn(f) Then
-					f = car(partialArgs(f))	&apos; get out B&apos;s 2nd arg (they&apos;re in reverse!)
-					q = p.st0
-					result = _toDerivationP(pSeq(Array(q), f), seen, options)
-				End If
 			Case &quot;seq&quot; &apos; only simple sequences supported here
 				&apos;result = Empty
 				qs = toList(p.st(0))
@@ -690,10 +714,10 @@ Function _toDerivationP( _
 					result.typ = typ_Parser_ASN
 				End If
 			Case Else
-				result = Empty				
+				result = Nothing
 		End Select
 	End If
-	If isEmpty(result) Then
+	If isNull(result) Then
 		croak(&quot;toDerivationP: cannot handle .tp=&quot; _
 			&amp; toString(p.tp) _
 			&amp; NL &amp; NL &amp; toString(p) _
@@ -711,6 +735,8 @@ End Function
 Function test_AST()
 	test_AST_toDerivationP_typ(0)
 	test_AST_toDerivationP_typ(dtOpt_hideSkipped)
+	
+	test_AST_toDerivationP_return()
 	
 	&apos;test_AST_match_mkDtTerminal()
 		
@@ -731,6 +757,7 @@ Function test_AST()
 	
 
 End Function 
+
 
 Function test_AST_mkASN()
 	Dim f As Object
@@ -853,6 +880,66 @@ Function test_AST_TASN_toString()
 	assertEqual(TASN_toString(n), &quot;─W+&quot;).x
 	n = mkASN(&quot;W?&quot;, Empty, nil)
 	assertEqual(TASN_toString(n), &quot;─W?&quot;).x
+End Function
+
+Function test_AST_toDerivationP_typ(opts As Integer)
+	Dim p As Object, q As Object, x As Variant
+	Dim hideSkipped As Boolean
+	hideSkipped = (opts And dtOpt_hideSkipped)
+	
+	p = pReturn(&quot;foo&quot;)
+	q = toDerivationP(p, opts)
+	assertEqual(q.typ, typ_Parser_ASN).x
+	
+	p = pItem
+	q = toDerivationP(p, opts)
+	assertEqual(q.typ, typ_Parser_ASN).x
+	
+	p = pStr(&quot;x&quot;)
+	q = toDerivationP(p, opts)
+	assertEqual(q.typ, typ_Parser_ASN).x
+	
+	p = pSat(equ(&quot;x&quot;))
+	q = toDerivationP(p, opts)
+	assertEqual(q.typ, typ_Parser_ASN).x
+	
+	p = pSkip(pItem)
+	q = toDerivationP(p, opts)
+	&apos;show(q)
+	assertEqual(q.typ, IIf(hideSkipped, &quot;&quot;, typ_Parser_ASN)).x
+	
+	p = pSkip(pStr(&quot;x&quot;))
+	q = toDerivationP(p, opts)
+	assertEqual(q.typ, IIf(hideSkipped, &quot;&quot;, typ_Parser_ASN)).x
+End Function
+
+Function test_AST_toDerivationP_return()
+	Dim p As Object, q As Object, x As Variant
+	
+	p = pReturn(&quot;foo&quot;)
+	q = toDerivationP(p, 0)
+	x = mkDtReturn(&quot;foo&quot;)
+	assert_parses(q, &quot;&quot;, x, 1).x
+	
+	p = pSeqL(Array( _
+			pReturn(&quot;foo&quot;), _
+			pReturn(&quot;bar&quot;) _
+		), id)
+	q = toDerivationP(p, 0)
+	x = List(mkDtReturn(&quot;foo&quot;), mkDtReturn(&quot;bar&quot;))
+	assert_parses(q, &quot;&quot;, x, 1).x
+
+	&apos; r &gt;&gt;= K x   is  like having a skip on r
+	p = pBind(pStr(&quot;foo&quot;), fstArg(pReturn(&quot;bar&quot;)))
+	q = toDerivationP(p, 0)
+	x = List( _
+		mkDtSkip(pStr(&quot;foo&quot;), List(mkDtTerminal(&quot;foo&quot;))), _
+		mkDtReturn(&quot;bar&quot;) _
+	)
+	assert_parses(q, &quot;foo&quot;, x, 4).x
+	q = toDerivationP(p, dtOpt_hideSkipped)
+	x = mkDtReturn(&quot;bar&quot;)
+	assert_parses(q, &quot;foo&quot;, x, 4).x
 End Function
 
 Function test_AST_toDerivationP_simple(opts As Integer)
@@ -1255,32 +1342,6 @@ Function test_AST_toDerivationP_skip(opts As Integer)
 	assert_parses(q, &quot; zz&quot;, x, 3).x
 End Function
 
-Function test_AST_toDerivationP_typ(opts As Integer)
-	Dim p As Object, q As Object, x As Variant
-	Dim hideSkipped As Boolean
-	hideSkipped = (opts And dtOpt_hideSkipped)
-	
-	p = pItem
-	q = toDerivationP(p, opts)
-	assertEqual(q.typ, typ_Parser_ASN).x
-	
-	p = pStr(&quot;x&quot;)
-	q = toDerivationP(p, opts)
-	assertEqual(q.typ, typ_Parser_ASN).x
-	
-	p = pSat(equ(&quot;x&quot;))
-	q = toDerivationP(p, opts)
-	assertEqual(q.typ, typ_Parser_ASN).x
-	
-	p = pSkip(pItem)
-	q = toDerivationP(p, opts)
-	&apos;show(q)
-	assertEqual(q.typ, IIf(hideSkipped, &quot;&quot;, typ_Parser_ASN)).x
-	
-	p = pSkip(pStr(&quot;x&quot;))
-	q = toDerivationP(p, opts)
-	assertEqual(q.typ, IIf(hideSkipped, &quot;&quot;, typ_Parser_ASN)).x
-End Function
 
 Function test_AST_match_mkDtTerminal()
 	Dim p As Object, q As Object
