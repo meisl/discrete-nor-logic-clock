@@ -80,8 +80,7 @@ Function pGrmEscQ()
 						pBind(pStr(&quot;r&quot;), fstArg(pReturn(CR))), _
 						pBind(pStr(&quot;n&quot;), fstArg(pReturn(LF))), _
 						pBind(pStr(&quot;t&quot;), fstArg(pReturn(TAB))), _
-						pStr(&quot;\&quot;), _
-						pStr(DQ) _
+						pCClass(List(&quot;\&quot;, DQ)) _
 					) ) _
 				 ), id)
 		result = fixIndirection(pInd(&quot;escQ&quot;), result)
@@ -98,11 +97,7 @@ Function pGrmEscC()
 						pBind(pStr(&quot;r&quot;), fstArg(pReturn(CR))), _
 						pBind(pStr(&quot;n&quot;), fstArg(pReturn(LF))), _
 						pBind(pStr(&quot;t&quot;), fstArg(pReturn(TAB))), _
-						pStr(&quot;\&quot;), _
-						pStr(DQ), _
-						pStr(&quot;[&quot;), _
-						pStr(&quot;-&quot;), _
-						pStr(&quot;]&quot;), _
+						pCClass(List(&quot;\&quot;, DQ, &quot;[&quot;, &quot;-&quot;, &quot;]&quot;)) _
 					) ) _
 				 ), id)
 		result = fixIndirection(pInd(&quot;escC&quot;), result)

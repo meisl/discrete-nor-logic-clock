@@ -791,24 +791,55 @@ End Function
 
 &apos;==================================================================
 
-Function pRange(lo As String, hi As String)
+Function escapeCClass(ByVal c As String)
+	Dim out As Variant
+	If (Len(c) &lt;&gt; 1) Then
+		croak(&quot;escapeCClass: invalid char &quot; &amp; toString(c))
+	End If
+	If (c = CR) Or (c = LF) Or (c = TAB) Then
+		c = toString(c)
+		out = Mid(c, 2, Len(c) - 2) &apos; strip off surrounding quotes
+	ElseIf (c = &quot;[&quot;) Or (c = &quot;-&quot;) Or (c = &quot;]&quot;) OR (c = &quot;\&quot;) Then
+		out = &quot;\&quot; &amp; c
+	Else
+		out = c
+	End If	
+	escapeCClass = out
+End Function
+
+Function pRange( _
+	ByVal lo As String, _
+	ByVal hi As String _
+)
 	Dim out As Object
 	out = pSat(compose(inRange(Asc(lo), Asc(hi)), Fn.asc))
-	out.str = &quot;[&quot; &amp; lo &amp; &quot;-&quot; &amp; hi &amp; &quot;]&quot;
+	
+	out.str = &quot;[&quot; &amp; escapeCClass(lo) &amp; &quot;-&quot; &amp; escapeCClass(hi) &amp; &quot;]&quot;
 	pRange = out
 End Function
 
 &apos; TODO: optimize pCClass
-Function pCClass(cs As Object)
+Function pCClass(ByVal cs As Object)
+	Static esc As Object : If isNull(esc) Then 
+		esc = List(&quot;\&quot;, &quot;[&quot;, &quot;-&quot;, &quot;]&quot;)
+	End If
 	assertEqual(isList(cs), True).x
 	Dim out As Object
 	Dim f As Object
-	f = compose(swap(filter, cs), equ)
+	f = compose(swap(skipUntil, cs), equ)
 	out = pSat(ite(compose(isNil, f), _
 				fstArg(False), _
 				fstArg(True) _
 	))
-	&apos;out.str = &quot;[&quot; &amp; lo &amp; &quot;-&quot; &amp; hi &amp; &quot;]&quot;
+	&apos;out.str = foldl(concat, &quot;[&quot;, map(escapeCClass, cs)) &amp; &quot;]&quot;
+	Dim s As String, c As String
+	s = &quot;&quot;
+	Do Until(isNil(cs))
+		c = car(cs)
+		s = s &amp; escapeCClass(c)
+		cs = cdr(cs)
+	Loop
+	out.str = &quot;[&quot; &amp; s &amp; &quot;]&quot;
 	pCClass = out
 End Function
 
@@ -2473,6 +2504,7 @@ End Function
 
 Function test_Parser_range()
 	Dim p As Parser, i As Integer
+	
 	p = pRange(&quot;A&quot;, &quot;Z&quot;)
 	For i = 1 To Asc(&quot;A&quot;) - 1
 		refute_parses(p, Chr(i)).x
@@ -2483,6 +2515,56 @@ Function test_Parser_range()
 	For i = Asc(&quot;Z&quot;) + 1 To 255
 		refute_parses(p, Chr(i)).x
 	Next i
+	assertEqual(toString(p), &quot;[A-Z]&quot;).x
+	
+	p = pRange(TAB, CR)
+	For i = 1 To Asc(TAB) - 1
+		refute_parses(p, Chr(i)).x
+	Next i
+	For i = Asc(TAB) To Asc(CR)
+		assert_parses(p, Chr(i), Chr(i), 2).x
+	Next i
+	For i = Asc(CR) + 1 To 255
+		refute_parses(p, Chr(i)).x
+	Next i
+	assertEqual(toString(p), &quot;[\t-\r]&quot;).x	
+	
+	p = pRange(LF, &quot;-&quot;)
+	For i = 1 To Asc(LF) - 1
+		refute_parses(p, Chr(i)).x
+	Next i
+	For i = Asc(LF) To Asc(&quot;-&quot;)
+		assert_parses(p, Chr(i), Chr(i), 2).x
+	Next i
+	For i = Asc(&quot;-&quot;) + 1 To 255
+		refute_parses(p, Chr(i)).x
+	Next i
+	assertEqual(toString(p), &quot;[\n-\-]&quot;).x	
+	
+	p = pRange(DQ, &quot;-&quot;)
+	For i = 1 To Asc(DQ) - 1
+		refute_parses(p, Chr(i)).x
+	Next i
+	For i = Asc(DQ) To Asc(&quot;-&quot;)
+		assert_parses(p, Chr(i), Chr(i), 2).x
+	Next i
+	For i = Asc(&quot;-&quot;) + 1 To 255
+		refute_parses(p, Chr(i)).x
+	Next i
+	&apos; Note: DQ should not be escaped
+	assertEqual(toString(p), &quot;[&quot; &amp; DQ &amp; &quot;-\-]&quot;).x	
+	
+	p = pRange(&quot;[&quot;, &quot;]&quot;)
+	For i = 1 To Asc(&quot;[&quot;) - 1
+		refute_parses(p, Chr(i)).x
+	Next i
+	For i = Asc(&quot;[&quot;) To Asc(&quot;]&quot;)
+		assert_parses(p, Chr(i), Chr(i), 2).x
+	Next i
+	For i = Asc(&quot;]&quot;) + 1 To 255
+		refute_parses(p, Chr(i)).x
+	Next i
+	assertEqual(toString(p), &quot;[\[-\]]&quot;).x	
 End Function
 
 Function test_Parser_cclass()
@@ -2502,6 +2584,28 @@ Function test_Parser_cclass()
 	
 	assert_parses(p, &quot; &quot; &amp; TAB,	&quot; &quot;, 2).x
 	assert_parses(p, TAB &amp; &quot; &quot;, TAB, 2).x
+	assertEqual(toString(p), &quot;[ \t]&quot;).x
+
+	p = pCClass(List(&quot;[&quot;, &quot;-&quot;, &quot;]&quot;, CR, LF, DQ, &quot;\&quot;)
+	
+	refute_parses(p, Array( _
+		&quot;&quot;, &quot;*&quot;, &quot;+&quot;, &quot;?&quot;, &quot;=&quot;, &quot;.&quot;, &quot;|&quot;,      &quot;_&quot;,      &quot;/&quot;, _
+		&quot;(&quot;, &quot;)&quot;,          &quot;{&quot;, &quot;}&quot;,     _
+		&quot; &quot;,         TAB, _
+		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;, _
+		&quot;a&quot;, &quot;b&quot;, &quot;c&quot;,   &quot;q&quot;,        &quot;x&quot;, &quot;y&quot;, &quot;z&quot;, _
+		&quot;A&quot;, &quot;B&quot;, &quot;C&quot;,        &quot;R&quot;,   &quot;X&quot;, &quot;Y&quot;, &quot;Z&quot; _
+	)).x
+	
+	assert_parses(p, &quot;[&quot;,	&quot;[&quot;, 2).x
+	assert_parses(p, &quot;-&quot;,	&quot;-&quot;, 2).x
+	assert_parses(p, &quot;]&quot;,	&quot;]&quot;, 2).x
+	assert_parses(p, CR,	CR,	 2).x
+	assert_parses(p, LF,	LF,  2).x
+	assert_parses(p, DQ,	DQ,  2).x
+	assert_parses(p, &quot;\&quot;,	&quot;\&quot;, 2).x
+	&apos; Note: DQ should not be escaped
+	assertEqual(toString(p), &quot;[\[\-\]\r\n&quot; &amp; DQ &amp; &quot;\\]&quot;).x
 End Function
 
 Function test_Parser_alphaLower()
