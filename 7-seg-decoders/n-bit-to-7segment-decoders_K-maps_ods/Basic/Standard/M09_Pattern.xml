@@ -59,24 +59,34 @@ Function patAny()
 End Function
 
 Function patEmpty()
-	patEmpty = patVal(Empty)
+	Static out As Object : If isNull(out) Then
+		out = patVal(Empty)
+	End If
+	patEmpty = out
 End Function
 
 Function patVal(v As Variant)
-	Static out As Object : If isNull(out) Then
-		out = newPattern(&quot;val&quot;, v)
-	End If
+	Dim out As Variant
+	out = newPattern(&quot;val&quot;, v)
 	patVal = out
 End Function
 
-Function matches(p As Object, v As Variant)
+Function matches( _
+	Optional ByRef p As Object, _
+	Optional ByVal v As Variant _
+)
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.matches : End If
 	Dim out As Variant
-	Select Case p.which
-		Case &quot;any&quot;: 	out = True
-		Case &quot;val&quot;:		out = equ(v, p.a0)
-		Case Else
-			croak(&quot;TPattern_matches: unsupported pattern .which = &quot; &amp; toString(p.which))
-	End Select
+	If isMissing(p) Then 		: out = oFn
+	ElseIf isMissing(v) Then	: out = apply(oFn, p)
+	Else
+		Select Case p.which
+			Case &quot;any&quot;: 	out = True
+			Case &quot;val&quot;:		out = equ(v, p.a0)
+			Case Else
+				croak(&quot;TPattern_matches: unsupported pattern .which = &quot; &amp; toString(p.which))
+		End Select
+	End If
 	matches = out
 End Function
 
@@ -133,8 +143,25 @@ Function test_Pattern_basePatterns()
 End Function
 
 Function test_Pattern_toString()
-	assertEqual(toString(patAny),   &quot;_&quot;).x
-	assertEqual(toString(patEmpty), &quot;()&quot;).x
+	assertEqual(toString(patAny),   		      &quot;_&quot;).x
+	assertEqual(toString(patEmpty), 		     &quot;()&quot;).x
+	assertEqual(toString(patVal(Empty)), 	     &quot;()&quot;).x
+	assert_toString_equals(patVal(Nothing),   Nothing).x
+	assert_toString_equals(patVal(True),	     True).x
+	assert_toString_equals(patVal(False),	    False).x
+	assert_toString_equals(patVal(&quot;&quot;), 		       &quot;&quot;).x
+	assert_toString_equals(patVal(&quot;a&quot;), 	      &quot;a&quot;).x
+	assert_toString_equals(patVal(&quot;foo&quot;), 	    &quot;foo&quot;).x
+	assert_toString_equals(patVal(CR), 	  	       CR).x
+	assert_toString_equals(patVal(LF), 	  	       LF).x
+	assert_toString_equals(patVal(TAB),   	      TAB).x
+	assert_toString_equals(patVal(    0),           0).x
+	assert_toString_equals(patVal(    1),           1).x
+	assert_toString_equals(patVal(    2),           2).x
+	assert_toString_equals(patVal( 4711),        4711).x
+	assert_toString_equals(patVal(3.1415),     3.1415).x
+	assert_toString_equals(patVal(CLng(42)), CLng(42)).x
+	assert_toString_equals(patVal(CLng(42)),       42).x
 End Function
 
 Function assert_matches(p As Object, ByVal vs As Variant)
@@ -194,7 +221,9 @@ Function _single_match_assertion( _
 End Function
 
 Function test_Pattern_matches()
-	Dim p As TPattern
+	Dim p As TPattern, f As Object
+	f = matches
+	assertEqual(arity(f), 2).x
 	
 	p = patAny
 	assert_matches(p, Array( _
@@ -224,6 +253,36 @@ Function test_Pattern_matches()
 		0, 1, 2, 3, 4711, CLng(4711), 3.1415, _
 		nil, List(nil), List(1, 2, 3) _
 	)).x
+	
+	p = patVal(Nothing)
+	assert_matches(p, Nothing).x
+	refute_matches(p, Array( _
+		Empty, _
+		nil, List(nil), List(1, 2, 3) _
+	)).x
+	f = matches(p)
+	assertThrows(f, Array(      True)).x
+	assertThrows(f, Array(     False)).x
+	assertThrows(f, Array(         0)).x
+	assertThrows(f, Array(         1)).x
+	assertThrows(f, Array(         2)).x
+	assertThrows(f, Array(      4711)).x
+	assertThrows(f, Array(CLng(4711))).x
+	assertThrows(f, Array(    3.1415)).x
+	
+	p = patVal(&quot;&quot;)
+	assert_matches(p, &quot;&quot;).x
+	refute_matches(p, Array( Empty, &quot;a&quot;, &quot;b&quot;, &quot;foo&quot; )).x
+	f = matches(p)
+	assertThrows(f, Array(   Nothing)).x
+	assertThrows(f, Array(      True)).x
+	assertThrows(f, Array(     False)).x
+	assertThrows(f, Array(         0)).x
+	assertThrows(f, Array(         1)).x
+	assertThrows(f, Array(         2)).x
+	assertThrows(f, Array(      4711)).x
+	assertThrows(f, Array(CLng(4711))).x
+	assertThrows(f, Array(    3.1415)).x
 End Function
 
 </script:module>
