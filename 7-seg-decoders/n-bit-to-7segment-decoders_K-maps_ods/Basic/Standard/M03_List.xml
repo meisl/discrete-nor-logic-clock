@@ -125,22 +125,32 @@ Function map(Optional f As Variant, Optional xs As Object)
 	map = result
 End Function
 
-Function filter(fn As Variant, ByVal xs As TList)
-	Dim result As TList
-	If IsArray(xs) Then
-		result = filter(fn, toList(xs))
+Function filter( _
+	Optional f As Variant, _
+	Optional ByVal xs As TList _
+)
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.filter : End If
+	Dim out As Variant
+	If isMissing(f) Then
+		out = oFn
+	ElseIf isMissing(xs) Then
+		out = apply(oFn, f)
 	Else
+		If IsArray(xs) Then
+			xs = toList(xs)
+		End If
 		Dim x As Variant
-		result = nil
+		out = nil
 		While Not(isNil(xs))
 			x = car(xs)
-			If (apply(fn, x)) Then
-				result = cons(x, result)
+			If (apply(f, x)) Then
+				out = cons(x, out)
 			End If
 			xs = cdr(xs)
 		Wend
+		out = reverse(out)
 	End If
-	filter = result
+	filter = out
 End Function
 
 Function foldl(Optional f As Object, Optional acc, Optional ByVal xs As TList)
@@ -489,23 +499,32 @@ Function test_List_map()
 End Function
 
 Function test_List_filter()
-	assertEqual(toString(filter(  &quot;isNil&quot;, nil  )), &quot;[]&quot;).x
-	assertEqual(toString(filter(  &quot;isNil&quot;, List(nil)  )), &quot;[[]]&quot;).x
-	assertEqual(toString(filter(  &quot;isNil&quot;, List(nil, nil)  )), &quot;[[], []]&quot;).x
-	assertEqual(toString(filter(  &quot;isNil&quot;, List(List(1), List(1, 0), List(nil))  )), &quot;[]&quot;).x
-	assertEqual(toString(filter(  &quot;isNil&quot;, List(nil, List(1), nil, List(1, 0), List(nil))  )), &quot;[[], []]&quot;).x
-	Dim equ1 As Variant
-	equ1 = apply(&quot;equ&quot;, 1)
-	assertEqual(toString(filter(  equ1, List(0, 1, 1, 0, 1, 0)  )), &quot;[1, 1, 1]&quot;).x
+	Dim p As Object
+	assertEqual(arity(filter), 2).x
 	
-	assertEqual(arityF(&quot;filter&quot;), 2).x
-	assertEqual(toString(apply(&quot;filter&quot;,  &quot;isNil&quot;, nil  )), &quot;[]&quot;).x
-	assertEqual(toString(apply(&quot;filter&quot;,  &quot;isNil&quot;, List(nil)  )), &quot;[[]]&quot;).x
-	assertEqual(toString(apply(&quot;filter&quot;,  &quot;isNil&quot;, List(nil, nil)  )), &quot;[[], []]&quot;).x
-	assertEqual(toString(apply(&quot;filter&quot;,  &quot;isNil&quot;, List(List(1), List(1, 0), List(nil))  )), &quot;[]&quot;).x
-	assertEqual(toString(apply(&quot;filter&quot;,  &quot;isNil&quot;, List(nil, List(1), nil, List(1, 0), List(nil))  )), &quot;[[], []]&quot;).x
+	p = isNil
+	assertEqual(arity(filter(p)), 1).x
 
-	assertEqual(toString(apply(&quot;filter&quot;,  equ1, List(0, 1, 1, 0, 1, 0)  )), &quot;[1, 1, 1]&quot;).x
+	assertEqual(toString(filter(p, nil)), 		  	&quot;[]&quot;).x
+	assertEqual(toString(filter(p, List(nil))),		&quot;[[]]&quot; ).x
+	assertEqual(toString(filter(p, List(nil, nil))), &quot;[[], []]&quot;).x
+	assertEqual(toString(filter(p, _
+		List(List(1), List(1, 0), List(nil))  )), _
+		&quot;[]&quot;).x
+	assertEqual(toString(filter(p, _
+		List(nil, List(1), nil, List(1, 0), List(nil))  )), _
+		&quot;[[], []]&quot;).x
+	
+	p = equ(1)
+	assertEqual(arity(filter(p)), 1).x
+	assertEqual(toString(filter(p, _
+		List(0, 1, 1, 0, 1, 0)  )), _
+		&quot;[1, 1, 1]&quot;).x
+	
+	&apos; it preserves order of elements
+	p = inRange(2, 4)
+	assertEqual(toString(filter(p, _
+		List(0, 1, 2, 3, 4, 5))), &quot;[2, 3, 4]&quot;).x
 End Function
 
 Function test_List_foldl() &apos;TODO: check order of args as they come in

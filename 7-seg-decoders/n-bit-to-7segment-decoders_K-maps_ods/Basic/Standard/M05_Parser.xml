@@ -792,10 +792,24 @@ End Function
 &apos;==================================================================
 
 Function pRange(lo As String, hi As String)
-	Dim result As Object
-	result = pSat(compose(inRange(Asc(lo), Asc(hi)), Fn.asc))
-	result.str = &quot;[&quot; &amp; lo &amp; &quot;-&quot; &amp; hi &amp; &quot;]&quot;
-	pRange = result
+	Dim out As Object
+	out = pSat(compose(inRange(Asc(lo), Asc(hi)), Fn.asc))
+	out.str = &quot;[&quot; &amp; lo &amp; &quot;-&quot; &amp; hi &amp; &quot;]&quot;
+	pRange = out
+End Function
+
+&apos; TODO: optimize pCClass
+Function pCClass(cs As Object)
+	assertEqual(isList(cs), True).x
+	Dim out As Object
+	Dim f As Object
+	f = compose(swap(filter, cs), equ)
+	out = pSat(ite(compose(isNil, f), _
+				fstArg(False), _
+				fstArg(True) _
+	))
+	&apos;out.str = &quot;[&quot; &amp; lo &amp; &quot;-&quot; &amp; hi &amp; &quot;]&quot;
+	pCClass = out
 End Function
 
 Function pWhite()
@@ -1560,6 +1574,7 @@ Function test_Parser(Optional what)
 	End If
 	If isMissing(what) Or (what = &quot;all&quot;) Or (what = &quot;basic&quot;) Then
 		test_Parser_range()
+		test_Parser_cclass()
 		test_Parser_white()
 		test_Parser_seq()
 		test_Parser_alphaLower()
@@ -2468,6 +2483,25 @@ Function test_Parser_range()
 	For i = Asc(&quot;Z&quot;) + 1 To 255
 		refute_parses(p, Chr(i)).x
 	Next i
+End Function
+
+Function test_Parser_cclass()
+	Dim p As Parser, i As Integer
+	p = pCClass(List(&quot; &quot;, TAB)
+	
+	refute_parses(p, Array( _
+		&quot;&quot;, &quot;*&quot;, &quot;+&quot;, &quot;?&quot;, &quot;=&quot;, &quot;.&quot;, &quot;|&quot;, &quot;-&quot;, &quot;_&quot;, &quot;\&quot;, &quot;/&quot;, _
+		&quot;(&quot;, &quot;)&quot;, &quot;[&quot;, &quot;]&quot;, &quot;{&quot;, &quot;}&quot;, DQ, _
+		     CR, LF,     _
+		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;, _
+		&quot;a&quot;, &quot;b&quot;, &quot;c&quot;,   &quot;q&quot;,        &quot;x&quot;, &quot;y&quot;, &quot;z&quot;, _
+		&quot;A&quot;, &quot;B&quot;, &quot;C&quot;,        &quot;R&quot;,   &quot;X&quot;, &quot;Y&quot;, &quot;Z&quot;, _
+		_dq(&quot;\&quot;), _dq(&quot;\-&quot;), _dq(&quot;\[&quot;), _dq(&quot;\]&quot;), _
+		_dq(CR), _dq(LF) _
+	)).x
+	
+	assert_parses(p, &quot; &quot; &amp; TAB,	&quot; &quot;, 2).x
+	assert_parses(p, TAB &amp; &quot; &quot;, TAB, 2).x
 End Function
 
 Function test_Parser_alphaLower()

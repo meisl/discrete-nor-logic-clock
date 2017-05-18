@@ -581,10 +581,14 @@ Function test_PrsGrammar_cclass()
 	p = pGrmCClass
 	
 	refute_parses(p, Array( _
-		&quot;&quot;, &quot;*&quot;, &quot;+&quot;, &quot;?&quot;, &quot;=&quot;,    , &quot;|&quot;, &quot;-&quot;,      &quot;\&quot;, &quot;/&quot;, _
+		&quot;&quot;, &quot;*&quot;, &quot;+&quot;, &quot;?&quot;, &quot;=&quot;,    , &quot;|&quot;, &quot;-&quot;, &quot;_&quot;, &quot;\&quot;, &quot;/&quot;, _
 		&quot;(&quot;, &quot;)&quot;, &quot;[&quot;, &quot;]&quot;, &quot;{&quot;, &quot;}&quot;, DQ, _
 		&quot; &quot;, CR, LF, TAB, _
-		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot; _
+		&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;, _
+		&quot;a&quot;, &quot;b&quot;, &quot;c&quot;,   &quot;q&quot;,        &quot;x&quot;, &quot;y&quot;, &quot;z&quot;, _
+		&quot;A&quot;, &quot;B&quot;, &quot;C&quot;,        &quot;R&quot;,   &quot;X&quot;, &quot;Y&quot;, &quot;Z&quot;, _
+		_dq(&quot;\&quot;), _dq(&quot;\-&quot;), _dq(&quot;\[&quot;), _dq(&quot;\]&quot;), _
+		_dq(CR), _dq(LF) _
 	)).x
 	
 	assert_parses(p, &quot;.&quot;, 		pItem, 2).x

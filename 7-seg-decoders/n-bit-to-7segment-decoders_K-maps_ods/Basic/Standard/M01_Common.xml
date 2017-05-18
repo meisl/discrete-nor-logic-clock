@@ -227,7 +227,11 @@ Function neq(Optional a As Variant, Optional b As Variant)
 	neq = _apply(Fn.neq, a, b)
 End Function
 
-Function inRange(Optional lo As Long, Optional hi As Long, Optional x As Long)
+Function inRange( _
+	Optional lo As Long, _
+	Optional hi As Long, _
+	Optional x As Long _
+)
 	inRange = _apply(Fn.inRange, lo, hi, x)
 End Function
 

@@ -47,6 +47,7 @@ Type TFnObjs
 	cadr		As Object
 	caddr		As Object
 	map			As Object
+	filter		As Object
 	foldl		As Object
 	foldr		As Object
 	foldl1		As Object
@@ -122,6 +123,7 @@ Function Fn
 		result.cadr 	= lookupFn(&quot;cadr&quot;)
 		result.caddr 	= lookupFn(&quot;caddr&quot;)
 		result.map		= lookupFn(&quot;map&quot;)
+		result.filter	= lookupFn(&quot;filter&quot;)
 		result.foldl	= lookupFn(&quot;foldl&quot;)
 		result.foldr	= lookupFn(&quot;foldr&quot;)
 		result.foldl1	= lookupFn(&quot;foldl1&quot;)
@@ -299,11 +301,11 @@ Function fnObjs()
 			newFn(&quot;cadr&quot;,			1), _
 			newFn(&quot;caddr&quot;,			1), _
 			newFn(&quot;map&quot;,			2, &quot;(a -&gt; b) -&gt; [a] -&gt; [b]&quot;), _
+			newFn(&quot;filter&quot;,			2, &quot;(a -&gt; Bool) -&gt; [a] -&gt; [a]&quot;), _
 			newFn(&quot;foldl&quot;,			3), _
 			newFn(&quot;foldr&quot;,			3), _
 			newFn(&quot;foldl1&quot;,			2), _
 			newFn(&quot;foldr1&quot;,			2), _
-			newFn(&quot;filter&quot;,			2), _
 			newFn(&quot;adjoin&quot;,			2), _
 			newFn(&quot;flatten&quot;,		1, &quot;List List a -&gt; List a&quot;), _
 			newFn(&quot;reverse&quot;,		1, &quot;List a -&gt; List a&quot;), _
@@ -724,11 +726,11 @@ Function test_Fn()
 		
 	Dim sndArg5 As Variant
 	sndArg5 = apply1(Fn.sndArg, 5)
-	assertEqual(isPartialApp(sndArg5), True).x
+	
 	assertEqual(arity(sndArg5), 1).x
 	assertEqual(apply1(sndArg5, 7), 7).x
+	
 	&apos; easy partial application:
-	assertEqual(arity(sndArg), 2).x
 	sndArg5 = sndArg(5)
 	assertEqual(arity(sndArg5), 1).x
 	assertEqual(apply(sndArg5, 7), 	7).x
@@ -834,6 +836,9 @@ Function test_Fn()
 
 	assertEqual(apply(&quot;toString&quot;, &quot;abcd&quot;), &quot;&apos;abcd&apos;&quot;).x
 
+	Dim fFilter As Object
+	fFilter = Fn.filter
+	show(fFilter)
 End Function
 
 </script:module>
