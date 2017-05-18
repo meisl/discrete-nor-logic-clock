@@ -303,7 +303,6 @@ Function fnObjs()
 			newFn(&quot;foldr&quot;,			3), _
 			newFn(&quot;foldl1&quot;,			2), _
 			newFn(&quot;foldr1&quot;,			2), _
-			newFn(&quot;map&quot;,			2), _
 			newFn(&quot;filter&quot;,			2), _
 			newFn(&quot;adjoin&quot;,			2), _
 			newFn(&quot;flatten&quot;,		1, &quot;List List a -&gt; List a&quot;), _

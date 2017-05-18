@@ -225,8 +225,8 @@ End Function
 Function pGrmTerminal()
 	Static result As Object
 	If isNull(result) Then
-		Dim badQ As Object
-		badQ = pSat( _
+		Dim nonEscQ As Object
+		nonEscQ = pSat( _
 					ite(equ(DQ), _
 						fstArg(False), _
 						ite(equ(&quot;\&quot;), _
@@ -238,13 +238,13 @@ Function pGrmTerminal()
 						) _
 					) _
 				)
-		badQ.str = &quot;[-&quot; &amp; DQ &amp; &quot;\r\n\t\\]&quot;
+		nonEscQ.str = &quot;[-&quot; &amp; DQ &amp; &quot;\r\n\t\\]&quot;
 		result = pSeq(Array( _
 					pSkip(pStr(DQ)), _
 					pMany1( _
 						pChoice( _
 							pGrmEscQ, _
-							badQ _
+							nonEscQ _
 						) _
 					), _
 					pSkip(pStr(DQ)) _
@@ -315,9 +315,49 @@ End Function
 Function pGrmCCItem()
 	Static result As Object
 	If isNull(result) Then
+		Dim nonEscC As Object, cs As Object, ds As Object
+		Dim kTrue As Object, kFalse As Object
+		kTrue  = fstArg(True)
+		kFalse = fstArg(False)
+		cs = List(CR, LF, TAB, &quot;[&quot;, &quot;-&quot;, &quot;]&quot;, &quot;\&quot;)
+		ds = map(neq, cs)
+		ds = cons( _
+			car(ds), _
+			map(ite, cdr(ds)) _
+		)
+		&apos;cs = cons(apply(car(cs), kTrue, kFalse), cdr(cs))
+		&apos;show(cs)
+		Dim f As Object, g As Object
+		&apos; f = \x.[x, K False]
+		f = swap(cons, List(kFalse))
+		&apos; g = \x h.(applyToList h (f x)
+		g = compose(swap(Fn.applyToList), f)
+		nonEscC = pSat( foldl1(g, ds) )
+		&apos; nonEscC = pSat ite (neq LF)
+		&apos;                    (ite (neq TAB)
+		&apos;                         ...
+		&apos;                              (ite (neq &quot;\&quot;)
+		&apos;                                   (neq CR)
+		&apos;                                   (K False) )
+		&apos;                         ...
+		&apos;                         (K False) )
+		&apos;                     (K False) )
+		Dim s As String, c As String
+		s = &quot;[-&quot;
+		While Not(isNil(cs))
+			c = toString(car(cs))
+			c = Mid(c, 2, Len(c) - 2) &apos; remove surrounding quotes
+			If (c = &quot;[&quot;) Or (c = &quot;-&quot;) Or (c = &quot;]&quot;) Then
+				c = &quot;\&quot; &amp; c
+			End If
+			s = s &amp; c
+			cs = cdr(cs)
+		Wend
+		nonEscC.str = s &amp; &quot;]&quot;
+		&apos;show(nonEscC)
 		result = pChoice( _
 					pGrmEscC, _
-					pStr(&quot;.&quot;) _
+					nonEscC _
 				)
 		result = fixIndirection(pInd(&quot;CCItem&quot;), result)
 	End If
@@ -344,6 +384,7 @@ Function [test_PrsGrammar======================================]()
 	test_PrsGrammar_linebreak()
 	test_PrsGrammar_escQ()
 	test_PrsGrammar_escC()
+	test_PrsGrammar_pclist()
 	test_PrsGrammar_terminal()
 	test_PrsGrammar_cclass()
 	test_PrsGrammar_pGrmMult()
@@ -460,6 +501,47 @@ Function test_PrsGrammar_escC()
 	assert_parses(p, &quot;\]&quot;,		&quot;]&quot;, 3).x
 End Function
 
+Function test_PrsGrammar_pclist()
+	Dim p As Object, x As Object
+	p = pGrmPCList
+	
+	assert_parses(p, &quot;\\&quot;, 		List(&quot;\&quot;), 3).x
+	assert_parses(p, &quot;\r&quot;, 		List(CR),  3).x
+	assert_parses(p, &quot;\n&quot;, 		List(LF),  3).x
+	assert_parses(p, &quot;\t&quot;, 		List(TAB), 3).x
+	assert_parses(p, &quot;\[&quot;,		List(&quot;[&quot;), 3).x
+	assert_parses(p, &quot;\-&quot;,		List(&quot;-&quot;), 3).x
+	assert_parses(p, &quot;\]&quot;,		List(&quot;]&quot;), 3).x	
+
+	&apos; can escape DQ
+	assert_parses(p, &quot;\&quot; &amp; DQ, 	List(DQ),  3).x
+	&apos; but don&apos;t need to:
+	assert_parses(p, DQ, 	List(DQ),  2).x
+
+	assert_parses(p, &quot;\\\r&quot;, 	List(&quot;\&quot;, CR), 		 5).x
+	assert_parses(p, &quot;\t\-\r&quot;, 	List(TAB, &quot;-&quot;, CR),  7).x
+	assert_parses(p, &quot;\t-\r&quot;, 	List(List(TAB, CR)), 6).x
+
+	assert_parses(p, &quot; \t&quot;, 	List(&quot; &quot;, TAB),		 4).x
+	assert_parses(p, &quot;\r\n\t\[\-\]\\&quot;, _
+					 List(CR, LF, TAB, &quot;[&quot;, &quot;-&quot;, &quot;]&quot;, &quot;\&quot;),	15).x
+	assert_parses(p, &quot;abc.DEF&quot;, List( _
+					 	&quot;a&quot;, &quot;b&quot;, &quot;c&quot;, &quot;.&quot;, &quot;D&quot;, &quot;E&quot;, &quot;F&quot; _
+					 ), 8).x
+	assert_parses(p, &quot;a-zA-Z_&quot;, List( _
+					 	List(&quot;a&quot;, &quot;z&quot;), _
+					 	List(&quot;A&quot;, &quot;Z&quot;), _
+					 	&quot;_&quot; _
+					 ), 8).x
+	assert_parses(p, &quot;a-zA-Z_0-9&quot;, List( _
+					 	List(&quot;a&quot;, &quot;z&quot;), _
+					 	List(&quot;A&quot;, &quot;Z&quot;), _
+					 	&quot;_&quot;, _
+					 	List(&quot;0&quot;, &quot;9&quot;) _
+					 ), 11).x
+
+End Function
+
 Function _dq(s As String) : _dq = DQ &amp; s &amp; DQ : End Function
 
 Function test_PrsGrammar_terminal()
@@ -522,7 +604,7 @@ Function test_PrsGrammar_cclass()
 	&apos; but we don&apos;t need to:
 	assert_parses(p, &quot;[&quot; &amp; DQ &amp; &quot;]&quot;, 	List(DQ), 4).x
 
-	assert_parses(p, &quot;[-.]&quot;, 	&quot;.&quot;, 5).x
+	&apos;assert_parses(p, &quot;[-.]&quot;, 	&quot;.&quot;, 5).x
 End Function
 
 Function test_PrsGrammar_ident(p As Object)
