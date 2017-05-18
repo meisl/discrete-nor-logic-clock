@@ -48,6 +48,8 @@ Type TFnObjs
 	caddr		As Object
 	map			As Object
 	filter		As Object
+	skipWhile	As Object
+	skipUntil	As Object
 	foldl		As Object
 	foldr		As Object
 	foldl1		As Object
@@ -124,6 +126,8 @@ Function Fn
 		result.caddr 	= lookupFn(&quot;caddr&quot;)
 		result.map		= lookupFn(&quot;map&quot;)
 		result.filter	= lookupFn(&quot;filter&quot;)
+		result.skipWhile = lookupFn(&quot;skipWhile&quot;)
+		result.skipUntil = lookupFn(&quot;skipUntil&quot;)
 		result.foldl	= lookupFn(&quot;foldl&quot;)
 		result.foldr	= lookupFn(&quot;foldr&quot;)
 		result.foldl1	= lookupFn(&quot;foldl1&quot;)
@@ -302,6 +306,8 @@ Function fnObjs()
 			newFn(&quot;caddr&quot;,			1), _
 			newFn(&quot;map&quot;,			2, &quot;(a -&gt; b) -&gt; [a] -&gt; [b]&quot;), _
 			newFn(&quot;filter&quot;,			2, &quot;(a -&gt; Bool) -&gt; [a] -&gt; [a]&quot;), _
+			newFn(&quot;skipWhile&quot;,		2, &quot;(a -&gt; Bool) -&gt; [a] -&gt; [a]&quot;), _
+			newFn(&quot;skipUntil&quot;,		2, &quot;(a -&gt; Bool) -&gt; [a] -&gt; [a]&quot;), _
 			newFn(&quot;foldl&quot;,			3), _
 			newFn(&quot;foldr&quot;,			3), _
 			newFn(&quot;foldl1&quot;,			2), _
@@ -512,6 +518,8 @@ applyLast_of_two:
 		Case &quot;cons&quot;:		result = cons(			a0, a1)
 		Case &quot;map&quot;:			result = map(			a0, a1)
 		Case &quot;filter&quot;:		result = filter(		a0, a1)
+		Case &quot;skipWhile&quot;:	result = skipWhile(		a0, a1)
+		Case &quot;skipUntil&quot;:	result = skipUntil(		a0, a1)
 		Case &quot;foldl1&quot;:		result = foldl1(		a0, a1)
 &apos;		Case &quot;foldr1&quot;:		result = foldr1(		a0, a1)
 		Case &quot;adjoin&quot;:		result = adjoin(		a0, a1)

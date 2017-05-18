@@ -126,8 +126,8 @@ Function map(Optional f As Variant, Optional xs As Object)
 End Function
 
 Function filter( _
-	Optional f As Variant, _
-	Optional ByVal xs As TList _
+	Optional ByRef f As Object, _
+	Optional ByVal xs As Variant _
 )
 	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.filter : End If
 	Dim out As Variant
@@ -151,6 +151,60 @@ Function filter( _
 		out = reverse(out)
 	End If
 	filter = out
+End Function
+
+Function skipWhile( _
+	Optional ByRef f As Object, _
+	Optional ByVal xs As Variant _
+)
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.skipWhile : End If
+	Dim out As Variant
+	If isMissing(f) Then
+		out = oFn
+	ElseIf isMissing(xs) Then
+		out = apply(oFn, f)
+	Else
+		If IsArray(xs) Then
+			xs = toList(xs)
+		End If
+		Dim x As Variant
+		out = xs
+		Do Until isNil(out)
+			If apply(f, car(out)) Then
+				out = cdr(out)
+			Else
+				Exit Do
+			End If
+		Loop
+	End If
+	skipWhile = out
+End Function
+
+Function skipUntil( _
+	Optional ByRef f As Object, _
+	Optional ByVal xs As Variant _
+)
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.skipUntil : End If
+	Dim out As Variant
+	If isMissing(f) Then
+		out = oFn
+	ElseIf isMissing(xs) Then
+		out = apply(oFn, f)
+	Else
+		If IsArray(xs) Then
+			xs = toList(xs)
+		End If
+		Dim x As Variant
+		out = xs
+		Do Until isNil(out)
+			If apply(f, car(out)) Then
+				Exit Do
+			Else
+				out = cdr(out)
+			End If
+		Loop
+	End If
+	skipUntil = out
 End Function
 
 Function foldl(Optional f As Object, Optional acc, Optional ByVal xs As TList)
@@ -326,6 +380,8 @@ Function test_List()
 	test_List_cdr()
 	test_List_map()
 	test_List_filter()
+	test_List_skipWhile()
+	test_List_skipUntil()
 	test_List_foldl()
 	test_List_foldl1()
 	test_List_foldr()
@@ -525,6 +581,64 @@ Function test_List_filter()
 	p = inRange(2, 4)
 	assertEqual(toString(filter(p, _
 		List(0, 1, 2, 3, 4, 5))), &quot;[2, 3, 4]&quot;).x
+End Function
+
+Function test_List_skipWhile()
+	Dim f As Object
+	f = skipWhile
+	assertEqual(arity(f), 2).x
+	f = skipWhile(isNil)
+	assertEqual(arity(f), 1).x
+	
+	f = compose(Fn.toString, skipWhile(isNil))
+
+	assertEqual(apply(f, nil),				&quot;[]&quot;).x
+	assertEqual(apply(f, List(nil)),		&quot;[]&quot; ).x
+	assertEqual(apply(f, List(nil, nil)),	&quot;[]&quot;).x
+	assertEqual(apply(f, List(List(nil), nil)),	&quot;[[[]], []]&quot;).x
+	assertEqual(apply(f, _
+		List(List(1), nil, List(1, 0))), _
+		&quot;[[1], [], [1, 0]]&quot;).x
+	assertEqual(apply(f, _
+		List(nil, nil, List(1), nil, List(1, 0))), _
+		&quot;[[1], [], [1, 0]]&quot;).x
+	
+	f = compose(Fn.toString, skipWhile(inRange(0, 2)))
+	
+	assertEqual(apply(f, List(0, 1, 2)), 		  &quot;[]&quot;).x
+	assertEqual(apply(f, List(0, 1, 2, 3)),		  &quot;[3]&quot;).x
+	assertEqual(apply(f, List(0, 1, 2, 3, 4, 5)), &quot;[3, 4, 5]&quot;).x
+	assertEqual(apply(f, List(2, 0, 3, 1, 4, 5)), &quot;[3, 1, 4, 5]&quot;).x
+	assertEqual(apply(f, List(5, 4, 3, 2, 1, 0)), &quot;[5, 4, 3, 2, 1, 0]&quot;).x
+End Function
+
+Function test_List_skipUntil()
+	Dim f As Object
+	f = skipUntil
+	assertEqual(arity(f), 2).x
+	f = skipUntil(isNil)
+	assertEqual(arity(f), 1).x
+	
+	f = compose(Fn.toString, skipUntil(isNil))
+
+	assertEqual(apply(f, nil),				&quot;[]&quot;).x
+	assertEqual(apply(f, List(nil)),		&quot;[[]]&quot; ).x
+	assertEqual(apply(f, List(nil, nil)),	&quot;[[], []]&quot;).x
+	assertEqual(apply(f, List(List(nil), nil)),	&quot;[[]]&quot;).x
+	assertEqual(apply(f, _
+		List(List(1), nil, List(1, 0))), _
+		&quot;[[], [1, 0]]&quot;).x
+	assertEqual(apply(f, _
+		List(nil, nil, List(1), nil, List(1, 0))), _
+		&quot;[[], [], [1], [], [1, 0]]&quot;).x
+	
+	f = compose(Fn.toString, skipUntil(inRange(0, 2)))
+	
+	assertEqual(apply(f, List(0, 1, 2)), 		  &quot;[0, 1, 2]&quot;).x
+	assertEqual(apply(f, List(0, 1, 2, 3)),		  &quot;[0, 1, 2, 3]&quot;).x
+	assertEqual(apply(f, List(0, 1, 2, 3, 4, 5)), &quot;[0, 1, 2, 3, 4, 5]&quot;).x
+	assertEqual(apply(f, List(2, 0, 3, 1, 4, 5)), &quot;[2, 0, 3, 1, 4, 5]&quot;).x
+	assertEqual(apply(f, List(5, 4, 3, 2, 1, 0)), &quot;[2, 1, 0]&quot;).x
 End Function
 
 Function test_List_foldl() &apos;TODO: check order of args as they come in
