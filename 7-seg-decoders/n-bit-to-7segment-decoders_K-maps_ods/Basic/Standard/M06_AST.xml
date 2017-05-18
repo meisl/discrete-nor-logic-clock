@@ -217,7 +217,7 @@ Function asnChild(n As Object, ByVal i As Integer)
 	asnChild = result
 End Function
 
-Function mkDtReturn(Optional value As String)
+Function mkDtReturn(Optional value As Variant)
 	Dim oFn As Object : If isNull(oFn) Then
 		oFn = swap(mkASN(dtReturnLabel), nil)
 	End If
