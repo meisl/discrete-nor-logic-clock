@@ -763,11 +763,11 @@ End Function
 Function test_List_equ()
 	assertEqual(arityF(&quot;TList_equ&quot;), 2).x
 	
-	assertThrows(&quot;equ&quot;, Array(nil, Empty)).x	&apos; incompatible types Object/TList and Empty
-	assertThrows(&quot;equ&quot;, Array(Empty, nil)).x	&apos; incompatible types Empty and Object/TList
+	assertEqual(equ(nil, Empty), False).x	&apos; Empty is comparable to anything
+	assertEqual(equ(Empty, nil), False).x
 
-	assertEqual(equ(nil,		Nothing),		False).x
-	assertEqual(equ(Nothing,	nil),			False).x
+	assertEqual(equ(nil,		Nothing),		False).x	&apos; TList is an Object type,
+	assertEqual(equ(Nothing,	nil),			False).x	&apos; ... so it&apos;s comparable to Nothing
 
 	assertEqual(equ(nil,		nil),			True).x
 	

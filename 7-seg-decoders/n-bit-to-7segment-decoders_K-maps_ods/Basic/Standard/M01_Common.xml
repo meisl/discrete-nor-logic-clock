@@ -242,11 +242,15 @@ Function equ(Optional a As Variant, Optional b As Variant)
 		result = oFn
 	ElseIf isMissing(b) Then
 		result = apply(oFn, a)
+	ElseIf isEmpty(a) Then
+		result = isEmpty(b)
+	ElseIf isEmpty(b) Then
+		result = False
 	Else
 		Dim ta As String, tb As String, tmp As String
 		ta = typeOf(a)
 		tb = typeOf(b)
-		If Not(ta = tb) Then
+		If (ta &lt;&gt; tb) Then
 			If (isNull(a) And startsWith(tb, ta)) Or (isNull(b) And startsWith(ta, tb)) Then
 				result = False
 			Else
@@ -254,6 +258,7 @@ Function equ(Optional a As Variant, Optional b As Variant)
 			End If
 		Else &apos; ta = tb
 			Select Case ta
+				Case &quot;Empty&quot;:	result = True
 				Case &quot;Object&quot;	&apos; Object without a .tyname field
 					result = CBool(isNull(a) And isNull(b))
 					If Not(result) Then
@@ -261,8 +266,6 @@ Function equ(Optional a As Variant, Optional b As Variant)
 					End If
 				Case &quot;Object/&quot;	&apos; Object with a uninitialized .tyname field
 					croak(&quot;equ: cannot compare (uninitialized) values of type &quot; &amp; ta)
-				Case &quot;Empty&quot;:	result = True
-				&apos;Case &quot;&quot;: result = 
 				Case Else
 					If isObject(a) Then	&apos;they are instances of the same custom type (with non-empty.tyname)
 						&apos; ATTENTION: do NOT access .tyname directly!
@@ -954,7 +957,6 @@ Function test_equ()
 	assertEqual(equ(&quot;xx&quot;, &quot;xx&quot;), True).x
 	assertEqual(equ(&quot; xx&quot;, &quot;xx&quot;), False).x
 	
-	assertEqual(equ(Empty, Empty), True).x
 	assertEqual(equ(Nothing, Nothing), True).x
 	
 	Dim vEmpty          As Variant
@@ -992,12 +994,54 @@ Function test_equ()
 	vUninitNoTyName = oUninitNoTyName
 	assertEqual(typeOf(vUninitNoTyName), &quot;Object&quot;).x
 	
+	&apos; Empty is comparable to anything:
+	assertEqual(equ(Empty, Empty),		True).x
+	assertEqual(equ(Empty, Nothing),	False).x
+	assertEqual(equ(Nothing, Empty),	False).x
+	assertEqual(equ(Empty, True),		False).x
+	assertEqual(equ(True, Empty),		False).x
+	assertEqual(equ(Empty, False),		False).x
+	assertEqual(equ(False, Empty),		False).x
+	assertEqual(equ(Empty, &quot;&quot;),			False).x
+	assertEqual(equ(&quot;&quot;, Empty),			False).x
+	assertEqual(equ(Empty, &quot;a&quot;),		False).x
+	assertEqual(equ(&quot;a&quot;, Empty),		False).x
+	assertEqual(equ(Empty, &quot;foo&quot;),		False).x
+	assertEqual(equ(&quot;foo&quot;, Empty),		False).x
+	assertEqual(equ(Empty, 0),			False).x
+	assertEqual(equ(0, Empty),			False).x
+	assertEqual(equ(Empty, 1),			False).x
+	assertEqual(equ(1, Empty),			False).x
+	assertEqual(equ(Empty, -1),			False).x
+	assertEqual(equ(-1, Empty),			False).x
+	assertEqual(equ(Empty, 2),			False).x
+	assertEqual(equ(2, Empty),			False).x
+	assertEqual(equ(Empty, -2),			False).x
+	assertEqual(equ(-2, Empty),			False).x
+	assertEqual(equ(Empty, 3.1415),		False).x
+	assertEqual(equ(3.1415, Empty),		False).x
+
+	assertEqual(equ(vEmpty, oNothing),		False).x
+	assertEqual(equ(oNothing, vEmpty),		False).x
+	assertEqual(equ(vEmpty, oUninitTyName),	False).x
+	assertEqual(equ(oUninitTyName, vEmpty),	False).x
+	assertEqual(equ(vEmpty, vUninitTyName),	False).x
+	assertEqual(equ(vUninitTyName, vEmpty),	False).x
+	assertEqual(equ(vEmpty, oUninitTyName),	False).x
+	assertEqual(equ(oUninitTyName, vEmpty),	False).x
+	
+
+	assertEqual(equ(vEmpty, nil),			False).x
+	assertEqual(equ(nil, vEmpty),			False).x
+	assertEqual(equ(vEmpty, List(nil)),		False).x
+	assertEqual(equ(List(nil), vEmpty),		False).x
+	assertEqual(equ(vEmpty, List(1)),		False).x
+	assertEqual(equ(List(1), vEmpty),		False).x
+	assertEqual(equ(vEmpty, List(1, &quot;a&quot;)),	False).x
+	assertEqual(equ(List(1, &quot;a&quot;), vEmpty),	False).x
+	
 	&apos;---------------
 	
-	assertThrows(&quot;equ&quot;, Array(vEmpty, oNothing)).x		&apos; incompatible types Empty and Object
-
-	assertThrows(&quot;equ&quot;, Array(vEmpty, oUninitTyName)).x	&apos; incompatible types Empty and Object/
-
 	assertThrows(&quot;equ&quot;, Array(vUninitTyName, oUninitTyName)).x	&apos; cannot compare uninitialized instances of type Object/
 
 	assertThrows(&quot;equ&quot;, Array(vUninitTyName, oInitTyName)).x	&apos; missing fn &quot;foobar_equ&quot;
@@ -1010,9 +1054,6 @@ Function test_equ()
 	assertEqual(equ(oUninitTyName,	Nothing),		False).x
 	assertEqual(equ(Nothing,		oInitTyName),	False).x
 	assertEqual(equ(oInitTyName,	Nothing),		False).x
-
-	assertThrows(&quot;equ&quot;, Array(vEmpty, oUninitNoTyName)).x	&apos; incompatible types Empty and Object
-	assertThrows(&quot;equ&quot;, Array(oUninitNoTyName, vEmpty)).x	&apos; incompatible types Object and Empty
 
 	assertThrows(&quot;equ&quot;, Array(vUninitNoTyName, oUninitNoTyName)).x	&apos; cannot compare values of underspecified type Object
 	assertThrows(&quot;equ&quot;, Array(oUninitNoTyName, vUninitNoTyName)).x	&apos; cannot compare values of underspecified type Object

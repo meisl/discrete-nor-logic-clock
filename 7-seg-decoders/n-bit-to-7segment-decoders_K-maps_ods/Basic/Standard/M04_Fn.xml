@@ -80,6 +80,9 @@ Type TFnObjs
 	mkDtCClass			As Object
 	mkDtNonterminal		As Object
 	mkDtMult			As Object
+	
+	isPattern			As Object
+	TPattern_toString	As Object
 End Type
 
 
@@ -158,6 +161,9 @@ Function Fn
 		result.mkDtCClass		= lookupFn(&quot;mkDtCClass&quot;)
 		result.mkDtNonterminal  = lookupFn(&quot;mkDtNonterminal&quot;)
 		result.mkDtMult  		= lookupFn(&quot;mkDtMult&quot;)
+		
+		result.isPattern			= lookupFn(&quot;isPattern&quot;)
+		result.TPattern_toString	= lookupFn(&quot;TPattern_toString&quot;)
 	End If
 	Fn = result
 End Function
@@ -337,7 +343,10 @@ Function fnObjs()
 			newFn(&quot;mkDtTerminal&quot;,		1, &quot;Str -&gt; ASN&quot;), _
 			newFn(&quot;mkDtCClass&quot;,			2, &quot;Str -&gt; Str -&gt; ASN&quot;), _
 			newFn(&quot;mkDtNonterminal&quot;,	2, &quot;Str -&gt; [ASN] -&gt; ASN&quot;), _
-			newFn(&quot;mkDtMult&quot;,			2, &quot;Str -&gt; [ASN] -&gt; ASN&quot;) _
+			newFn(&quot;mkDtMult&quot;,			2, &quot;Str -&gt; [ASN] -&gt; ASN&quot;), _
+			_
+			newFn(&quot;isPattern&quot;,			1, &quot;Any -&gt; Bool&quot;), _
+			newFn(&quot;TPattern_toString&quot;,	1, &quot;Pattern -&gt; Str&quot;) _
 	))
 	End If
 	fnObjs = result
@@ -499,6 +508,8 @@ applyLast_of_one:
 		Case &quot;TParser_toString&quot;:	result = TParser_toString(	a0)
 		Case &quot;TASN_toString&quot;:		result = TASN_toString(		a0)
 		Case &quot;mkDtTerminal&quot;:		result = mkDtTerminal(		a0)
+		Case &quot;isPattern&quot;:	result = isPattern(	a0)
+		Case &quot;TPattern_toString&quot;:	result = TPattern_toString(	a0)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select
@@ -843,10 +854,6 @@ Function test_Fn()
 	assertEqual(apply(&quot;arityF&quot;,  &quot;applyToList&quot;),     2).x
 
 	assertEqual(apply(&quot;toString&quot;, &quot;abcd&quot;), &quot;&apos;abcd&apos;&quot;).x
-
-	Dim fFilter As Object
-	fFilter = Fn.filter
-	show(fFilter)
 End Function
 
 </script:module>

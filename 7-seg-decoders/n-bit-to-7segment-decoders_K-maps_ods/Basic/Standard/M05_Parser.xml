@@ -1744,16 +1744,16 @@ Function assert_parses(p As Parser, ByVal ss As Variant, expVal As Variant, expP
 			If assertEqual(actPos, expPos).isFail _
 			Or assertEqual(actTyp, expTyp).isFail _
 			Or assertEqual(actStr, expStr).isFail _
-			Then : Goto assert_parse_failed : End If
+			Then : Goto assert_parses_failed : End If
 		Else
 			If assertEqual(actPos, expPos).isFail _
 			Or assertEqual(actVal, expVal).isFail _
-			Then : Goto assert_parse_failed : End If
+			Then : Goto assert_parses_failed : End If
 		End If
 	Next i
 	assert_parses = mkPass()
 	Exit Function
-assert_parse_failed:
+assert_parses_failed:
 	actual   = List(actPos, actTyp, actStr)
 	expected = List(expPos, expTyp, expStr)
 	msg = &quot;actual &quot; _
