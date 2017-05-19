@@ -66,7 +66,7 @@ Function pGrmIdent()
 						pAlpha, _
 						pMany(pAlphaNumDash), _
 					), foldl(concat))
-		&apos;result = fixIndirection(pInd(&quot;Ident&quot;), result)
+		result = fixIndirection(pInd(&quot;Ident&quot;), result)
 	End If
 	pGrmIdent = result
 End Function

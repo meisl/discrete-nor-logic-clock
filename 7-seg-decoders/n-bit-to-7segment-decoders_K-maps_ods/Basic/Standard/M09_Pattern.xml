@@ -3,16 +3,18 @@
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M09_Pattern" script:language="StarBasic">REM  *****  BASIC  *****
 Option Explicit
 
+&apos; data Pattern a = Any
+&apos;                | Val a
+&apos;                | Var Str
+&apos;                | Dat TypeCtor [Pattern Any]  ~~~~~
+
 Const TPattern_tyname = &quot;TPattern&quot;
 Type TPattern
 	tyname	As String
 	which	As String
 	a0		As Variant
 End Type
-&apos; data Pattern a = Any
-&apos;                | Val a
-&apos;                | Var Str
-&apos;                | Dat TypeCtor [Pattern Any]
+
 
 Sub Main
 	[test_Pattern======================================]
@@ -41,9 +43,9 @@ End Function
 Function TPattern_toString(p As Object)
 	Dim out As Variant
 	Select Case p.which
-		Case &quot;any&quot;:			out = &quot;_&quot;
-		Case &quot;var&quot;:			out = p.a0
-		Case &quot;val&quot;
+		Case &quot;Any&quot;:			out = &quot;_&quot;
+		Case &quot;Var&quot;:			out = p.a0
+		Case &quot;Val&quot;
 			If isEmpty(p.a0) Then
 				out = &quot;()&quot;
 			Else
@@ -51,10 +53,27 @@ Function TPattern_toString(p As Object)
 			End If
 		Case &quot;List.nil&quot;:	out = &quot;[]&quot;
 		Case &quot;List.cons&quot;
-			out = &quot;(&quot; _
+			Dim patHd As Object, patTl As Object
+			patHd = car(p.a0)
+			patTl = cadr(p.a0)
+			If (patTl.which = patList_nil.which) Then
+				out = &quot;[&quot; _
+					&amp; TPattern_toString(patHd) _
+					&amp; &quot;]&quot;
+			Else
+				out = &quot;(&quot; _
+					&amp; TPattern_toString(patHd) _
+					&amp; &quot;:&quot; _
+					&amp; TPattern_toString(patTl) _
+					&amp; &quot;)&quot;
+			End If
+		Case &quot;ASN&quot;
+			out = &quot;(ASN &quot; _
 				&amp; TPattern_toString(car(p.a0)) _
-				&amp; &quot;:&quot; _
+				&amp; &quot; &quot; _
 				&amp; TPattern_toString(cadr(p.a0)) _
+				&amp; &quot; &quot; _
+				&amp; TPattern_toString(caddr(p.a0)) _
 				&amp; &quot;)&quot;
 		Case Else
 			croak(&quot;TPattern_toString: unsupported pattern .which = &quot; &amp; toString(p.which))
@@ -64,20 +83,20 @@ End Function
 
 Function patAny()
 	Static out As Object : If isNull(out) Then
-		out = newPattern(&quot;any&quot;, Empty)
+		out = newPattern(&quot;Any&quot;, Empty)
 	End If
 	patAny = out
 End Function
 
 Function patVal(v As Variant)
 	Dim out As Variant
-	out = newPattern(&quot;val&quot;, v)
+	out = newPattern(&quot;Val&quot;, v)
 	patVal = out
 End Function
 
 Function patVar(s As String)
 	Dim out As Variant
-	out = newPattern(&quot;var&quot;, s)
+	out = newPattern(&quot;Var&quot;, s)
 	patVar = out
 End Function
 
@@ -86,10 +105,18 @@ Function patList_nil()
 	patList_nil = out
 End Function
 
-Function patList_cons(hd As Variant, tl As Object)
+Function patList_cons(patHd As Variant, patTl As Object)
 	Dim out As Variant
-	out = newPattern(&quot;List.cons&quot;, List(hd, tl))
+	&apos; TODO: make sure patHd and patTl are proper patterns
+	out = newPattern(&quot;List.cons&quot;, List(patHd, patTl))
 	patList_cons = out
+End Function
+
+Function patASN(patLabel As Variant, patValue As Object, patChildren As Object)
+	Dim out As Variant
+	&apos; TODO: make sure patLabel, patValue and patChildren are proper patterns
+	out = newPattern(&quot;ASN&quot;, List(patLabel, patValue, patChildren))
+	patASN = out
 End Function
 
 &apos; matches :: Pattern a -&gt; Maybe Env -&gt; a -&gt; Maybe Env
@@ -122,11 +149,11 @@ Function matches( _
 	ElseIf isEmpty(e) Then		: out = Empty
 	Else
 		Select Case p.which
-			Case &quot;any&quot;: 	out = e
-			Case &quot;val&quot;
+			Case &quot;Any&quot;: 	out = e
+			Case &quot;Val&quot;
 				If equ(x, p.a0) Then : out = e
 				Else : out = Empty : End If
-			Case &quot;var&quot;
+			Case &quot;Var&quot;
 				Dim s As String, y As Variant
 				s = p.a0
 				y = lookup(s, e)
@@ -155,6 +182,18 @@ Function matches( _
 					out = matches(patHd, e,   car(x))
 					out = matches(patTl, out, cdr(x))
 				End If
+			Case &quot;ASN&quot;
+				If Not(isASN(x)) Then
+					out = Empty	&apos; TODO: maybe throw on type error?
+				Else
+					Dim patLabel As Object, patValue As Object, patChildren As Object
+					patLabel    = car(p.a0)
+					patValue    = cadr(p.a0)
+					patChildren = caddr(p.a0)
+					out = matches(patLabel,    e,   asnLabel(x))
+					out = matches(patValue,    out, asnValue(x))
+					out = matches(patChildren, out, asnChildren(x))
+				End If
 			Case Else
 				croak(&quot;TPattern_matches: unsupported pattern .which = &quot; &amp; toString(p.which))
 		End Select
@@ -165,16 +204,11 @@ End Function
 Function [test_Pattern======================================]()
 	test_Pattern_isPattern()
 	test_Pattern_toString()
-	test_Pattern_matches_any()
-	test_Pattern_matches_val()
-	test_Pattern_matches_var()
-	test_Pattern_matches_list()
-End Function
-
-Function test_Pattern_newPattern()
-	Dim p As Object
-	p = newPattern()
-	assertEqual(typeOf(p), &quot;Object/&quot; &amp; TPattern_tyname).x
+	test_Pattern_matches_Any()
+	test_Pattern_matches_Val()
+	test_Pattern_matches_Var()
+	test_Pattern_matches_List()
+	test_Pattern_matches_ASN()
 End Function
 
 Function test_Pattern_isPattern()
@@ -190,6 +224,8 @@ Function test_Pattern_isPattern()
 
 	assertEqual(isPattern(patList_nil),						True).x
 	assertEqual(isPattern(patList_cons(patAny, patAny)),	True).x
+
+	assertEqual(isPattern(patASN(patAny, patAny, patAny)),	True).x
 
 	assertEqual(isPattern(Empty),		False).x
 	assertEqual(isPattern(Nothing),		False).x
@@ -247,6 +283,10 @@ Function test_Pattern_toString()
 	
 	assertEqual(toString(patList_nil), 					&quot;[]&quot;).x
 	assertEqual(toString(patList_cons(patAny, patAny)), &quot;(_:_)&quot;).x
+	assertEqual(toString(patList_cons(patVar(&quot;x&quot;), patList_nil)), &quot;[x]&quot;).x
+	
+	
+	assertEqual(toString(patASN(patVar(&quot;lbl&quot;), patVal(Empty), patList_nil)), &quot;(ASN lbl () [])&quot;).x
 End Function
 
 Function assert_matches(p As Object, env As Variant, ByVal vs As Variant)
@@ -314,7 +354,7 @@ Function _single_match_assertion( _
 	_single_match_assertion = testResult
 End Function
 
-Function test_Pattern_matches_any()
+Function test_Pattern_matches_Any()
 	Dim p As TPattern, f As Object, e As Object
 	f = matches
 	e = envEmpty
@@ -338,7 +378,7 @@ Function test_Pattern_matches_any()
 	)).x
 End Function
 
-Function test_Pattern_matches_val()
+Function test_Pattern_matches_Val()
 	Dim p As TPattern, f As Object, e As Object
 	f = matches
 	e = envEmpty
@@ -408,7 +448,7 @@ Function test_Pattern_matches_val()
 	)).x
 End Function	
 	
-Function test_Pattern_matches_var()
+Function test_Pattern_matches_Var()
 	Dim p As TPattern, f As Object, e As Object
 	f = matches
 	e = envEmpty
@@ -451,7 +491,7 @@ Function test_Pattern_matches_var()
 	assertThrows(f, Array(    3.1415)).x	
 End Function	
 	
-Function test_Pattern_matches_list()
+Function test_Pattern_matches_List()
 	Dim p As TPattern, f As Object, e As Object
 	f = matches
 	e = envEmpty
@@ -505,8 +545,48 @@ Function test_Pattern_matches_list()
 	assert_matches(p, e, List(1, 1, 3)			).x
 	refute_matches(p, e, List(1, 2, 3)			).x
 	assert_matches(p, e, List(1, 1, 2, 3)		).x
-	
 End Function
+	
+Function test_Pattern_matches_ASN()
+	Dim p As TPattern, f As Object, e As Object, v As Object
+	f = matches
+	e = envEmpty
+
+	v = mkDtTerminal(&quot;Foo&quot;)
+	p = patASN(patAny, patAny, patList_nil)
+	assert_matches(p, e, v).x
+	p = patASN(patVal(Empty), patVar(&quot;val&quot;), patList_nil)
+	assert_matches(p, e, v).x
+	e = matches(p, e, v)
+	assertEqual(lookup(&quot;val&quot;, e), &quot;Foo&quot;).x
+	
+
+	&apos;ASN &quot;Alt&quot;  () [x]        -&gt; x
+	p = patASN(patVal(&quot;Alt&quot;), patVal(Empty), patList_cons(patVar(&quot;x&quot;), patList_nil))
+	v = mkDtNonterminal(&quot;Con&quot;, List(mkDtNonterminal(&quot;Atom&quot;, List(mkASN(&quot;Terminal&quot;, &quot;foo&quot;, nil)))))
+	e = envEmpty
+	refute_matches(p, e, v).x
+	v = mkDtNonterminal(&quot;Alt&quot;, List(v))
+	assert_matches(p, e, v).x
+	e = matches(p, e, v)
+	assertEqual(isASN(lookup(&quot;x&quot;, e)), True).x
+	assert_toString_equals(lookup(&quot;x&quot;, e), asnChild(v, 0)).x
+	
+	&apos;ASN lbl    () [ASN () val []] -&gt; ASN lbl v []
+	&apos;inner one first:
+	p = patASN(patVal(Empty), patVar(&quot;val&quot;), patList_nil)
+	p = patASN(patVar(&quot;lbl&quot;), patVal(Empty), patList_cons(p, patList_nil))
+	v = mkDtNonTerminal(&quot;Foo&quot;, List(mkDtTerminal(&quot;bar&quot;)))
+	e = envEmpty
+	assert_matches(p, e, v).x
+	e = matches(p, e, v)
+	assertEqual(lookup(&quot;lbl&quot;, e), &quot;Foo&quot;).x
+	assertEqual(lookup(&quot;val&quot;, e), &quot;bar&quot;).x
+	
+	&apos;ASN &quot;Con&quot;  () [x]        -&gt; x
+	&apos;ASN &quot;Atom&quot; () [x]        -&gt; x
+	
+End Function	
 
 
 </script:module>
