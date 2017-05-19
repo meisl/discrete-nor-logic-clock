@@ -11,9 +11,24 @@ Type TList
 End Type
 
 Sub Main
+	show(Env_toString(TList))
 	test_List()
 End Sub
 
+Function TList()
+	Static out As Object : If isNull(out) Then
+		Dim tv As Variant, t As Variant
+		tv = mkTypeVar(&quot;a&quot;)
+		t = mkTypeCtor(&quot;List&quot;, List(tv))
+		out = envEmpty
+		out = extend(out, &quot;cons&quot;, mkArrowType(tv, t))
+		out = extend(out, &quot;nil&quot;, t)
+		out = extend(envEmpty, &quot;DataCtors&quot;, out)
+		&apos;out = extend(out, &quot;TypeArgs&quot;, &quot;a&quot;)
+		out = extend(out, &quot;TypeCtor&quot;, t)
+		End If
+	TList = out
+End Function
 
 Function TList_toString(xs As TList)
 &apos;	concat &quot;[&quot; (concat (foldl1 (\acc.(concat acc) ° (concat &quot;, &quot;))) &quot;[&quot; (map toString xs)) &quot;]&quot;

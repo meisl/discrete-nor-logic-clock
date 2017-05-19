@@ -453,6 +453,17 @@ Function isKreturn(f As Object) As Boolean
 	isKreturn = result
 End Function
 
+Function isKEmpty(f As Object) As Boolean
+	Dim result As Boolean
+	result = False
+	If isKsomething(f) Then
+		Dim a0 As Variant
+		a0 = car(partialArgs(f))
+		result = isEmpty(a0)
+	End If
+	isKEmpty = result
+End Function
+
 Function isBsomething(f As Object) As Boolean
 	isBsomething = (getFnName(f) = getFnName(Fn.compose)) And (arity(f) = 1)
 End Function

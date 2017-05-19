@@ -41,14 +41,21 @@ End Function
 Function TPattern_toString(p As Object)
 	Dim out As Variant
 	Select Case p.which
-		Case &quot;any&quot;:		out = &quot;_&quot;
-		Case &quot;var&quot;:		out = p.a0
+		Case &quot;any&quot;:			out = &quot;_&quot;
+		Case &quot;var&quot;:			out = p.a0
 		Case &quot;val&quot;
 			If isEmpty(p.a0) Then
 				out = &quot;()&quot;
 			Else
 				out = toString(p.a0)
 			End If
+		Case &quot;List.nil&quot;:	out = &quot;[]&quot;
+		Case &quot;List.cons&quot;
+			out = &quot;(&quot; _
+				&amp; TPattern_toString(car(p.a0)) _
+				&amp; &quot;:&quot; _
+				&amp; TPattern_toString(cadr(p.a0)) _
+				&amp; &quot;)&quot;
 		Case Else
 			croak(&quot;TPattern_toString: unsupported pattern .which = &quot; &amp; toString(p.which))
 	End Select
@@ -72,6 +79,17 @@ Function patVar(s As String)
 	Dim out As Variant
 	out = newPattern(&quot;var&quot;, s)
 	patVar = out
+End Function
+
+Function patList_nil()
+	Static out As Object : If isNull(out) Then : out = newPattern(&quot;List.nil&quot;, nil) : End If
+	patList_nil = out
+End Function
+
+Function patList_cons(hd As Variant, tl As Object)
+	Dim out As Variant
+	out = newPattern(&quot;List.cons&quot;, List(hd, tl))
+	patList_cons = out
 End Function
 
 &apos; matches :: Pattern a -&gt; Maybe Env -&gt; a -&gt; Maybe Env
@@ -117,6 +135,26 @@ Function matches( _
 				Else
 					out = matches(patVal(y), e, x)
 				End If
+			Case &quot;List.nil&quot;
+				If Not(isList(x)) Then
+					out = Empty	&apos; TODO: maybe throw on type error?
+				ElseIf isNil(x) Then
+					out = e
+				Else
+					out = Empty
+				End If
+			Case &quot;List.cons&quot;
+				If Not(isList(x)) Then
+					out = Empty	&apos; TODO: maybe throw on type error?
+				ElseIf isNil(x) Then
+					out = Empty
+				Else
+					Dim patHd As Object, patTl As Object
+					patHd = car(p.a0)
+					patTl = cadr(p.a0)
+					out = matches(patHd, e,   car(x))
+					out = matches(patTl, out, cdr(x))
+				End If
 			Case Else
 				croak(&quot;TPattern_matches: unsupported pattern .which = &quot; &amp; toString(p.which))
 		End Select
@@ -130,6 +168,7 @@ Function [test_Pattern======================================]()
 	test_Pattern_matches_any()
 	test_Pattern_matches_val()
 	test_Pattern_matches_var()
+	test_Pattern_matches_list()
 End Function
 
 Function test_Pattern_newPattern()
@@ -140,12 +179,17 @@ End Function
 
 Function test_Pattern_isPattern()
 	assertEqual(isPattern(patAny), 			True).x
+	
 	assertEqual(isPattern(patVal(Empty)), 	True).x
 	assertEqual(isPattern(patVal(Nothing)), True).x
 	assertEqual(isPattern(patVal(&quot;&quot;)), 		True).x
 	assertEqual(isPattern(patVal(&quot;a&quot;)),		True).x
+	
 	assertEqual(isPattern(patVar(&quot;a&quot;)),		True).x
 	assertEqual(isPattern(patVar(&quot;b&quot;)),		True).x
+
+	assertEqual(isPattern(patList_nil),						True).x
+	assertEqual(isPattern(patList_cons(patAny, patAny)),	True).x
 
 	assertEqual(isPattern(Empty),		False).x
 	assertEqual(isPattern(Nothing),		False).x
@@ -200,6 +244,9 @@ Function test_Pattern_toString()
 	
 	assertEqual(toString(patVar(&quot;a&quot;)), &quot;a&quot;).x
 	assertEqual(toString(patVar(&quot;b&quot;)), &quot;b&quot;).x
+	
+	assertEqual(toString(patList_nil), 					&quot;[]&quot;).x
+	assertEqual(toString(patList_cons(patAny, patAny)), &quot;(_:_)&quot;).x
 End Function
 
 Function assert_matches(p As Object, env As Variant, ByVal vs As Variant)
@@ -383,10 +430,15 @@ Function test_Pattern_matches_var()
 		nil, List(nil), List(1, 2, 3) _
 	)).x
 	
+	&apos; bind the var &quot;a&quot; to the value &quot;foo&quot;:
 	e = matches(p, envEmpty, &quot;foo&quot;)
+	&apos; under this env var-pattern &quot;a&quot; matches only &quot;foo&quot;:
 	assert_matches(p, e, 		&quot;foo&quot;).x
 	refute_matches(p, e, 		&quot;bar&quot;).x
-	assert_matches(p, envEmpty, &quot;bar&quot;).x
+	&apos; but under an env where &quot;a&quot; isn&apos;t bound it still matches anything
+	e = extend(envEmpty, &quot;b&quot;, &quot;foo&quot;)
+	assert_matches(p, e, &quot;foo&quot;).x
+	assert_matches(p, e, &quot;bar&quot;).x
 	f = matches(p, e)
 	assertThrows(f, Array(   Nothing)).x
 	assertThrows(f, Array(      True)).x
@@ -397,6 +449,64 @@ Function test_Pattern_matches_var()
 	assertThrows(f, Array(      4711)).x
 	assertThrows(f, Array(CLng(4711))).x
 	assertThrows(f, Array(    3.1415)).x	
+End Function	
+	
+Function test_Pattern_matches_list()
+	Dim p As TPattern, f As Object, e As Object
+	f = matches
+	e = envEmpty
+	
+	&apos; pattern of the empty list
+	p = patList_nil
+	assert_matches(p, e, nil).x
+	refute_matches(p, e, List(nil)).x
+	
+	&apos; pattern of a non-empty list
+	p = patList_cons(patVar(&quot;x&quot;), patVar(&quot;xs&quot;))
+	refute_matches(p, e, nil).x
+	assert_matches(p, e, List(nil)				).x
+	assert_matches(p, e, List(nil, nil)			).x
+	assert_matches(p, e, List(1)				).x
+	assert_matches(p, e, List(1, 2, 3)			).x
+	assert_matches(p, e, List(&quot;a&quot;)				).x
+	assert_matches(p, e, List(&quot;a&quot;, &quot;b&quot;, &quot;c&quot;)	).x
+	
+	&apos; pattern of a singleton list
+	p = patList_cons(patVar(&quot;x&quot;), patList_nil)
+	refute_matches(p, e, nil).x
+	assert_matches(p, e, List(nil)				).x
+	refute_matches(p, e, List(nil, nil)			).x
+	assert_matches(p, e, List(1)				).x
+	refute_matches(p, e, List(1, 2, 3)			).x
+	assert_matches(p, e, List(&quot;a&quot;)				).x
+	refute_matches(p, e, List(&quot;a&quot;, &quot;b&quot;, &quot;c&quot;)	).x
+	
+	&apos; pattern of a list with head equal to tail (so head must be a list, too)
+	p = patList_cons(patVar(&quot;x&quot;), patVar(&quot;x&quot;))
+	refute_matches(p, e, nil).x
+	assert_matches(p, e, List(nil)				).x
+	refute_matches(p, e, List(nil, nil)			).x
+	&apos;refute_matches(p, e, List(1)				).x	&apos; does not type-check (x:1 matched against a list)
+	&apos;refute_matches(p, e, List(1, 2, 3)			).x &apos; -&quot;-
+	&apos;assert_matches(p, e, List(&quot;a&quot;)				).x &apos; -&quot;-
+	&apos;refute_matches(p, e, List(&quot;a&quot;, &quot;b&quot;, &quot;c&quot;)	).x &apos; -&quot;-
+	&apos;refute_matches(p, e, List(List(1), List(1))	).x &apos; does not type-check
+	assert_matches(p, e, List(List(1), 1) ).x
+	refute_matches(p, e, List(List(1), 2) ).x
+	
+	&apos; pattern of a list with first two elems equal
+	p = patList_cons(patVar(&quot;x&quot;), patList_cons(patVar(&quot;x&quot;), patAny))
+	refute_matches(p, e, nil).x
+	refute_matches(p, e, List(nil)				).x
+	assert_matches(p, e, List(nil, nil)			).x
+	refute_matches(p, e, List(1)				).x
+	assert_matches(p, e, List(1, 1)				).x
+	refute_matches(p, e, List(1, 2)				).x
+	assert_matches(p, e, List(1, 1, 3)			).x
+	refute_matches(p, e, List(1, 2, 3)			).x
+	assert_matches(p, e, List(1, 1, 2, 3)		).x
+	
 End Function
+
 
 </script:module>

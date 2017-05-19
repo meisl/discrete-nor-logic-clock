@@ -34,7 +34,7 @@ Function _Env_toString(ByVal env As Object)
 	out = &quot;&quot;
 	seen = envEmpty
 _Env_toString_start:	
-	If isKsomething(env) Then
+	If isKEmpty(env) Then
 		&apos; nothing to do
 	Else
 		Dim args As Object, a0 As Object, a1 As Object, a2 As Object
@@ -48,7 +48,11 @@ _Env_toString_start:
 		&apos;If isEmpty(lookup(key, seen)) Then &apos; don&apos;t show shadowed entries
 		&apos;	seen = extend(seen, key, val)
 			key = toString(key)
-			val = toString(val)
+			If isEnv(val) Then
+				val = Env_toString(val)
+			Else
+				val = toString(val)
+			End If
 			If (out = &quot;&quot;) Then
 				out = key &amp; &quot;: &quot; &amp; val
 			Else
@@ -61,6 +65,32 @@ _Env_toString_start:
 	_Env_toString = out
 End Function
 
+
+Function isEnv(ByVal x As Variant)
+	Dim out As Variant
+	out = False
+isEnv_start:
+	If isFn(x) Then
+		If isKEmpty(x) Then
+			out = True
+		ElseIf (getFnName(x) = getFnName(Fn.ite)) And (arity(x) = 1) Then
+			Dim args As Object, a0 As Variant, a1 As Variant, a2 As Variant
+			args = partialArgs(x)
+			a2 = car(args) : args = cdr(args)
+			a1 = car(args) : args = cdr(args)
+			a0 = car(args)
+			If (getFnName(a0) = getFnName(Fn.equ)) _
+				And (arity(a0) = 1) _
+				And isKsomething(a1) _
+			Then
+				x = a2
+				Goto isEnv_start
+			End If
+		End If
+	End If
+	isEnv = out
+End Function
+
 Function [test_Env======================================]
 	test_Env_empty()
 	test_Env_extend()
@@ -70,10 +100,7 @@ End Function
 Function test_Env_empty()
 	Dim e As Object
 	e = envEmpty
-	assertEqual(apply(e, &quot;a&quot;), Empty).x
-	assertEqual(apply(e, &quot;b&quot;), Empty).x
-	assertEqual(apply(e, &quot;c&quot;), Empty).x
-	
+	assertEqual(isEnv(e),	   True).x
 	assertEqual(lookup(&quot;a&quot;, e), Empty).x
 	assertEqual(lookup(&quot;b&quot;, e), Empty).x
 	assertEqual(lookup(&quot;c&quot;, e), Empty).x
@@ -84,29 +111,20 @@ Function test_Env_extend()
 	e = envEmpty	
 	
 	e = extend(e, &quot;a&quot;, 7)
-	assertEqual(apply(e, &quot;a&quot;), 7).x
-	assertEqual(apply(e, &quot;b&quot;), Empty).x
-	assertEqual(apply(e, &quot;c&quot;), Empty).x
-	
+	assertEqual(isEnv(e),	   True).x
 	assertEqual(lookup(&quot;a&quot;, e), 7).x
 	assertEqual(lookup(&quot;b&quot;, e), Empty).x
 	assertEqual(lookup(&quot;c&quot;, e), Empty).x
 	
 	
 	e = extend(e, &quot;b&quot;, 42)
-	assertEqual(apply(e, &quot;a&quot;), 7).x
-	assertEqual(apply(e, &quot;b&quot;), 42).x
-	assertEqual(apply(e, &quot;c&quot;), Empty).x
-	
+	assertEqual(isEnv(e),	   True).x
 	assertEqual(lookup(&quot;a&quot;, e), 7).x
 	assertEqual(lookup(&quot;b&quot;, e), 42).x
 	assertEqual(lookup(&quot;c&quot;, e), Empty).x
 	
 	e = extend(e, &quot;a&quot;, 4711)
-	assertEqual(apply(e, &quot;a&quot;), 4711).x
-	assertEqual(apply(e, &quot;b&quot;), 42).x
-	assertEqual(apply(e, &quot;c&quot;), Empty).x
-	
+	assertEqual(isEnv(e),	   True).x
 	assertEqual(lookup(&quot;a&quot;, e), 4711).x
 	assertEqual(lookup(&quot;b&quot;, e), 42).x
 	assertEqual(lookup(&quot;c&quot;, e), Empty).x
@@ -125,7 +143,13 @@ Function test_Env_toString()
 	assertEqual(Env_toString(e), &quot;{&apos;c&apos;: 4711, &apos;b&apos;: 42, &apos;a&apos;: 7}&quot;).x
 	e = extend(e, &quot;a&quot;, 88)
 	assertEqual(Env_toString(e), &quot;{&apos;a&apos;: 88, &apos;c&apos;: 4711, &apos;b&apos;: 42, &apos;a&apos;: 7}&quot;).x
-	&apos;show(e)
+	
+	&apos; nested envs
+	Dim d As Object
+	d = extend(envEmpty, &quot;foo&quot;, e)
+	assertEqual(Env_toString(d), &quot;{&apos;foo&apos;: &quot; &amp; Env_toString(e) &amp; &quot;}&quot;).x
+	
+	
 End Function
 
 </script:module>
