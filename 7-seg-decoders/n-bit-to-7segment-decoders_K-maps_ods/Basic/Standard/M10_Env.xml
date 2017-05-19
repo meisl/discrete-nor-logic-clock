@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="M10_Env" script:language="StarBasic">REM  *****  BASIC  *****
+Option Explicit
+
+
+
+Sub Main
+	[test_Env======================================]
+End Sub
+
+Function envEmpty
+	Static out As Object
+	If isNull(out) Then
+		out = fstArg(Empty)
+	End If
+	envEmpty = out
+End Function
+
+Function lookup(key As Variant, env As Object)
+	lookup = apply(env, key)
+End Function
+
+Function extend(env As Object, key As Variant, value As Variant)
+	extend = ite(equ(key), fstArg(value), env)
+End Function
+
+Function Env_toString(env As Object)
+	Env_toString = &quot;{&quot; &amp; _Env_toString(env) &amp; &quot;}&quot;
+End Function
+
+Function _Env_toString(ByVal env As Object)
+	Dim out As Variant
+	out = &quot;&quot;
+_Env_toString_start:	
+	If isKsomething(env) Then
+		&apos; nothing to do
+	Else
+		Dim args As Object, a0 As Object, a1 As Object, a2 As Object
+		args = partialArgs(env)
+		a2 = car(args) : args = cdr(args)
+		a1 = car(args) : args = cdr(args)
+		a0 = car(args)
+		Dim key As Variant, val As Variant
+		key = toString(car(partialArgs(a0)))
+		val = toString(car(partialArgs(a1)))
+		If (out = &quot;&quot;) Then
+			out = key &amp; &quot;: &quot; &amp; val
+		Else
+			out = out &amp; &quot;, &quot; &amp; key &amp; &quot;: &quot; &amp; val
+		End If
+		env = a2
+		Goto _Env_toString_start
+	End If
+	_Env_toString = out
+End Function
+
+Function [test_Env======================================]
+	test_Env_empty()
+	test_Env_extend()
+	test_Env_toString()
+End Function
+
+Function test_Env_empty()
+	Dim e As Object
+	e = envEmpty
+	assertEqual(apply(e, &quot;a&quot;), Empty).x
+	assertEqual(apply(e, &quot;b&quot;), Empty).x
+	assertEqual(apply(e, &quot;c&quot;), Empty).x
+	
+	assertEqual(lookup(&quot;a&quot;, e), Empty).x
+	assertEqual(lookup(&quot;b&quot;, e), Empty).x
+	assertEqual(lookup(&quot;c&quot;, e), Empty).x
+End Function
+
+Function test_Env_extend()
+	Dim e As Object
+	e = envEmpty	
+	
+	e = extend(e, &quot;a&quot;, 7)
+	assertEqual(apply(e, &quot;a&quot;), 7).x
+	assertEqual(apply(e, &quot;b&quot;), Empty).x
+	assertEqual(apply(e, &quot;c&quot;), Empty).x
+	
+	assertEqual(lookup(&quot;a&quot;, e), 7).x
+	assertEqual(lookup(&quot;b&quot;, e), Empty).x
+	assertEqual(lookup(&quot;c&quot;, e), Empty).x
+	
+	
+	e = extend(e, &quot;b&quot;, 42)
+	assertEqual(apply(e, &quot;a&quot;), 7).x
+	assertEqual(apply(e, &quot;b&quot;), 42).x
+	assertEqual(apply(e, &quot;c&quot;), Empty).x
+	
+	assertEqual(lookup(&quot;a&quot;, e), 7).x
+	assertEqual(lookup(&quot;b&quot;, e), 42).x
+	assertEqual(lookup(&quot;c&quot;, e), Empty).x
+	
+	e = extend(e, &quot;a&quot;, 4711)
+	assertEqual(apply(e, &quot;a&quot;), 4711).x
+	assertEqual(apply(e, &quot;b&quot;), 42).x
+	assertEqual(apply(e, &quot;c&quot;), Empty).x
+	
+	assertEqual(lookup(&quot;a&quot;, e), 4711).x
+	assertEqual(lookup(&quot;b&quot;, e), 42).x
+	assertEqual(lookup(&quot;c&quot;, e), Empty).x
+End Function
+
+Function test_Env_toString()
+	Dim e As Object
+	e = envEmpty
+	
+	assertEqual(Env_toString(e), &quot;{}&quot;).x
+	e = extend(e, &quot;a&quot;, 7)
+	assertEqual(Env_toString(e), &quot;{&apos;a&apos;: 7}&quot;).x
+	e = extend(e, &quot;b&quot;, 42)
+	assertEqual(Env_toString(e), &quot;{&apos;b&apos;: 42, &apos;a&apos;: 7}&quot;).x
+	e = extend(e, &quot;c&quot;, 4711)
+	assertEqual(Env_toString(e), &quot;{&apos;c&apos;: 4711, &apos;b&apos;: 42, &apos;a&apos;: 7}&quot;).x
+	e = extend(e, &quot;a&quot;, 88)
+	assertEqual(Env_toString(e), &quot;{&apos;a&apos;: 8, &apos;c&apos;: 4711, &apos;b&apos;: 42, &apos;a&apos;: 7}&quot;).x
+End Function
+
+</script:module>

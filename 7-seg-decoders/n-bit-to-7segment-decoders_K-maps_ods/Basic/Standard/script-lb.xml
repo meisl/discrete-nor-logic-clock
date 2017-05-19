@@ -7,9 +7,10 @@
  <library:element library:name="M00_Test"/>
  <library:element library:name="M01_Common"/>
  <library:element library:name="M05_Parser"/>
- <library:element library:name="M0x_Scratch"/>
+ <library:element library:name="M09_Pattern"/>
  <library:element library:name="M06_AST"/>
  <library:element library:name="M07_PrsLogic"/>
  <library:element library:name="M08_PrsGrammar"/>
- <library:element library:name="M09_Pattern"/>
+ <library:element library:name="Mxx_Scratch"/>
+ <library:element library:name="M10_Env"/>
 </library:library>
