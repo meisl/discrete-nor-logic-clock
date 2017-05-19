@@ -30,8 +30,9 @@ Function Env_toString(env As Object)
 End Function
 
 Function _Env_toString(ByVal env As Object)
-	Dim out As Variant
+	Dim out As Variant, seen As Object
 	out = &quot;&quot;
+	seen = envEmpty
 _Env_toString_start:	
 	If isKsomething(env) Then
 		&apos; nothing to do
@@ -42,13 +43,18 @@ _Env_toString_start:
 		a1 = car(args) : args = cdr(args)
 		a0 = car(args)
 		Dim key As Variant, val As Variant
-		key = toString(car(partialArgs(a0)))
-		val = toString(car(partialArgs(a1)))
-		If (out = &quot;&quot;) Then
-			out = key &amp; &quot;: &quot; &amp; val
-		Else
-			out = out &amp; &quot;, &quot; &amp; key &amp; &quot;: &quot; &amp; val
-		End If
+		key = car(partialArgs(a0))
+		val = car(partialArgs(a1))
+		&apos;If isEmpty(lookup(key, seen)) Then &apos; don&apos;t show shadowed entries
+		&apos;	seen = extend(seen, key, val)
+			key = toString(key)
+			val = toString(val)
+			If (out = &quot;&quot;) Then
+				out = key &amp; &quot;: &quot; &amp; val
+			Else
+				out = out &amp; &quot;, &quot; &amp; key &amp; &quot;: &quot; &amp; val
+			End If
+		&apos;End If
 		env = a2
 		Goto _Env_toString_start
 	End If
@@ -118,7 +124,8 @@ Function test_Env_toString()
 	e = extend(e, &quot;c&quot;, 4711)
 	assertEqual(Env_toString(e), &quot;{&apos;c&apos;: 4711, &apos;b&apos;: 42, &apos;a&apos;: 7}&quot;).x
 	e = extend(e, &quot;a&quot;, 88)
-	assertEqual(Env_toString(e), &quot;{&apos;a&apos;: 8, &apos;c&apos;: 4711, &apos;b&apos;: 42, &apos;a&apos;: 7}&quot;).x
+	assertEqual(Env_toString(e), &quot;{&apos;a&apos;: 88, &apos;c&apos;: 4711, &apos;b&apos;: 42, &apos;a&apos;: 7}&quot;).x
+	&apos;show(e)
 End Function
 
 </script:module>

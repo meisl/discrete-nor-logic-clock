@@ -349,7 +349,7 @@ Function fnObjs()
 			_
 			newFn(&quot;isPattern&quot;,			1, &quot;Any -&gt; Bool&quot;), _
 			newFn(&quot;TPattern_toString&quot;,	1, &quot;Pattern a -&gt; Str&quot;), _
-			newFn(&quot;matches&quot;,			2, &quot;Pattern a -&gt; a -&gt; Bool&quot;) _
+			newFn(&quot;matches&quot;,			3, &quot;Pattern a -&gt; Maybe Env -&gt; a -&gt; Maybe Env&quot;) _
 	))
 	End If
 	fnObjs = result
@@ -548,7 +548,6 @@ applyLast_of_two:
 		Case &quot;mkDtCClass&quot;:	result = mkDtCClass(	a0, a1)
 		Case &quot;mkDtNonterminal&quot;:	result = mkDtNonterminal(	a0, a1)
 		Case &quot;mkDtMult&quot;:		result = mkDtMult(	a0, a1)
-		Case &quot;matches&quot;:		result = matches(		a0, a1)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select
@@ -565,6 +564,7 @@ applyLast_of_three:
 		Case &quot;foldl&quot;:		result = foldl(		a0, a1, a2)
 		Case &quot;foldr&quot;:		result = foldr(		a0, a1, a2)
 		Case &quot;mkASN&quot;:		result = mkASN(		a0, a1, a2)
+		Case &quot;matches&quot;:		result = matches(	a0, a1, a2)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select

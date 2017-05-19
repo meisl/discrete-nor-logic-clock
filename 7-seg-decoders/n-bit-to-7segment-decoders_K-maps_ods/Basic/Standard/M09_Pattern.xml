@@ -9,7 +9,10 @@ Type TPattern
 	which	As String
 	a0		As Variant
 End Type
-
+&apos; data Pattern a = Any
+&apos;                | Val a
+&apos;                | Var Str
+&apos;                | Dat TypeCtor [Pattern Any]
 
 Sub Main
 	[test_Pattern======================================]
@@ -39,6 +42,7 @@ Function TPattern_toString(p As Object)
 	Dim out As Variant
 	Select Case p.which
 		Case &quot;any&quot;:		out = &quot;_&quot;
+		Case &quot;var&quot;:		out = p.a0
 		Case &quot;val&quot;
 			If isEmpty(p.a0) Then
 				out = &quot;()&quot;
@@ -58,31 +62,61 @@ Function patAny()
 	patAny = out
 End Function
 
-Function patEmpty()
-	Static out As Object : If isNull(out) Then
-		out = patVal(Empty)
-	End If
-	patEmpty = out
-End Function
-
 Function patVal(v As Variant)
 	Dim out As Variant
 	out = newPattern(&quot;val&quot;, v)
 	patVal = out
 End Function
 
+Function patVar(s As String)
+	Dim out As Variant
+	out = newPattern(&quot;var&quot;, s)
+	patVar = out
+End Function
+
+&apos; matches :: Pattern a -&gt; Maybe Env -&gt; a -&gt; Maybe Env
+&apos; matches _          None     _ = None
+&apos; matches Any        (Some e) x = Some e
+&apos; matches (Val v)    (Some e) x = if x = v then Some e else None
+&apos; matches (Var s)    (Some e) x = case (lookup s e) of
+&apos;                              None   -&gt; Some (extend e s x)
+&apos;                              Some y -&gt; matches (Val y) (Some e) x
+&apos; matches (Dat c qs) (Some e) x = if (typeCtor x) != c
+&apos;                                 then None
+&apos;                                 else let f = (\acc q.let fs = fst acc
+&apos;                                                          me = snd acc
+&apos;                                                      in
+&apos;                                                      case me of
+&apos;                                                        None   -&gt; None
+&apos;                                                        e&apos; -&gt; (matches q e&apos; (car fs), cdr fs)
+&apos;									   in
+&apos;                                      foldl f (fields x, Some e) qs
 Function matches( _
 	Optional ByRef p As Object, _
-	Optional ByVal v As Variant _
+	Optional ByRef e As Variant, _
+	Optional ByVal x As Variant _
 )
 	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.matches : End If
 	Dim out As Variant
-	If isMissing(p) Then 		: out = oFn
-	ElseIf isMissing(v) Then	: out = apply(oFn, p)
+	If isMissing(e) Then 		: out = oFn
+	ElseIf isMissing(p) Then 	: out = apply(oFn, e)
+	ElseIf isMissing(x) Then	: out = apply(oFn, e, p)
+	ElseIf isEmpty(e) Then		: out = Empty
 	Else
 		Select Case p.which
-			Case &quot;any&quot;: 	out = True
-			Case &quot;val&quot;:		out = equ(v, p.a0)
+			Case &quot;any&quot;: 	out = e
+			Case &quot;val&quot;
+				If equ(x, p.a0) Then : out = e
+				Else : out = Empty : End If
+			Case &quot;var&quot;
+				Dim s As String, y As Variant
+				s = p.a0
+				y = lookup(s, e)
+				If isEmpty(y) Then
+					out = extend(e, s, x)
+				Else
+					out = matches(patVal(y), e, x)
+				End If
 			Case Else
 				croak(&quot;TPattern_matches: unsupported pattern .which = &quot; &amp; toString(p.which))
 		End Select
@@ -92,9 +126,10 @@ End Function
 
 Function [test_Pattern======================================]()
 	test_Pattern_isPattern()
-	test_Pattern_basePatterns()
 	test_Pattern_toString()
-	test_Pattern_matches()
+	test_Pattern_matches_any()
+	test_Pattern_matches_val()
+	test_Pattern_matches_var()
 End Function
 
 Function test_Pattern_newPattern()
@@ -104,7 +139,14 @@ Function test_Pattern_newPattern()
 End Function
 
 Function test_Pattern_isPattern()
-	&apos; see test_Pattern_basePatterns for positive tests (assertEqual(isPattern(...), True)) 	
+	assertEqual(isPattern(patAny), 			True).x
+	assertEqual(isPattern(patVal(Empty)), 	True).x
+	assertEqual(isPattern(patVal(Nothing)), True).x
+	assertEqual(isPattern(patVal(&quot;&quot;)), 		True).x
+	assertEqual(isPattern(patVal(&quot;a&quot;)),		True).x
+	assertEqual(isPattern(patVar(&quot;a&quot;)),		True).x
+	assertEqual(isPattern(patVar(&quot;b&quot;)),		True).x
+
 	assertEqual(isPattern(Empty),		False).x
 	assertEqual(isPattern(Nothing),		False).x
 	assertEqual(isPattern(True),		False).x
@@ -134,18 +176,11 @@ Function test_Pattern_isPattern()
 	assertEqual(apply(f, 3.1415),		False).x
 End Function
 
-Function test_Pattern_basePatterns()
-	Dim p As Object
-	p = patAny
-	assertEqual(isPattern(p), True).x
-	p = patEmpty
-	assertEqual(isPattern(p), True).x
-End Function
-
 Function test_Pattern_toString()
 	assertEqual(toString(patAny),   		      &quot;_&quot;).x
-	assertEqual(toString(patEmpty), 		     &quot;()&quot;).x
+
 	assertEqual(toString(patVal(Empty)), 	     &quot;()&quot;).x
+
 	assert_toString_equals(patVal(Nothing),   Nothing).x
 	assert_toString_equals(patVal(True),	     True).x
 	assert_toString_equals(patVal(False),	    False).x
@@ -162,19 +197,22 @@ Function test_Pattern_toString()
 	assert_toString_equals(patVal(3.1415),     3.1415).x
 	assert_toString_equals(patVal(CLng(42)), CLng(42)).x
 	assert_toString_equals(patVal(CLng(42)),       42).x
+	
+	assertEqual(toString(patVar(&quot;a&quot;)), &quot;a&quot;).x
+	assertEqual(toString(patVar(&quot;b&quot;)), &quot;b&quot;).x
 End Function
 
-Function assert_matches(p As Object, ByVal vs As Variant)
-	assert_matches = _match_assertions(p, vs, True)
+Function assert_matches(p As Object, env As Variant, ByVal vs As Variant)
+	assert_matches = _match_assertions(p, env, vs, envEmpty) &apos; TODO: expect particular env
 End Function
 
-Function refute_matches(p As Object, ByVal vs As Variant)
-	refute_matches = _match_assertions(p, vs, False)
+Function refute_matches(p As Object, env As Variant, ByVal vs As Variant)
+	refute_matches = _match_assertions(p, env, vs, Empty)
 End Function
 
-Function _match_assertions(p As Object, ByVal vs As Variant, expected As Boolean)
+Function _match_assertions(p As Object, env As Variant, ByVal vs As Variant, expected As Variant)
 	If Not(isPattern(p)) Then
-		croak(IIf(expected, &quot;assert&quot;, &quot;refute&quot;) &amp; &quot;_matches: invalid pattern &quot; &amp; toString(p))
+		croak(IIf(isEmpty(expected), &quot;refute&quot;, &quot;assert&quot;) &amp; &quot;_matches: invalid pattern &quot; &amp; toString(p))
 	End If
 	Dim testResult As Object
 	Dim val As Variant, i As Integer, gotArray As Boolean
@@ -183,7 +221,7 @@ Function _match_assertions(p As Object, ByVal vs As Variant, expected As Boolean
 		vs = Array(vs)
 	End If
 	For i = LBound(vs) To UBound(vs)
-		testResult = _single_match_assertion(p, vs(i), expected, gotArray, i)
+		testResult = _single_match_assertion(p, env, vs(i), expected, gotArray, i)
 		If testResult.isFail Then
 			Goto _match_assertions_end
 		End If
@@ -194,73 +232,95 @@ End Function
 
 Function _single_match_assertion( _
 	p As Object, _
+	env As Variant, _
 	val As Variant, _
-	expected As Boolean, _
+	expected As Variant, _
 	gotArray As Boolean, _
 	i As Integer _
 )
-	Dim matchResult As Boolean, testResult As Object
-	matchResult = matches(p, val)
-	If matchResult = expected Then &apos; don&apos;t use assertEqual in order to avoid stupid MsgBox
-		testResult = assertEqual(expected, expected) &apos; inc assertionCount
+	Dim matchResult As Variant, testResult As Object
+	matchResult = matches(p, env, val)
+	If isEmpty(matchResult) = isEmpty(expected) Then &apos; don&apos;t use assertEqual in order to avoid stupid MsgBox
+		testResult = assertEqual(True, True) &apos; inc assertionCount
 	Else
-		Dim msg As String, valStr As String, pStr As String
+		Dim msg As String, valStr As String, pStr As String, eStr As String, mStr As String
 		valStr = toString(val)
 		pStr = toString(p)
-		msg = &quot;expected pattern &quot; _
-			&amp; NL &amp; NL &amp; &quot;  &quot; &amp; pStr _
-			&amp; NL &amp; NL &amp; &quot;expected &quot; &amp; IIf(expected, &quot;&quot;, &quot;NOT &quot;) &amp; &quot;to match:&quot; _
-			&amp; NL &amp; NL &amp; &quot;  &quot; &amp; valStr
+		If isEmpty(env) Then : eStr = &quot;Empty (None)&quot;
+		Else : eStr = Env_toString(env) : End If
+		If isEmpty(matchResult) Then : mStr = &quot;Empty (None)&quot;
+		Else : mStr = Env_toString(matchResult) : End If
+		msg = &quot;pattern&quot; _
+			&amp; NL &amp; &quot;  &quot; &amp; pStr _
+			&amp; NL &amp; &quot;under env&quot; _
+			&amp; NL &amp; &quot;  &quot; &amp; eStr _
+			&amp; NL &amp; NL &amp; &quot;expected &quot; &amp; IIf(isEmpty(expected), &quot;NOT &quot;, &quot;&quot;) &amp; &quot;to match:&quot; _
+			&amp; NL &amp; &quot;  &quot; &amp; valStr _
+			&amp; NL &amp; NL &amp; &quot;but returned env&quot; _
+			&amp; NL &amp; mStr
 		If gotArray Then
 			msg = &quot;at index &quot; &amp; i &amp; &quot;: &quot; _
 				&amp; NL &amp; msg
 		End If
-		testResult = mkFail(Not(expected), expected, msg)
+		testResult = mkFail(matchResult, expected, msg)
 	End If
 	_single_match_assertion = testResult
 End Function
 
-Function test_Pattern_matches()
-	Dim p As TPattern, f As Object
+Function test_Pattern_matches_any()
+	Dim p As TPattern, f As Object, e As Object
 	f = matches
-	assertEqual(arity(f), 2).x
+	e = envEmpty
+	assertEqual(arity(f), 3).x
 	
 	p = patAny
-	assert_matches(p, Array( _
+	assert_matches(p, e, Array( _
 		Empty, Nothing, _
 		True, False, _
 		&quot;&quot;, &quot;a&quot;, &quot;b&quot;, &quot;foo&quot;, _
 		0, 1, 2, 3, 4711, CLng(4711), 3.1415, _
 		nil, List(nil), List(1, 2, 3) _
 	)).x
-	
-	p = patEmpty
-	assert_matches(p, Empty).x
-	refute_matches(p, Array( _
-		       Nothing, _
+	&apos; under env = Empty (None) it does not match anything:
+	refute_matches(p, Empty, Array( _
+		Empty, Nothing, _
 		True, False, _
 		&quot;&quot;, &quot;a&quot;, &quot;b&quot;, &quot;foo&quot;, _
 		0, 1, 2, 3, 4711, CLng(4711), 3.1415, _
 		nil, List(nil), List(1, 2, 3) _
 	)).x
-	
+End Function
+
+Function test_Pattern_matches_val()
+	Dim p As TPattern, f As Object, e As Object
+	f = matches
+	e = envEmpty
+
 	p = patVal(Empty)
-	assert_matches(p, Empty).x
-	refute_matches(p, Array( _
+	assert_matches(p, e, Empty).x
+	refute_matches(p, e, Array( _
 		       Nothing, _
 		True, False, _
 		&quot;&quot;, &quot;a&quot;, &quot;b&quot;, &quot;foo&quot;, _
 		0, 1, 2, 3, 4711, CLng(4711), 3.1415, _
 		nil, List(nil), List(1, 2, 3) _
 	)).x
-	
+	&apos; under env = Empty (None) it does not match anything:
+	refute_matches(p, Empty, Array( _
+		Empty, Nothing, _
+		True, False, _
+		&quot;&quot;, &quot;a&quot;, &quot;b&quot;, &quot;foo&quot;, _
+		0, 1, 2, 3, 4711, CLng(4711), 3.1415, _
+		nil, List(nil), List(1, 2, 3) _
+	)).x
+		
 	p = patVal(Nothing)
-	assert_matches(p, Nothing).x
-	refute_matches(p, Array( _
+	assert_matches(p, e, Nothing).x
+	refute_matches(p, e, Array( _
 		Empty, _
 		nil, List(nil), List(1, 2, 3) _
 	)).x
-	f = matches(p)
+	f = matches(p, e)
 	assertThrows(f, Array(      True)).x
 	assertThrows(f, Array(     False)).x
 	assertThrows(f, Array(         0)).x
@@ -269,11 +329,19 @@ Function test_Pattern_matches()
 	assertThrows(f, Array(      4711)).x
 	assertThrows(f, Array(CLng(4711))).x
 	assertThrows(f, Array(    3.1415)).x
+	&apos; under env = Empty (None) it does not match anything:
+	refute_matches(p, Empty, Array( _
+		Empty, Nothing, _
+		True, False, _
+		&quot;&quot;, &quot;a&quot;, &quot;b&quot;, &quot;foo&quot;, _
+		0, 1, 2, 3, 4711, CLng(4711), 3.1415, _
+		nil, List(nil), List(1, 2, 3) _
+	)).x
 	
 	p = patVal(&quot;&quot;)
-	assert_matches(p, &quot;&quot;).x
-	refute_matches(p, Array( Empty, &quot;a&quot;, &quot;b&quot;, &quot;foo&quot; )).x
-	f = matches(p)
+	assert_matches(p, e, &quot;&quot;).x
+	refute_matches(p, e, Array( Empty, &quot;a&quot;, &quot;b&quot;, &quot;foo&quot; )).x
+	f = matches(p, e)
 	assertThrows(f, Array(   Nothing)).x
 	assertThrows(f, Array(      True)).x
 	assertThrows(f, Array(     False)).x
@@ -282,7 +350,53 @@ Function test_Pattern_matches()
 	assertThrows(f, Array(         2)).x
 	assertThrows(f, Array(      4711)).x
 	assertThrows(f, Array(CLng(4711))).x
-	assertThrows(f, Array(    3.1415)).x
+	assertThrows(f, Array(    3.1415)).x	
+	&apos; under env = Empty (None) it does not match anything:
+	refute_matches(p, Empty, Array( _
+		Empty, Nothing, _
+		True, False, _
+		&quot;&quot;, &quot;a&quot;, &quot;b&quot;, &quot;foo&quot;, _
+		0, 1, 2, 3, 4711, CLng(4711), 3.1415, _
+		nil, List(nil), List(1, 2, 3) _
+	)).x
+End Function	
+	
+Function test_Pattern_matches_var()
+	Dim p As TPattern, f As Object, e As Object
+	f = matches
+	e = envEmpty
+	
+	p = patVar(&quot;a&quot;)
+	assert_matches(p, e, Array( _
+		Empty, Nothing, _
+		True, False, _
+		&quot;&quot;, &quot;a&quot;, &quot;b&quot;, &quot;foo&quot;, _
+		0, 1, 2, 3, 4711, CLng(4711), 3.1415, _
+		nil, List(nil), List(1, 2, 3) _
+	)).x
+	&apos; under env = Empty (None) it does not match anything:
+	refute_matches(p, Empty, Array( _
+		Empty, Nothing, _
+		True, False, _
+		&quot;&quot;, &quot;a&quot;, &quot;b&quot;, &quot;foo&quot;, _
+		0, 1, 2, 3, 4711, CLng(4711), 3.1415, _
+		nil, List(nil), List(1, 2, 3) _
+	)).x
+	
+	e = matches(p, envEmpty, &quot;foo&quot;)
+	assert_matches(p, e, 		&quot;foo&quot;).x
+	refute_matches(p, e, 		&quot;bar&quot;).x
+	assert_matches(p, envEmpty, &quot;bar&quot;).x
+	f = matches(p, e)
+	assertThrows(f, Array(   Nothing)).x
+	assertThrows(f, Array(      True)).x
+	assertThrows(f, Array(     False)).x
+	assertThrows(f, Array(         0)).x
+	assertThrows(f, Array(         1)).x
+	assertThrows(f, Array(         2)).x
+	assertThrows(f, Array(      4711)).x
+	assertThrows(f, Array(CLng(4711))).x
+	assertThrows(f, Array(    3.1415)).x	
 End Function
 
 </script:module>
