@@ -440,7 +440,7 @@ Function test_passing_pointers()
 	&apos; fn did however change the object pointed to:
 	assertEqual(o.bar, 9).x
 
-	&apos;Things change when we pass it ByRef (which is the default)
+	&apos;Things change when we pass it ByRef (which is the default!)
 	Dim o2 As Object
 	o2 = o	&apos; keep original in different var
 	&apos; call fn

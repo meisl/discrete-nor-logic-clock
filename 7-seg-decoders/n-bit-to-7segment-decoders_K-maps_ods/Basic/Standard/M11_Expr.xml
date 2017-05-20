@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="M11_Expr" script:language="StarBasic">REM  *****  BASIC  *****
+Option Explicit
+
+&apos; data Expr = Val Any
+&apos;           | Var Str
+&apos;           | Lam Str Expr
+&apos;           | App Expr Expr
+&apos;           | Builtin Obj
+
+Const TExpr_tyname = &quot;TExpr&quot;
+Type TExpr
+	tyname	As String
+	which	As String
+	id		As Long
+	a0		As Variant
+	a1		As Variant
+End Type
+
+
+Sub Main
+	[test_Expr======================================]
+End Sub
+
+
+Function newExpr(which As String, a0 As Variant, a1 As Variant)
+	Static instanceCount As Long
+	Dim out As New TExpr
+	out.tyname = TExpr_tyname
+	out.which  = which
+	out.a0	   = a0
+	out.a1	   = a1
+	out.id     = instanceCount
+	instanceCount = instanceCount + 1
+	newExpr = out
+End Function
+
+Function isExpr(Optional x As Variant)
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.isExpr : End If
+	Dim out As Variant
+	If isMissing(x) Then
+		out = oFn
+	Else
+		out = (typeOf(x) = &quot;Object/&quot; &amp; TExpr_tyname)
+	End If
+	isExpr = out
+End Function
+
+Function TExpr_same(Optional x As Object, Optional y As Object)
+	&apos;Static oFn As Object : If isNull(oFn) Then : oFn = Fn.TExpr_same : End If
+	Dim out As Variant
+	If isMissing(x) Then 	 : out = oFn
+	ElseIf isMissing(y) Then : out = apply(oFn, x)
+	Else
+		If isExpr(x) And isExpr(y) Then
+			out = (x.id = y.id)
+		Else
+			croak(&quot;TExpr_same: invalid types &quot; &amp; typeOf(x) &amp; &quot;, &quot; &amp; typeOf(y))
+		End If
+	End If
+	TExpr_same = out
+End Function
+
+Function TExpr_equ(Optional x As Object, Optional y As Object)
+	&apos;Static oFn As Object : If isNull(oFn) Then : oFn = Fn.TExpr_equ : End If
+	Dim out As Variant
+	If isMissing(x) Then 	 : out = oFn
+	ElseIf isMissing(y) Then : out = apply(oFn, x)
+	ElseIf TExpr_same(x, y) Then
+		out = True
+	ElseIf (x.which = y.which) Then
+		Select Case x.which
+			Case &quot;Val&quot;:	out = equ(x.a0, y.a0)
+			Case &quot;Var&quot;:	out = (x.a0 = y.a0)
+			Case &quot;Lam&quot;
+				If (x.a0 = y.a0) Then
+					out = TExpr_equ(x.a1, y.a1) &apos; tail-recursive!
+				Else
+					out = False
+				End If
+			Case &quot;App&quot;
+				out = TExpr_equ(x.a0, y.a0) 
+				If out Then
+					out = TExpr_equ(x.a1, y.a1) &apos; tail-recursive!
+				End If
+			&apos;Case &quot;BuiltIn&quot; &apos; TODO: TExpr_equ Builtin
+		Case Else
+			croak(&quot;TExpr_equ: unsupported expr .which = &quot; &amp; toString(x.which))
+		End Select
+	Else
+		out = False
+	End If
+	TExpr_equ = out
+End Function
+
+Function xpVal(v As Variant)
+	xpVal = newExpr(&quot;Val&quot;, v, Empty)
+End Function
+
+Function xpVar(ByVal s As String)
+	xpVar = newExpr(&quot;Var&quot;, s, Empty)
+End Function
+
+Function xpLam(ByVal s As String, ByVal x As Object)
+	xpLam = newExpr(&quot;Lam&quot;, s, x)
+End Function
+
+Function xpApp(ByVal f As Object, ByVal a As Variant)
+	xpApp = newExpr(&quot;App&quot;, f, a)
+End Function
+
+Function xpBuiltin(ByVal oFn As Object)
+	xpBuiltin = newExpr(&quot;Builtin&quot;, oFn, Empty)
+End Function
+
+
+&apos; Builtin (+) 
+&apos; ~&gt; Lam &quot;fresh_1&quot; 
+&apos;        (Lam &quot;fresh_2&quot;
+&apos;             (App
+&apos;                  (App (Builtin (+))
+&apos;                       (fresh_1)     
+&apos;                  )
+&apos;                  fresh_2
+&apos;             )
+&apos;        )
+
+&apos; Builtin (+) 
+&apos; ~&gt; \fresh_1.\fresh2.let fresh_3 = [fresh_1, fresh_2]
+&apos;                      in (applyToList (+) fresh_3)
+&apos; = \fresh_1.\fresh_2.(\fresh_3.applyToList (+) fresh_3) [fresh_1, fresh_2]
+&apos; = \f1.\f2.(\f3.applyToList (+) fresh_3) (cons f1 (cons f2 nil))
+&apos; = \f1.\f2.applyToList (+) (cons f1 (cons f2 nil))
+Function evalX(ByVal x As Object, ByVal e As Object)
+	Dim out As Variant
+	Select Case x.which
+		Case &quot;Val&quot;:	out = x.a0
+		Case &quot;Var&quot;
+			Dim v As Variant
+			v = lookup(x.a0, e)
+			If isEmpty(v) Then
+				croak(&quot;evalX: unbound Var &quot; &amp; toString(x.a0))
+			Else
+				out = v
+			End If
+		&apos;Case &quot;Lam&quot;: 	out = x
+		Case &quot;Builtin&quot;: out = x.a0
+		Case &quot;App&quot;
+			Dim f As Object, a As Variant
+			f = x.a0
+			f = evalX(f, e)
+			a = x.a1
+			a = evalX(a, e) &apos; strict evaluation
+			out = apply1(f, a)
+		Case Else
+			croak(&quot;evalX: unsupported expr .which = &quot; &amp; toString(x.which))
+	End Select
+	evalX = out
+End Function
+
+
+Function [test_Expr======================================]
+	test_Expr_isExpr()
+	&apos; TODO: test TExpr_same
+	&apos; TODO: test TExpr_equ
+	test_Expr_eval_Val()
+	test_Expr_eval_Var()
+	&apos;test_Expr_eval_Lam() &apos; App (Lam ...) ... tested here
+	test_Expr_eval_Builtin() &apos; App (Builtin ...) ... tested here
+End Function
+
+Function test_Expr_isExpr()
+	Dim x As Object
+	assertEqual(isExpr(xpVal(True)), 					 True).x
+	assertEqual(isExpr(xpVar(&quot;a&quot;)), 					 True).x
+	assertEqual(isExpr(xpLam(&quot;a&quot;, xpVar(&quot;a&quot;))), 		 True).x
+	assertEqual(isExpr(xpApp(xpVar(&quot;a&quot;), xpVal(False))), True).x
+End Function
+
+Function test_Expr_eval_Val()
+	Dim x As Object, e As Object, v As Variant
+	e = envEmpty
+	v = &quot;foo&quot; :	x = xpVal(v)
+	assertEqual(evalX(x, e), v).x
+	v = &quot;bar&quot;
+	assertEqual(evalX(x, e), &quot;foo&quot;).x
+	e = extend(e, &quot;foo&quot;, &quot;bar&quot;)
+	assertEqual(evalX(x, e), &quot;foo&quot;).x
+End Function
+
+Function test_Expr_eval_Var()
+	Dim x As Object, e As Object, v As Variant
+	e = envEmpty
+	x = xpVar(&quot;a&quot;)
+	v = &quot;foo&quot;
+	e = extend(e, &quot;a&quot;, v) &apos; must wrap it in a Val
+	assertEqual(evalX(x, e), v).x
+	
+	e = extend(e, &quot;b&quot;, v)
+	x = xpVar(&quot;b&quot;)
+	assertEqual(evalX(x, e), v).x
+End Function
+
+Function test_Expr_eval_Lam()
+	Dim x As Object, e As Object
+	e = envEmpty
+	x = xpLam(&quot;a&quot;, xpVal(42))
+	assertEqual(TExpr_equ( evalX(x, e), x), True).x
+	assertEqual(TExpr_same(evalX(x, e), x), True).x
+	e = extend(e, &quot;a&quot;, 4711)
+	assertEqual(TExpr_equ( evalX(x, e), x), True).x
+	assertEqual(TExpr_same(evalX(x, e), x), True).x
+
+	Dim f As Object, a As Object
+	e = envEmpty
+	f = xpLam(&quot;a&quot;, xpVal(42))
+	a = xpVal(88)
+	assertEqual(evalX(xpApp(f, a), e), 42).x
+	e = extend(e, &quot;a&quot;, xpVal(4711))
+	assertEqual(evalX(xpApp(f, a), e), 42).x
+
+	f = xpLam(&quot;a&quot;, xpVar(&quot;a&quot;))
+	assertEqual(evalX(xpApp(f, a), e), 88).x
+
+	f = xpLam(&quot;_&quot;, xpVar(&quot;a&quot;))
+	assertEqual(evalX(xpApp(f, a), e), 4711).x
+End Function
+
+Function test_Expr_eval_Builtin()
+	Dim f As Object, a As Object, e As Object, x As Variant, act As Variant
+	e = envEmpty
+	f = xpBuiltin(fstArg)
+	&apos; first, Builtin as such evaluates to the fn obj withing:
+	a = evalX(f, e)
+	assertEqual(isFn(a), True).x
+	assertEqual(getFnName(a), getFnName(fstArg)).x
+	assertEqual(arity(a), 2).x
+	
+	&apos; let&apos;s apply a Builtin:
+	a = xpVal(42)
+	x = xpApp(xpApp(f, a), xpVal(88))
+	act = evalX(x, e)
+	assertEqual(evalX(x, e), 42).x
+End Function
+
+
+</script:module>

@@ -549,6 +549,7 @@ End Function
 	
 Function test_Pattern_matches_ASN()
 	Dim p As TPattern, f As Object, e As Object, v As Object
+	Dim x As Object, w As Object
 	f = matches
 	e = envEmpty
 
@@ -583,6 +584,21 @@ Function test_Pattern_matches_ASN()
 	assertEqual(lookup(&quot;lbl&quot;, e), &quot;Foo&quot;).x
 	assertEqual(lookup(&quot;val&quot;, e), &quot;bar&quot;).x
 	
+	w = xpApp( _
+			xpApp( _
+				xpApp( _
+					xpBuiltin(mkASN), _
+					xpVar(&quot;lbl&quot;) _
+				), _
+				xpVar(&quot;val&quot;) _
+			), xpVal(nil) _
+		)
+	w = evalX(w, e)
+	show(v)
+	show(w)
+	assert_toString_equals(w, mkASN(&quot;Foo&quot;, &quot;bar&quot;, nil)).x
+	
+
 	&apos;ASN &quot;Con&quot;  () [x]        -&gt; x
 	&apos;ASN &quot;Atom&quot; () [x]        -&gt; x
 	

@@ -84,6 +84,8 @@ Type TFnObjs
 	isPattern			As Object
 	TPattern_toString	As Object
 	matches				As Object
+	
+	isExpr				As Object
 End Type
 
 
@@ -166,6 +168,8 @@ Function Fn
 		result.isPattern			= lookupFn(&quot;isPattern&quot;)
 		result.TPattern_toString	= lookupFn(&quot;TPattern_toString&quot;)
 		result.matches				= lookupFn(&quot;matches&quot;)
+		
+		result.isExpr			= lookupFn(&quot;isExpr&quot;)
 	End If
 	Fn = result
 End Function
@@ -349,7 +353,9 @@ Function fnObjs()
 			_
 			newFn(&quot;isPattern&quot;,			1, &quot;Any -&gt; Bool&quot;), _
 			newFn(&quot;TPattern_toString&quot;,	1, &quot;Pattern a -&gt; Str&quot;), _
-			newFn(&quot;matches&quot;,			3, &quot;Pattern a -&gt; Maybe Env -&gt; a -&gt; Maybe Env&quot;) _
+			newFn(&quot;matches&quot;,			3, &quot;Pattern a -&gt; Maybe Env -&gt; a -&gt; Maybe Env&quot;), _
+			_
+			newFn(&quot;isExpr&quot;,				1, &quot;Any -&gt; Bool&quot;) _
 	))
 	End If
 	fnObjs = result
@@ -459,7 +465,7 @@ Function apply1(ByVal fn As Variant, ByVal arg As Variant)
 	apply1 = result
 End Function
 
-Function applyLast(fn As Object, arg As Variant)
+Function applyLast(ByVal fn As Object, arg As Variant)
 	Dim result As Variant
 	Dim reverseArgs As Object
 	Dim baseArity As Integer
@@ -511,8 +517,9 @@ applyLast_of_one:
 		Case &quot;TParser_toString&quot;:	result = TParser_toString(	a0)
 		Case &quot;TASN_toString&quot;:		result = TASN_toString(		a0)
 		Case &quot;mkDtTerminal&quot;:		result = mkDtTerminal(		a0)
-		Case &quot;isPattern&quot;:	result = isPattern(	a0)
+		Case &quot;isPattern&quot;:			result = isPattern(	a0)
 		Case &quot;TPattern_toString&quot;:	result = TPattern_toString(	a0)
+		Case &quot;isExpr&quot;:				result = isExpr(			a0)
 		Case Else
 			Goto applyLast_doTheCall
 	End Select
