@@ -148,57 +148,96 @@ Function matches( _
 	ElseIf isMissing(x) Then	: out = apply(oFn, e, p)
 	ElseIf isEmpty(e) Then		: out = Empty
 	Else
-		Select Case p.which
-			Case &quot;Any&quot;: 	out = e
-			Case &quot;Val&quot;
-				If equ(x, p.a0) Then : out = e
-				Else : out = Empty : End If
-			Case &quot;Var&quot;
-				Dim s As String, y As Variant
-				s = p.a0
-				y = lookup(s, e)
-				If isEmpty(y) Then
-					out = extend(e, s, x)
-				Else
-					out = matches(patVal(y), e, x)
-				End If
-			Case &quot;List.nil&quot;
-				If Not(isList(x)) Then
-					out = Empty	&apos; TODO: maybe throw on type error?
-				ElseIf isNil(x) Then
-					out = e
-				Else
-					out = Empty
-				End If
-			Case &quot;List.cons&quot;
-				If Not(isList(x)) Then
-					out = Empty	&apos; TODO: maybe throw on type error?
-				ElseIf isNil(x) Then
-					out = Empty
-				Else
-					Dim patHd As Object, patTl As Object
-					patHd = car(p.a0)
-					patTl = cadr(p.a0)
-					out = matches(patHd, e,   car(x))
-					out = matches(patTl, out, cdr(x))
-				End If
-			Case &quot;ASN&quot;
-				If Not(isASN(x)) Then
-					out = Empty	&apos; TODO: maybe throw on type error?
-				Else
-					Dim patLabel As Object, patValue As Object, patChildren As Object
-					patLabel    = car(p.a0)
-					patValue    = cadr(p.a0)
-					patChildren = caddr(p.a0)
-					out = matches(patLabel,    e,   asnLabel(x))
-					out = matches(patValue,    out, asnValue(x))
-					out = matches(patChildren, out, asnChildren(x))
-				End If
-			Case Else
-				croak(&quot;TPattern_matches: unsupported pattern .which = &quot; &amp; toString(p.which))
-		End Select
+		out = _matches(p, e, x, nil)
 	End If
 	matches = out
+End Function
+
+Function _matches( _
+	ByVal p As Object, _
+	ByVal e As Variant, _
+	ByVal x As Variant, _
+	ByVal args As Object _
+)
+	If isEmpty(e) Then
+		_matches = Empty
+		Exit Function
+	End If
+	Dim out As Variant, u As Variant
+_matches_dispatch:
+	Select Case p.which
+		Case &quot;Any&quot;: 	out = e
+		Case &quot;Val&quot;
+			u = p.a0
+_matches_Val_equalityTest:
+			If equ(x, u) Then
+				out = e
+			Else
+				out = Empty
+			End If
+		Case &quot;Var&quot;
+			Dim s As String, y As Variant
+			s = p.a0
+			y = lookup(s, e)
+			If isEmpty(y) Then
+				out = extend(e, s, x)
+			Else
+				&apos; tail-call:
+				&apos;out = _matches(patVal(y), e, x, args)
+				u = y
+				Goto _matches_Val_equalityTest
+			End If
+		Case &quot;List.nil&quot;
+			If Not(isList(x)) Then
+				out = Empty	&apos; TODO: maybe throw on type error?
+			ElseIf isNil(x) Then
+				out = e
+			Else
+				out = Empty
+			End If
+		Case &quot;List.cons&quot;
+			If Not(isList(x)) Then
+				out = Empty	&apos; TODO: maybe throw on type error?
+			ElseIf isNil(x) Then
+				out = Empty
+			Else
+				Dim patHd As Object, patTl As Object
+				patHd = car(p.a0)
+				out = _matches(patHd, e,   car(x), args)
+				If isEmpty(out) Then : Goto _matches_end : End If
+				patTl = cadr(p.a0)
+				&apos; tail-call:
+				&apos;out = _matches(patTl, out, cdr(x), args)
+			
+				p = patTl
+				e = out
+				x = cdr(x)
+				Goto _matches_dispatch
+			End If
+		Case &quot;ASN&quot;
+			If Not(isASN(x)) Then
+				out = Empty	&apos; TODO: maybe throw on type error?
+			Else
+				Dim patLabel As Object, patValue As Object, patChildren As Object
+				patLabel    = car(p.a0)
+				out = _matches(patLabel,    e,   asnLabel(x),    args)
+				If isEmpty(out) Then : Goto _matches_end : End If
+				patValue    = cadr(p.a0)
+				out = _matches(patValue,    out, asnValue(x),    args)
+				If isEmpty(out) Then : Goto _matches_end : End If
+				patChildren = caddr(p.a0)
+				&apos; tail-call:
+				&apos;out = _matches(patChildren, out, asnChildren(x), args)
+				p = patChildren
+				e = out
+				x = asnChildren(x)
+				Goto _matches_dispatch
+			End If
+		Case Else
+			croak(&quot;TPattern_matches: unsupported pattern .which = &quot; &amp; toString(p.which))
+	End Select
+_matches_end:
+	_matches = out
 End Function
 
 Function [test_Pattern======================================]()
