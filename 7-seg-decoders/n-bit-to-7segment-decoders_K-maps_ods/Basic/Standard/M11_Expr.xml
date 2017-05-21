@@ -126,19 +126,22 @@ End Function
 &apos;             )
 &apos;        )
 
-&apos; Builtin (+) 
-&apos; ~&gt; \fresh_1.\fresh2.let fresh_3 = [fresh_1, fresh_2]
-&apos;                      in (applyToList (+) fresh_3)
-&apos; = \fresh_1.\fresh_2.(\fresh_3.applyToList (+) fresh_3) [fresh_1, fresh_2]
-&apos; = \f1.\f2.(\f3.applyToList (+) fresh_3) (cons f1 (cons f2 nil))
-&apos; = \f1.\f2.applyToList (+) (cons f1 (cons f2 nil))
+
 Function evalX(ByVal x As Object, ByVal e As Object)
+	evalX = _evalX(x, e, nil)
+End Function
+
+Function _evalX( _
+	ByVal x     As Object, _
+	ByVal env   As Object, _
+	ByVal argXs As Object _
+)
 	Dim out As Variant
 	Select Case x.which
 		Case &quot;Val&quot;:	out = x.a0
 		Case &quot;Var&quot;
 			Dim v As Variant
-			v = lookup(x.a0, e)
+			v = lookup(x.a0, env)
 			If isEmpty(v) Then
 				croak(&quot;evalX: unbound Var &quot; &amp; toString(x.a0))
 			Else
@@ -148,17 +151,45 @@ Function evalX(ByVal x As Object, ByVal e As Object)
 		Case &quot;Builtin&quot;: out = x.a0
 		Case &quot;App&quot;
 			Dim f As Object, a As Variant
+_evalX_descend_Apps:
 			f = x.a0
-			f = evalX(f, e)
 			a = x.a1
-			a = evalX(a, e) &apos; strict evaluation
-			out = apply1(f, a)
+			If (f.which = &quot;App&quot;) Then
+				&apos;out = _evalX(f, env, cons(a, argXs)) &apos; tail-recursive
+				argXs = cons(a, argXs)
+				x = f
+				Goto _evalX_descend_Apps
+			Else
+				f = evalX(f, env)
+				out = _applyX(f, env, cons(a, argXs))
+			End If
 		Case Else
 			croak(&quot;evalX: unsupported expr .which = &quot; &amp; toString(x.which))
 	End Select
-	evalX = out
+	_evalX = out
 End Function
 
+Function _applyX(oFn As Object, env As Object, ByVal argXs As Object)
+	Dim out As Variant
+	Dim r As Integer, n As Integer, arg As Variant, argVs As Object
+	r = arity(oFn)
+	n = length(argXs)
+	argVs = nil
+	Do Until(isNil(argXs))	&apos; strict: eval argXs from left to right
+		arg = car(argXs)	&apos; *before* passing them to oFn
+		argVs = cons(evalX(arg, env), argVs)
+		argXs = cdr(argXs)
+	Loop
+	argVs = reverse(argVs)
+	If False And (r &lt;&gt; n) Then
+		show(&quot;applying &quot; &amp; getFnName(oFn) _
+				&amp; &quot; (arity &quot; &amp; r &amp; &quot;) to &quot; &amp; n &amp; &quot; args&quot;, _
+			argVs _
+		)
+	End If
+	out = applyToList(oFn, argVs)
+	_applyX = out
+End Function
 
 Function [test_Expr======================================]
 	test_Expr_isExpr()
@@ -230,18 +261,69 @@ End Function
 Function test_Expr_eval_Builtin()
 	Dim f As Object, a As Object, e As Object, x As Variant, act As Variant
 	e = envEmpty
-	f = xpBuiltin(fstArg)
+	assertEqual(arity(Fn.fstArg), 2).x &apos; are we assuming the right arity?
+	f = xpBuiltin(Fn.fstArg)
+	
 	&apos; first, Builtin as such evaluates to the fn obj withing:
 	a = evalX(f, e)
 	assertEqual(isFn(a), True).x
-	assertEqual(getFnName(a), getFnName(fstArg)).x
+	assertEqual(getFnName(a), getFnName(Fn.fstArg)).x
 	assertEqual(arity(a), 2).x
 	
-	&apos; let&apos;s apply a Builtin:
+	&apos; let&apos;s apply it to as many args as it expects:
 	a = xpVal(42)
 	x = xpApp(xpApp(f, a), xpVal(88))
 	act = evalX(x, e)
-	assertEqual(evalX(x, e), 42).x
+	assertEqual(act, 42).x
+	
+	&apos; partial application:
+	x = xpApp(f, a)
+	act = evalX(x, e)
+	assertEqual(isFn(act), True).x
+	assertEqual(getFnName(act), getFnName(Fn.fstArg)).x
+	assertEqual(arity(act), 1).x
+	
+	&apos; apply partially applied fn to more args:
+	x = xpApp(xpVar(&quot;K_42&quot;), xpVal(88))
+	act = evalX(x, extend(e, &quot;K_42&quot;, act))
+	assertEqual(act, 42).x
+	
+	&apos; &quot;over-application&quot;:
+	x = xpApp(xpApp(xpApp(f, xpBuiltin(id)), xpVal(1)), xpVal(2))
+	act = evalX(x, e)
+	assertEqual(act, 2).x
+	
+	&apos;----------------
+	&apos; apply builtin swap (arity 3)
+	assertEqual(arity(Fn.swap), 3).x &apos; are we assuming the right arity?
+	f = xpBuiltin(Fn.swap)
+
+	&apos; let&apos;s apply it to as many args as it expects:
+	a = xpBuiltin(Fn.cons)
+	x = xpApp(xpApp(xpApp(f, a), xpVal(nil)), xpVal(42))
+	act = evalX(x, e)
+	assert_toString_equals(act, List(42)).x
+	
+	&apos; partial application (2 more missing):
+	x = xpApp(f, a)
+	act = evalX(x, e)
+	assertEqual(isFn(act), True).x
+	assertEqual(getFnName(act), getFnName(Fn.swap)).x
+	assertEqual(arity(act), 2).x
+	
+	&apos; partial application (1 more missing):
+	x = xpApp(xpApp(f, a), xpVal(List(2))
+	act = evalX(x, e)
+	assertEqual(isFn(act), True).x
+	assertEqual(getFnName(act), getFnName(Fn.swap)).x
+	assertEqual(arity(act), 1).x
+
+	&apos; apply partially applied fn to more args:
+	x = xpApp(xpVar(&quot;swap_cons_[2]&quot;), xpVal(1))
+	act = evalX(x, extend(e, &quot;swap_cons_[2]&quot;, act))
+	assert_toString_equals(act, List(1, 2)).x
+	
+	
 End Function
 
 
