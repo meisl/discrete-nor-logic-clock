@@ -7,6 +7,7 @@ Option Explicit
 &apos;           | Var Str
 &apos;           | Lam Str Expr
 &apos;           | App Expr Expr
+&apos;           | Err Str
 &apos;           | Builtin Obj
 
 Const TExpr_tyname = &quot;TExpr&quot;
@@ -114,6 +115,10 @@ Function xpBuiltin(ByVal oFn As Object)
 	xpBuiltin = newExpr(&quot;Builtin&quot;, oFn, Empty)
 End Function
 
+Function xpErr(ByVal msg As String)
+	xpErr = newExpr(&quot;Err&quot;, msg, Empty)
+End Function
+
 
 &apos; Builtin (+) 
 &apos; ~&gt; Lam &quot;fresh_1&quot; 
@@ -164,6 +169,8 @@ _evalX_descend_Apps:
 				f = evalX(f, env)
 				out = _applyX(f, env, cons(a, argXs))
 			End If
+		Case &quot;Err&quot;
+		 	croak(x.a0)
 		Case Else
 			croak(&quot;evalX: unsupported expr .which = &quot; &amp; toString(x.which))
 	End Select
@@ -176,18 +183,23 @@ Function _applyX( _
 	ByVal argXs As Object _
 )
 	Dim out As Variant, arg As Variant
+_applyX_begin:
 	If isList(f) Then &apos; eval&apos;d Lambda (= nothing but the lambda expr together with a (lexical) env)
 		Dim x As Object, v As String, body As Object, lexicalEnv As Object
 		x = car(f)
 		v = x.a0
 		body = x.a1
 		lexicalEnv = cadr(f)
-		arg = evalX(car(argXs), dynamicEnv)
-		lexicalEnv = extend(lexicalEnv, v, arg)
+		If (v &lt;&gt; &quot;_&quot;) Then
+			arg = evalX(car(argXs), dynamicEnv)
+			lexicalEnv = extend(lexicalEnv, v, arg)
+		End If
 		out = evalX(body, lexicalEnv)
 		argXs = cdr(argXs)
 		If Not(isNil(argXs)) Then
-			out = _applyX(out, dynamicEnv, argXs) &apos; tail-recursive
+			&apos;out = _applyX(out, dynamicEnv, argXs) &apos; tail-recursive
+			f = out
+			Goto _applyX_begin
 		End If
 	Else
 		Dim r As Integer, n As Integer, argVs As Object
@@ -372,7 +384,6 @@ Function test_Expr_eval_Lam()
 	x = xpApp(xpApp(xpApp(f, xpVal(1)), xpVal(2)), xpVal(3))
 	assertEqual(evalX(x, e), 2).x
 
-
 	&apos; two-arg lambda
 	&apos; \ys.\y.cons y ys
 	f = xpLam(&quot;ys&quot;, xpLam(&quot;y&quot;, xpApp(xpApp(xpVar(&quot;cons&quot;), xpVar(&quot;y&quot;)), xpVar(&quot;ys&quot;)))
@@ -381,8 +392,18 @@ Function test_Expr_eval_Lam()
 	act = evalX(x, e)
 	assertEqual(equ(act, List(1, 2, 3)), True).x
 
-End Function
+	&apos; &quot;_&quot; parameter isn&apos;t eval&apos;d
+	f = xpLam(&quot;_&quot;, xpVal(42))
+	x = xpApp(f, xpErr(&quot;Boom!&quot;))
+	act = evalX(x, envEmpty)
+	assertEqual(act, 42).x
+	
+	f = xpLam(&quot;a&quot;, xpLam(&quot;_&quot;, xpVar(&quot;a&quot;)))
+	x = xpApp(xpApp(f, xpVal(42)), xpErr(&quot;Boom!&quot;))
+	act = evalX(x, envEmpty)
+	assertEqual(act, 42).x
 
+End Function
 
 
 </script:module>
