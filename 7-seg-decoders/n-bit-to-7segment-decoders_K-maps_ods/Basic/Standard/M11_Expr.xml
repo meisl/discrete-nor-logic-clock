@@ -161,7 +161,8 @@ _evalX_descend_Apps:
 			f = x.a0
 			a = x.a1
 			If (f.which = &quot;App&quot;) Then
-				&apos;out = _evalX(f, env, cons(a, argXs)) &apos; tail-recursive
+				&apos; tail-call:
+				&apos;out = _evalX(f, env, cons(a, argXs))
 				argXs = cons(a, argXs)
 				x = f
 				Goto _evalX_descend_Apps

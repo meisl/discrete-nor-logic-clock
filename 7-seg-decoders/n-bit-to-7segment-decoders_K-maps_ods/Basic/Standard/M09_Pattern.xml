@@ -51,6 +51,11 @@ Function TPattern_toString(p As Object)
 			Else
 				out = toString(p.a0)
 			End If
+		Case &quot;Dat&quot;:			out = getFnName(p.a0)
+		Case &quot;App&quot;
+			out = &quot;(&quot; &amp; TPattern_toString(p.a0) _
+				&amp; &quot; &quot; &amp; TPattern_toString(p.a1) _
+				&amp; &quot;)&quot;
 		Case &quot;List.nil&quot;:	out = &quot;[]&quot;
 		Case &quot;List.cons&quot;
 			Dim patHd As Object, patTl As Object
@@ -103,6 +108,12 @@ End Function
 Function patList_nil()
 	Static out As Object : If isNull(out) Then : out = newPattern(&quot;List.nil&quot;, nil) : End If
 	patList_nil = out
+End Function
+
+Function patDat(ctor As Object)
+	Dim out As Object
+	out = newPattern(&quot;Dat&quot;, ctor)
+	patDat = out
 End Function
 
 Function patList_cons(patHd As Variant, patTl As Object)
@@ -187,6 +198,21 @@ _matches_Val_equalityTest:
 				u = y
 				Goto _matches_Val_equalityTest
 			End If
+		Case &quot;App&quot;
+			Dim f As Object, a As Variant
+_matches_descend_Apps:
+			f = p.a0
+			a = p.a1
+			If (f.which = &quot;App&quot;) Then
+				&apos; tail-call:
+				&apos;out = _matches(f, e, x, cons(a, args))
+				args = cons(a, args)
+				p = f
+				Goto _matches_descend_Apps
+			Else
+				&apos; tail-call:
+				out = _matchApplication(f, e, x, cons(a, args))
+			End If
 		Case &quot;List.nil&quot;
 			If Not(isList(x)) Then
 				out = Empty	&apos; TODO: maybe throw on type error?
@@ -239,6 +265,45 @@ _matches_Val_equalityTest:
 _matches_end:
 	_matches = out
 End Function
+
+Function _matchApplication( _
+	ByVal ptOp  As Object, _
+	ByVal env   As Variant, _
+	ByVal val   As Variant, _
+	ByVal args  As Object _
+)
+	Dim out As Variant
+	out = Empty
+	If ptOp.which &lt;&gt; &quot;Dat&quot; Then
+		croak(&quot;_matchApplication: unsupported op pattern &quot; &amp; NL &amp; TPattern_toString(ptOp))
+	End If
+	Dim ctor As Variant
+	ctor = ctorOf(val)
+	If isEmpty(ctor) Then &apos; not a datatype value
+		out = Empty	&apos; TODO: maybe throw on type error?
+	Else
+		Dim ctorName As String, opName As String
+		ctorName = getFnName(ctor)
+		opName = getFnName(ptOp.a0)
+		If ctorName = opName Then
+			Dim opArity As Integer, ctorArity As Integer
+			opArity = arity(ptOp.a0)
+			ctorArity = arity(ctor)
+			If opArity &lt;&gt; ctorArity Then
+				croak(&quot;_matchApplication/NYI: unequal arities of op &quot; _
+					&amp; opName &amp; &quot; (&quot; &amp; opArity &amp; &quot;)&quot; _
+					&amp; &quot; &lt;&gt; &quot; &amp; ctorName &amp; &quot; (&quot; &amp; ctorArity &amp; &quot;)&quot; _
+				)
+			End If
+			show(&quot;_matchApplication/NYI: applyToList &quot; &amp; opName _
+				&amp; &quot; &quot; &amp; toString(args) _
+				&amp; NL &amp; &quot; matched against&quot;, val _
+			)
+		End If
+	End If
+	_matchApplication = out
+End Function
+
 
 Function [test_Pattern======================================]()
 	test_Pattern_isPattern()
@@ -296,6 +361,7 @@ Function test_Pattern_isPattern()
 End Function
 
 Function test_Pattern_toString()
+	Dim p As Object
 	assertEqual(toString(patAny),   		      &quot;_&quot;).x
 
 	assertEqual(toString(patVal(Empty)), 	     &quot;()&quot;).x
@@ -320,10 +386,15 @@ Function test_Pattern_toString()
 	assertEqual(toString(patVar(&quot;a&quot;)), &quot;a&quot;).x
 	assertEqual(toString(patVar(&quot;b&quot;)), &quot;b&quot;).x
 	
+	assertEqual(toString(patDat(cons)), &quot;cons&quot;).x
+	&apos;assertEqual(toString(patDat(nil)),  &quot;nil&quot;).x &apos; TODO: handle 0-arity datactors
+	
+	p = xpApp(xpApp(patDat(cons), patVar(&quot;x&quot;)), patVar(&quot;xs&quot;))
+	assertEqual(TPattern_toString(p), &quot;((cons x) xs)&quot;).x
+	
 	assertEqual(toString(patList_nil), 					&quot;[]&quot;).x
 	assertEqual(toString(patList_cons(patAny, patAny)), &quot;(_:_)&quot;).x
 	assertEqual(toString(patList_cons(patVar(&quot;x&quot;), patList_nil)), &quot;[x]&quot;).x
-	
 	
 	assertEqual(toString(patASN(patVar(&quot;lbl&quot;), patVal(Empty), patList_nil)), &quot;(ASN lbl () [])&quot;).x
 End Function
@@ -587,7 +658,8 @@ Function test_Pattern_matches_List()
 End Function
 	
 Function test_Pattern_matches_ASN()
-	Dim p As TPattern, f As Object, e As Object, v As Object
+	Dim p As Object, f As Object, e As Object, v As Object
+	Dim act As Variant
 	Dim x As Object, w As Object
 	f = matches
 	e = envEmpty
@@ -633,11 +705,22 @@ Function test_Pattern_matches_ASN()
 			), xpVal(nil) _
 		)
 	w = evalX(w, e)
-	show(v)
-	show(w)
+	&apos;show(v)
+	&apos;show(w)
 	assert_toString_equals(w, mkASN(&quot;Foo&quot;, &quot;bar&quot;, nil)).x
 	
-
+	p = xpApp( _
+			xpApp( _
+				patDat(cons), _
+				patVar(&quot;x&quot;) _
+			), _
+			patVar(&quot;xs&quot;) _
+		)
+	v = List(1, 2, 3)	&apos;	mkDtTerminal(&quot;asdf&quot;) &apos; 
+	e = envEmpty
+	act = matches(p, e, v)
+	show(act)
+	
 	&apos;ASN &quot;Con&quot;  () [x]        -&gt; x
 	&apos;ASN &quot;Atom&quot; () [x]        -&gt; x
 	

@@ -89,11 +89,7 @@ ctorOf_error:
 End Function
 
 Function _ctor(o As Object)
-	Dim out As Variant
-	On Local Error Goto _ctor_end
-	out = o.ctor
-_ctor_end:
-	_ctor = out
+	_ctor = o.ctor
 End Function
 
 
@@ -595,8 +591,16 @@ Function test_ctorOf()
 	assertEqual(ctorOf( 1),			Empty).x
 	assertEqual(ctorOf(-1),			Empty).x
 	assertEqual(ctorOf(3.1415),		Empty).x
-	
+
 	Dim o As Object, act As Variant
+	
+	&apos; an object without member .ctor:
+	o = New TTest_TyName
+	assertEqual(ctorOf(o), Empty).x
+	o.tyname = &quot;foo&quot;
+	assertEqual(ctorOf(o), Empty).x
+
+	&apos; an object with a member .ctor:
 	o = New TTest_Ctor
 	o.ctor = Empty		: assertThrows(ctorOf, Array(o)).x
 	o.ctor = Nothing	: assertThrows(ctorOf, Array(o)).x
@@ -614,7 +618,7 @@ Function test_ctorOf()
 	assertThrows(ctorOf, Array(o)).x
 	o.ctor.tyname = &quot;foo&quot;
 	assertThrows(ctorOf, Array(o)).x
-	
+
 	o.ctor = Fn.cons
 	act = ctorOf(o)
 	assertEqual(isFn(act), True).x
