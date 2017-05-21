@@ -127,8 +127,8 @@ End Function
 &apos;        )
 
 
-Function evalX(ByVal x As Object, ByVal e As Object)
-	evalX = _evalX(x, e, nil)
+Function evalX(ByVal x As Object, ByVal env As Object)
+	evalX = _evalX(x, env, nil)
 End Function
 
 Function _evalX( _
@@ -147,7 +147,8 @@ Function _evalX( _
 			Else
 				out = v
 			End If
-		&apos;Case &quot;Lam&quot;: 	out = x
+		Case &quot;Lam&quot;
+		 	out = List(x, env)
 		Case &quot;Builtin&quot;: out = x.a0
 		Case &quot;App&quot;
 			Dim f As Object, a As Variant
@@ -169,25 +170,44 @@ _evalX_descend_Apps:
 	_evalX = out
 End Function
 
-Function _applyX(oFn As Object, env As Object, ByVal argXs As Object)
-	Dim out As Variant
-	Dim r As Integer, n As Integer, arg As Variant, argVs As Object
-	r = arity(oFn)
-	n = length(argXs)
-	argVs = nil
-	Do Until(isNil(argXs))	&apos; strict: eval argXs from left to right
-		arg = car(argXs)	&apos; *before* passing them to oFn
-		argVs = cons(evalX(arg, env), argVs)
+Function _applyX( _
+	ByVal f As Object, _
+	ByVal dynamicEnv As Object, _
+	ByVal argXs As Object _
+)
+	Dim out As Variant, arg As Variant
+	If isList(f) Then &apos; eval&apos;d Lambda (= nothing but the lambda expr together with a (lexical) env)
+		Dim x As Object, v As String, body As Object, lexicalEnv As Object
+		x = car(f)
+		v = x.a0
+		body = x.a1
+		lexicalEnv = cadr(f)
+		arg = evalX(car(argXs), dynamicEnv)
+		lexicalEnv = extend(lexicalEnv, v, arg)
+		out = evalX(body, lexicalEnv)
 		argXs = cdr(argXs)
-	Loop
-	argVs = reverse(argVs)
-	If False And (r &lt;&gt; n) Then
-		show(&quot;applying &quot; &amp; getFnName(oFn) _
-				&amp; &quot; (arity &quot; &amp; r &amp; &quot;) to &quot; &amp; n &amp; &quot; args&quot;, _
-			argVs _
-		)
+		If Not(isNil(argXs)) Then
+			out = _applyX(out, dynamicEnv, argXs) &apos; tail-recursive
+		End If
+	Else
+		Dim r As Integer, n As Integer, argVs As Object
+			n = length(argXs)
+			argVs = nil
+			Do Until(isNil(argXs))	&apos; strict: eval argXs from left to right
+				arg = car(argXs)	&apos; *before* passing them to oFn
+				argVs = cons(evalX(arg, dynamicEnv), argVs)
+				argXs = cdr(argXs)
+			Loop
+		argVs = reverse(argVs)		
+		r = arity(f)
+		If False And (r &lt;&gt; n) Then
+			show(&quot;applying &quot; &amp; getFnName(f) _
+					&amp; &quot; (arity &quot; &amp; r &amp; &quot;) to &quot; &amp; n &amp; &quot; args&quot;, _
+				argVs _
+			)
+		End If
+		out = applyToList(f, argVs)
 	End If
-	out = applyToList(oFn, argVs)
 	_applyX = out
 End Function
 
@@ -197,8 +217,8 @@ Function [test_Expr======================================]
 	&apos; TODO: test TExpr_equ
 	test_Expr_eval_Val()
 	test_Expr_eval_Var()
-	&apos;test_Expr_eval_Lam() &apos; App (Lam ...) ... tested here
 	test_Expr_eval_Builtin() &apos; App (Builtin ...) ... tested here
+	test_Expr_eval_Lam() &apos; App (Lam ...) ... tested here
 End Function
 
 Function test_Expr_isExpr()
@@ -231,31 +251,6 @@ Function test_Expr_eval_Var()
 	e = extend(e, &quot;b&quot;, v)
 	x = xpVar(&quot;b&quot;)
 	assertEqual(evalX(x, e), v).x
-End Function
-
-Function test_Expr_eval_Lam()
-	Dim x As Object, e As Object
-	e = envEmpty
-	x = xpLam(&quot;a&quot;, xpVal(42))
-	assertEqual(TExpr_equ( evalX(x, e), x), True).x
-	assertEqual(TExpr_same(evalX(x, e), x), True).x
-	e = extend(e, &quot;a&quot;, 4711)
-	assertEqual(TExpr_equ( evalX(x, e), x), True).x
-	assertEqual(TExpr_same(evalX(x, e), x), True).x
-
-	Dim f As Object, a As Object
-	e = envEmpty
-	f = xpLam(&quot;a&quot;, xpVal(42))
-	a = xpVal(88)
-	assertEqual(evalX(xpApp(f, a), e), 42).x
-	e = extend(e, &quot;a&quot;, xpVal(4711))
-	assertEqual(evalX(xpApp(f, a), e), 42).x
-
-	f = xpLam(&quot;a&quot;, xpVar(&quot;a&quot;))
-	assertEqual(evalX(xpApp(f, a), e), 88).x
-
-	f = xpLam(&quot;_&quot;, xpVar(&quot;a&quot;))
-	assertEqual(evalX(xpApp(f, a), e), 4711).x
 End Function
 
 Function test_Expr_eval_Builtin()
@@ -322,9 +317,72 @@ Function test_Expr_eval_Builtin()
 	x = xpApp(xpVar(&quot;swap_cons_[2]&quot;), xpVal(1))
 	act = evalX(x, extend(e, &quot;swap_cons_[2]&quot;, act))
 	assert_toString_equals(act, List(1, 2)).x
-	
-	
 End Function
+
+Function test_Expr_eval_Lam()
+	Dim x As Object, e As Object, act As Variant
+	e = envEmpty
+	x = xpLam(&quot;a&quot;, xpVal(42))
+	
+	act = evalX(x, e)
+	assertEqual(isList(act), True).x
+	assertEqual(length(act), 2).x
+	assertEqual(TExpr_same(car(act), x), True).x
+	assertEqual(Env_toString(cadr(act)), Env_toString(e)).x
+		
+	e = extend(e, &quot;a&quot;, 4711)
+	act = evalX(x, e)
+	assertEqual(isList(act), True).x
+	assertEqual(length(act), 2).x
+	assertEqual(TExpr_same(car(act), x), True).x
+	assertEqual(Env_toString(cadr(act)), Env_toString(e)).x
+
+	&apos; one-arg lambda
+
+	Dim f As Object, a As Object
+	e = envEmpty
+	f = xpLam(&quot;a&quot;, xpVal(42))
+	a = xpVal(88)
+	x = xpApp(f, a)
+	assertEqual(evalX(x, e), 42).x
+	e = extend(e, &quot;a&quot;, 4711)
+	assertEqual(evalX(x, e), 42).x
+
+	f = xpLam(&quot;a&quot;, xpVar(&quot;a&quot;))
+	x = xpApp(f, a)
+	assertEqual(evalX(x, e), 88).x
+
+	f = xpLam(&quot;_&quot;, xpVar(&quot;a&quot;))
+	x = xpApp(f, a)
+	assertEqual(evalX(x, e), 4711).x
+
+	&apos; lexical scope:
+	&apos; evaluate the lambda in its own env, then apply that in another
+	e = extend(envEmpty, &quot;a&quot;, 4711)
+	act = evalX(xpLam(&quot;_&quot;, xpVar(&quot;a&quot;)), e)
+	e = extend(envEmpty, &quot;it&quot;, act)
+	x = xpApp(xpVar(&quot;it&quot;), xpVal(88))
+	act = evalX(x, e)
+	assertEqual(act, 4711).x
+
+	&apos; &quot;over-applying a one-arg lambda (which returns a builtin fn obj)
+	&apos; make sure we&apos;re assuming the right arity:
+	assertEqual(arity(Fn.fstArg), 2).x
+	f = xpLam(&quot;_&quot;, xpVal(Fn.fstArg))
+	x = xpApp(xpApp(xpApp(f, xpVal(1)), xpVal(2)), xpVal(3))
+	assertEqual(evalX(x, e), 2).x
+
+
+	&apos; two-arg lambda
+	&apos; \ys.\y.cons y ys
+	f = xpLam(&quot;ys&quot;, xpLam(&quot;y&quot;, xpApp(xpApp(xpVar(&quot;cons&quot;), xpVar(&quot;y&quot;)), xpVar(&quot;ys&quot;)))
+	e = extend(envEmpty, &quot;cons&quot;, Fn.cons)
+	x = xpApp(xpApp(f, xpVal(List(2, 3))), xpVal(1))
+	act = evalX(x, e)
+	assertEqual(equ(act, List(1, 2, 3)), True).x
+
+End Function
+
 
 
 </script:module>
