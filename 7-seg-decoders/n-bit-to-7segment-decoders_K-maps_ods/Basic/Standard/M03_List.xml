@@ -3,15 +3,17 @@
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M03_List" script:language="StarBasic">REM  *****  BASIC  *****
 Option Explicit
 
+Const TList_tyname = &quot;TList&quot;
 Type TList
 	tyname As String
-	len As Integer
+	ctor As Object
 	head As Variant
 	tail As TList
+	len As Integer
 End Type
 
 Sub Main
-	show(Env_toString(TList))
+	&apos;show(Env_toString(TList))
 	test_List()
 End Sub
 
@@ -30,71 +32,42 @@ Function TList()
 	TList = out
 End Function
 
-Function TList_toString(xs As TList)
-&apos;	concat &quot;[&quot; (concat (foldl1 (\acc.(concat acc) ° (concat &quot;, &quot;))) &quot;[&quot; (map toString xs)) &quot;]&quot;
-	Dim result As String
-	result = &quot;[&quot; &amp; Join(toArray(map(Fn.toString, xs)), &quot;, &quot;) &amp; &quot;]&quot;
-	TList_toString = result
-End Function
+&apos; --- constructors ---
 
-Function TList_equ(xs As TList, ys As TList) As Boolean
-	Dim result As Boolean
-	If xs.len &lt;&gt; ys.len Then
-		result = False
-	ElseIf (isNil(xs) And isNil(ys)) Then
-		result = True
-	Else
-		On Local Error Goto IncompatibleCars
-		If equ(car(xs), car(ys)) Then
-			result = TList_equ(cdr(xs), cdr(ys))
-			TList_equ = result
-			Exit Function
-		End If
-IncompatibleCars:
-		result = False	
-	End If
-	TList_equ = result
+Function _newList(head As Variant, tail As TList) As TList
+	Dim out As New TList
+	out.tyname = TList_tyname
+	out.head = head
+	out.tail = tail
+	_newList = out
 End Function
 
 Function nil() As TList
-	Static result As Object
-	If isNull(result) Then
-		Set result = New TList
-		result.tyname = &quot;TList&quot;
+	Static out As Object
+	If isNull(out) Then
+		out = _newList(Empty, Nothing)
+		out.ctor = out
+		out.len = 0
 	End If
-	nil = result
+	nil = out
 End Function
 
-Function isList(Optional x As Variant)
-	If isMissing(x) Then
-		isList = Fn.isList
+Function cons(Optional x, Optional xs)
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.cons : End If
+	Dim out As Variant
+	If isMissing(x) Then :		out = oFn
+	ElseIf isMissing(xs) Then : out = apply1(oFn, x)
+	ElseIf isList(xs) Then
+		out = _newList(x, xs)
+		out.ctor = oFn
+		out.len = xs.len + 1
 	Else
-		isList = (typeOf(x) = typeOf(nil))
+		croak(&quot;cons: invalid tail - expected a List but got a &quot; &amp; typeOf(xs) &amp; &quot;:&quot; &amp; NL &amp; toString(xs))
 	End If
+	cons = out
 End Function
 
-Function isNil(Optional xs As TList)
-	If isMissing(xs) Then : isNil = Fn.isNil : Else
-		isNil = (xs.len = 0)
-	End If
-End Function
-
-Function length(Optional xs As TList)
-	If isMissing(xs) Then : length = Fn.length : Else
-		length = xs.len
-	End If
-End Function
-
-Function cons(Optional x, Optional xs As TList)
-	If isMissing(xs) Then : cons = _apply(Fn.cons, x) : Else
-		Dim result As New TList
-		result.tyname = nil.tyname
-		result.head = x
-		result.tail = xs
-		result.len = xs.len + 1&apos; do not dot-access xs directly!
-		cons = result
-	End If
-End Function
+&apos; --- destructors ---
 
 Function car(Optional xs As TList) As Variant
 	If isMissing(xs) Then : car = Fn.car : Exit Function : End If
@@ -113,6 +86,70 @@ Function cdr(Optional xs As TList) As TList
 		cdr = xs.tail
 	End If
 End Function
+
+Function length(Optional xs As TList)
+	If isMissing(xs) Then : length = Fn.length : Else
+		length = xs.len
+	End If
+End Function
+
+&apos; --- type test ---
+
+Function isList(Optional x As Variant)
+	If isMissing(x) Then
+		isList = Fn.isList
+	Else
+		isList = (typeOf(x) = typeOf(nil))
+	End If
+End Function
+
+&apos; --- ctor test ---
+
+Function isNil(Optional xs As TList)
+	If isMissing(xs) Then : isNil = Fn.isNil : Else
+		isNil = (xs.len = 0)
+	End If
+End Function
+
+&apos; --- toString ---
+
+Function TList_toString(xs As TList)
+&apos;	concat &quot;[&quot; (concat (foldl1 (\acc.(concat acc) ° (concat &quot;, &quot;))) &quot;[&quot; (map toString xs)) &quot;]&quot;
+	Dim result As String
+	result = &quot;[&quot; &amp; Join(toArray(map(Fn.toString, xs)), &quot;, &quot;) &amp; &quot;]&quot;
+	TList_toString = result
+End Function
+
+&apos; --- equality ---
+
+Function TList_equ(xs As TList, ys As TList) As Boolean
+	Dim out As Boolean
+	out = False
+	Dim n As Integer
+	n = length(xs)
+	
+	If n = length(ys) Then
+TList_equ_compare_elems:
+		If n = 0 Then
+			out = True
+		Else
+			On Local Error Goto TList_equ_end &apos; if cars are incomparable
+			If equ(car(xs), car(ys)) Then
+				&apos; tail-call:
+				&apos;out = TList_equ(cdr(xs), cdr(ys))
+				xs = cdr(xs)
+				ys = cdr(ys)
+				n = n - 1
+				Goto TList_equ_compare_elems
+			End If
+		End If
+	End If
+TList_equ_end:
+	TList_equ = out
+End Function
+
+
+&apos; --- fns on List ---
 
 Function cadr(xs As TList)
 	cadr = car(cdr(xs))
@@ -134,7 +171,7 @@ Function map(Optional f As Variant, Optional xs As Object)
 		ElseIf isNil(xs) Then
 			result = nil
 		Else
-			result = cons(apply(f, xs.head), map(f, xs.tail))
+			result = cons(apply(f, car(xs)), map(f, cdr(xs)))
 		End If
 	End If
 	map = result
@@ -311,37 +348,41 @@ Function flatten(Optional xs As TList)
 	End If
 End Function
 
-Function reverse(Optional xs As TList)
-	If isMissing(xs) Then : reverse = Fn.reverse : Exit Function : End If
-	Dim result As Object
-	If xs.len &lt;= 1 Then
-		result = xs
+Function reverse(Optional ByVal xs As TList)
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.reverse : End If
+	Dim out As Variant
+	If isMissing(xs) Then : out = oFn
 	Else
-		&apos;result = foldl(swap(cons), nil, xs)
-		Dim ts As Object
-		ts = xs
-		result = nil
-		While (ts.len &gt; 0)
-			result = cons(ts.head, result)
-			ts = ts.tail
-		Wend
+		&apos;out = foldl(swap(cons), nil, xs)
+		Dim n As Integer
+		n = length(xs)
+		If n &lt;= 1 Then
+			out = xs
+		Else
+			out = nil
+			Do Until (n = 0)
+				out = cons(car(xs), out)
+				xs = cdr(xs)
+				n = n - 1
+			Loop
+		End If
 	End If
-	reverse = result
+	reverse = out
 End Function
 
-Function toArray(xs As TList)
-	If isNil(xs) Then
+Function toArray(ByVal xs As TList)
+	Dim n As Integer
+	n = length(xs) - 1
+	If n = -1 Then
 		toArray = Array()
 	Else
-		Dim result(0 To xs.len - 1)
-		Dim t As TList
-		Set t = xs
+		Dim out(0 To n)
 		Dim i As Integer
-		For i = 0 To xs.len - 1
-			result(i) = t.head
-			Set t = t.tail
+		For i = 0 To n
+			out(i) = car(xs)
+			xs = cdr(xs)
 		Next i
-		toArray = result
+		toArray = out
 	End If
 End Function
 
@@ -353,6 +394,7 @@ Function List(Optional a0, Optional a1, Optional a2, Optional a3, Optional a4, O
 	If isMissing(a0) Then
 		result = nil
 	Else
+		&apos; tail-call:
 		result = cons(a0, List(a1, a2, a3, a4, a5, a6, a7, a8, a9))
 	End If
 	List = result
@@ -431,6 +473,15 @@ Function test_List_isNil_and_cons()
 &apos;	assertThrows(isNil, Array()).x		&apos; assertThrows can&apos;t test call with 0 args
 	assertThrows(isNil, Array(Empty)).x
 	assertThrows(isNil, Array(Nothing)).x
+
+	assertThrows(cons, Array(42, Empty)).x
+	assertThrows(cons, Array(42, Nothing)).x
+	assertThrows(cons, Array(42, True)).x
+	assertThrows(cons, Array(42, False)).x
+	assertThrows(cons, Array(42, 87)).x
+	assertThrows(cons, Array(42, &quot;&quot;)).x
+	assertThrows(cons, Array(42, &quot;foo&quot;)).x
+	assertThrows(cons, Array(42, Array())).x
 
 	assertEqual(isNil(cons(nil, nil)), False).x
 	assertEqual(isNil(cons(0, nil)), False).x
@@ -799,6 +850,8 @@ Function test_List_equ()
 	assertEqual(equ(List(1, 2), List(1, 2)),	True).x
 	assertEqual(equ(List(2, 2), List(1, 2)),	False).x
 	assertEqual(equ(List(2, 1), List(1, 2)),	False).x
+
+	assertEqual(equ(List(1, 2), List(1, &quot;2&quot;)),	False).x
 
 End Function
 

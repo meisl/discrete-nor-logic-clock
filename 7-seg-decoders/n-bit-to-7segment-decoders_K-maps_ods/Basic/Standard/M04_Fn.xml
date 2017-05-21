@@ -14,6 +14,11 @@ Type TFn
 End Type
 
 Type TFnObjs
+	ctorOf		As Object
+	
+	isEmpty		As Object
+	isString	As Object
+	
 	id 			As Object
 	fstArg 		As Object
 	sndArg 		As Object
@@ -26,8 +31,6 @@ Type TFnObjs
 	lcase		As Object
 	add			As Object
 	mul			As Object
-	isString	As Object
-	isEmpty		As Object
 	toString	As Object
 	concat		As Object
 	readHex		As Object
@@ -98,6 +101,11 @@ Function Fn
 	Static result As Object
 	If isNull(result) Then
 		Set result = New TFnObjs
+		result.ctorOf	= lookupFn(&quot;ctorOf&quot;)
+		
+		result.isEmpty	= lookupFn(&quot;isEmpty&quot;)
+		result.isString	= lookupFn(&quot;isString&quot;)
+
 		result.id      	= lookupFn(&quot;id&quot;)
 		result.fstArg  	= lookupFn(&quot;fstArg&quot;)
 		result.sndArg  	= lookupFn(&quot;sndArg&quot;)
@@ -110,8 +118,6 @@ Function Fn
 		result.lcase	= lookupFn(&quot;lcase&quot;)
 		result.add 		= lookupFn(&quot;add&quot;)
 		result.mul 		= lookupFn(&quot;mul&quot;)
-		result.isString	= lookupFn(&quot;isString&quot;)
-		result.isEmpty	= lookupFn(&quot;isEmpty&quot;)
 		result.toString = lookupFn(&quot;toString&quot;)
 		result.concat	= lookupFn(&quot;concat&quot;)
 		result.readHex	= lookupFn(&quot;readHex&quot;)
@@ -280,8 +286,11 @@ Function fnObjs()
 	Static result As Object
 	If IsNull(result) Then
 		result = toList(Array(_
-			newFn(&quot;isString&quot;,		1, &quot;Any -&gt; Bool&quot;), _
+			newFn(&quot;ctorOf&quot;,			1, &quot;Any -&gt; Maybe DataCtor&quot;), _
+			_
 			newFn(&quot;isEmpty&quot;,		1, &quot;Any -&gt; Bool&quot;), _
+			newFn(&quot;isString&quot;,		1, &quot;Any -&gt; Bool&quot;), _
+			_
 			newFn(&quot;toString&quot;,		1, &quot;Any -&gt; Str&quot;), _
 			newFn(&quot;id&quot;,				1, &quot;a -&gt; a&quot;), _
 			newFn(&quot;fstArg&quot;,			2, &quot;a -&gt; b -&gt; a&quot;), _
@@ -486,14 +495,17 @@ Function applyLast(ByVal fn As Object, arg As Variant)
 applyLast_of_one:
 	a0 = arg
 	Select Case name
+		Case &quot;ctorOf&quot;:		result = ctorOf(	a0)
+		
+		Case &quot;isEmpty&quot;:		result = isEmpty(	a0)
+		Case &quot;isString&quot;:	result = isString(	a0)
+
 		Case &quot;id&quot;: 			result = a0
 		Case &quot;sndArg&quot;:		result = sndArg(	a0)
 		Case &quot;asc&quot;:			result = Asc(		a0)
 		Case &quot;chr&quot;:			result = Chr(		a0)
 		Case &quot;ucase&quot;:		result = UCase(		a0)
 		Case &quot;lcase&quot;:		result = LCase(		a0)
-		Case &quot;isString&quot;:	result = isString(	a0)
-		Case &quot;isEmpty&quot;:		result = isEmpty(	a0)
 		Case &quot;toString&quot;:	result = toString(	a0)
 		Case &quot;readHex&quot;:		result = readHex(	a0)
 		Case &quot;isList&quot;:		result = isList(	a0)

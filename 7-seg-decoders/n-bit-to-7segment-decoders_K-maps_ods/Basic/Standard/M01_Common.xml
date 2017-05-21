@@ -10,6 +10,10 @@ Type TTest_Tyname
 	tyname As String
 End Type
 
+Type TTest_Ctor
+	ctor As Variant
+End Type
+
 Type TTest_Foo
 	bar As Integer
 End Type
@@ -37,24 +41,61 @@ Function show(a As Variant, Optional b As Variant)
 End Function
 
 Function typeOf(x As Variant)
-	Dim result As String
-	result = TypeName(x)
-	If result = &quot;Object&quot; Then
-		result = _typeOf(x) &apos; DONT access fields in here!
+	Dim out As String
+	out = TypeName(x)
+	If out = &quot;Object&quot; Then
+		out = _typeOf(x) &apos; DONT access fields in here!
 	ElseIf IsArray(x) Then
-		result = &quot;Array&quot;
+		out = &quot;Array&quot;
 	End If
-	typeOf = result
+	typeOf = out
 End Function
 
 Function _typeOf(o As Object)
-	Dim result As String
-	result = &quot;Object&quot;
-	On Local Error Goto ErrorHandler
-	result = result &amp; &quot;/&quot; &amp; _tyname(o)
-ErrorHandler:
-	_typeOf = result
+	Dim out As String
+	out = &quot;Object&quot;
+	On Local Error Goto _typeOf_end
+	out = out &amp; &quot;/&quot; &amp; _tyname(o)
+_typeOf_end:
+	_typeOf = out
 End Function
+
+Function _tyname(o As Object)
+	_tyname = o.tyname
+End Function
+
+Function ctorOf(Optional x As Variant)
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.ctorOf : End If
+	Dim out As Variant
+	If isMissing(x) Then : out = oFn
+	Else
+		out = Empty
+		If isObject(x) Then
+			If Not(isNull(x)) Then
+				On Local Error Goto ctorOf_end
+				out = _ctor(x) &apos; DONT access fields in here!
+				If Not(isFn(out)) Then
+					On Local Error Goto ctorOf_error
+					out.provoke_an_error
+				End If
+			End If
+		End If
+	End If
+ctorOf_end:
+	ctorOf = out
+	Exit Function
+ctorOf_error:
+	croak(&quot;ctorOf: object with invalid .ctor :: &quot; &amp; typeOf(out) &amp; NL &amp; toString(out))
+End Function
+
+Function _ctor(o As Object)
+	Dim out As Variant
+	On Local Error Goto _ctor_end
+	out = o.ctor
+_ctor_end:
+	_ctor = out
+End Function
+
 
 Function isString(Optional x As Variant)
 	If isMissing(x) Then
@@ -62,10 +103,6 @@ Function isString(Optional x As Variant)
 	Else
 		isString = (typeOf(x) = typeOf(&quot;&quot;))
 	End If
-End Function
-
-Function _tyname(o As Object)
-	_tyname = o.tyname
 End Function
 
 Sub croak(msg As String)
@@ -378,9 +415,11 @@ End Function
 
 Function test_Common()
 	testLevel = 0
+	test_isObject()
 	test_passing_pointers()
 	test_concat()
 	test_typeOf()
+	test_ctorOf()
 	test_isString()
 	test_toString()
 	test_id()
@@ -395,6 +434,27 @@ Function test_Common()
 	test_readHex()
 End Function
 
+Function test_isObject()
+	Dim o As Object
+
+	assertEqual(isObject(Nothing),	True).x
+
+	assertEqual(isObject(Empty),	False).x
+	assertEqual(isObject(True),		False).x
+	assertEqual(isObject(False),	False).x
+	assertEqual(isObject(&quot;&quot;),		False).x
+	assertEqual(isObject(&quot;foobar&quot;),	False).x
+	assertEqual(isObject( 0),		False).x
+	assertEqual(isObject( 1),		False).x
+	assertEqual(isObject(-1),		False).x
+	assertEqual(isObject(3.1415),	False).x
+	assertEqual(isObject(Array()),	False).x
+
+	o = New TTest_Foo
+	assertEqual(isObject(o), True).x
+	o.bar = 4711
+	assertEqual(isObject(o), True).x
+End Function
 
 Function test_passPtrByVal_Object(ByVal o As Object)
 	o.bar = o.bar + 1
@@ -501,23 +561,6 @@ Function test_passing_pointers()
 	assertEqual(p2.bar, 11).x
 End Function
 	
-Function test_concat()
-	assertEqual(concat(&quot;&quot;, &quot;&quot;), &quot;&quot;).x
-	assertEqual(concat(&quot;a&quot;, &quot;&quot;), &quot;a&quot;).x
-	assertEqual(concat(&quot;a&quot;, &quot;b&quot;), &quot;ab&quot;).x
-	assertEqual(concat(&quot;a&quot;, &quot;bc&quot;), &quot;abc&quot;).x
-	assertEqual(concat(&quot;ab&quot;, &quot;c&quot;), &quot;abc&quot;).x
-	
-	assertEqual(arity(Fn.concat), 2).x	&apos; from Fn object
-	assertEqual(arity(concat), 	  2).x	&apos; from 0-arg call
-
-	assertEqual(apply(concat, &quot;&quot;, &quot;&quot;), &quot;&quot;).x
-	assertEqual(apply(concat, &quot;a&quot;, &quot;&quot;), &quot;a&quot;).x
-	assertEqual(apply(concat, &quot;a&quot;, &quot;b&quot;), &quot;ab&quot;).x
-	assertEqual(apply(concat, &quot;a&quot;, &quot;bc&quot;), &quot;abc&quot;).x
-	assertEqual(apply(concat, &quot;ab&quot;, &quot;c&quot;), &quot;abc&quot;).x
-End Function
-
 Function test_typeOf()
 	assertEqual(typeOf(0), &quot;Integer&quot;).x
 	assertEqual(typeOf(1), &quot;Integer&quot;).x
@@ -540,6 +583,62 @@ Function test_typeOf()
 	t2.tyname = &quot;foobar&quot;
 	assertEqual(typeOf(t2), &quot;Object/foobar&quot;).x
 End Function
+	
+Function test_ctorOf()
+	assertEqual(ctorOf(Nothing),	Empty).x
+	assertEqual(ctorOf(Empty),		Empty).x
+	assertEqual(ctorOf(True),		Empty).x
+	assertEqual(ctorOf(False),		Empty).x
+	assertEqual(ctorOf(&quot;&quot;),			Empty).x
+	assertEqual(ctorOf(&quot;blah&quot;),		Empty).x
+	assertEqual(ctorOf( 0),			Empty).x
+	assertEqual(ctorOf( 1),			Empty).x
+	assertEqual(ctorOf(-1),			Empty).x
+	assertEqual(ctorOf(3.1415),		Empty).x
+	
+	Dim o As Object, act As Variant
+	o = New TTest_Ctor
+	o.ctor = Empty		: assertThrows(ctorOf, Array(o)).x
+	o.ctor = Nothing	: assertThrows(ctorOf, Array(o)).x
+	o.ctor = True		: assertThrows(ctorOf, Array(o)).x
+	o.ctor = False		: assertThrows(ctorOf, Array(o)).x
+	o.ctor = &quot;&quot;			: assertThrows(ctorOf, Array(o)).x
+	o.ctor = &quot;foo&quot;		: assertThrows(ctorOf, Array(o)).x
+	o.ctor =  0			: assertThrows(ctorOf, Array(o)).x
+	o.ctor =  1			: assertThrows(ctorOf, Array(o)).x
+	o.ctor = -1			: assertThrows(ctorOf, Array(o)).x
+	o.ctor = 3.1415		: assertThrows(ctorOf, Array(o)).x
+	o.ctor = Array()	: assertThrows(ctorOf, Array(o)).x
+	
+	o.ctor = New TTest_TyName
+	assertThrows(ctorOf, Array(o)).x
+	o.ctor.tyname = &quot;foo&quot;
+	assertThrows(ctorOf, Array(o)).x
+	
+	o.ctor = Fn.cons
+	act = ctorOf(o)
+	assertEqual(isFn(act), True).x
+	assertEqual(getFnName(act), getFnName(Fn.cons)).x
+	assertEqual(arity(act), arity(Fn.cons)).x
+End Function
+
+Function test_concat()
+	assertEqual(concat(&quot;&quot;, &quot;&quot;), &quot;&quot;).x
+	assertEqual(concat(&quot;a&quot;, &quot;&quot;), &quot;a&quot;).x
+	assertEqual(concat(&quot;a&quot;, &quot;b&quot;), &quot;ab&quot;).x
+	assertEqual(concat(&quot;a&quot;, &quot;bc&quot;), &quot;abc&quot;).x
+	assertEqual(concat(&quot;ab&quot;, &quot;c&quot;), &quot;abc&quot;).x
+	
+	assertEqual(arity(Fn.concat), 2).x	&apos; from Fn object
+	assertEqual(arity(concat), 	  2).x	&apos; from 0-arg call
+
+	assertEqual(apply(concat, &quot;&quot;, &quot;&quot;), &quot;&quot;).x
+	assertEqual(apply(concat, &quot;a&quot;, &quot;&quot;), &quot;a&quot;).x
+	assertEqual(apply(concat, &quot;a&quot;, &quot;b&quot;), &quot;ab&quot;).x
+	assertEqual(apply(concat, &quot;a&quot;, &quot;bc&quot;), &quot;abc&quot;).x
+	assertEqual(apply(concat, &quot;ab&quot;, &quot;c&quot;), &quot;abc&quot;).x
+End Function
+
 
 Function test_isString()
 	assertEqual(isString(&quot;&quot;),                  True).x
