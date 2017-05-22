@@ -5,34 +5,124 @@ Option Explicit
 
 
 Type TypeCtor
-	_name	As String	&apos; cannot use just &quot;name&quot;, that&apos;s a BASIC directive
-	arity	As Integer
+	_name	  As String	 &apos; cannot use just &quot;name&quot;, that&apos;s a BASIC directive
+	arity	  As Integer &apos; the nr of typeArgs
+	dataCtors As Array
 End Type
 
 Type DataType
 	str		 As String	&apos; debugger shows that in inspector
-	arity	 As Integer
 	typeArgs As Array
 	typeCtor As TypeCtor
 End Type
 
-
 Type DataCtor
+	tag		 As String
 	str		 As String	&apos; debugger shows that in inspector
 	_name	 As String	&apos; see TypeCtor._name
+	typeCtor As TypeCtor
+	argTypes As Array
 	arity    As Integer
-	dataType As DataType
 End Type
 
+Type DataValue
+	str		 As String	&apos; debugger shows that in inspector
+	ctor	 As DataCtor
+	dataType As DataType
+	fields   As Array
+End Type
 
 Sub Main
 	[test_Type======================================]
 End Sub
 
-Function _newTypeCtor(name As String, arity As Integer) As TypeCtor
+
+Function _newDataCtor( _
+	typeCtor As TypeCtor, _
+	name 	 As String, _
+	argTypes As Array _
+)
+	Dim out As New DataCtor
+	out.tag = &quot;DataCtor&quot;
+	out._name = name
+	out.typeCtor = typeCtor
+	Dim lo As Integer : lo = LBound(argTypes)
+	Dim hi As Integer : hi = UBound(argTypes)
+	Dim n  As Integer : n = hi - lo + 1
+	out.arity = n
+
+	Dim typeStr As String, i As Integer
+	typeStr = &quot;&quot;
+	If n = 0 Then
+		out.argTypes = Array()
+	Else
+		Dim ats(0 To n - 1)
+		Dim t As Variant
+		Dim k As Integer : k = 0
+		For i = lo To hi
+			t = argTypes(i)
+			If isInteger(t) Then
+				If (t &lt; 0) Or (t &gt;= typeCtor.arity) Then
+					croak(&quot;_newDataCtor &quot; &amp; name &amp; &quot;: &quot; _
+						&amp; &quot;invalid type var index &quot; &amp; t _
+						&amp; &quot; - expected [0..&quot; &amp; (typeCtor.arity - 1) &amp; &quot;]&quot;_
+					)
+				End If
+				typeStr = typeStr &amp; &quot;a&quot; &amp; t &amp; &quot; -&gt; &quot;
+			ElseIf isType(t) Then
+				If isArrowType(t) Then
+					typeStr = typeStr &amp; &quot;(&quot; &amp; t.str &amp; &quot;)&quot;
+				Else
+					typeStr = typeStr &amp; t.str
+				End If
+				typeStr = typeStr &amp; &quot; -&gt; &quot;
+			Else
+				croak(&quot;_newDataCtor &quot; &amp; name &amp; &quot;: &quot; _
+					&amp; &quot;invalid type arg &quot; &amp; toString(t) _
+				)
+			End If
+			ats(k) = t
+			k = k + 1
+		Next i
+	End If
+	
+	typeStr = typeStr &amp; typeCtor._name
+	For i = 0 To typeCtor.arity - 1
+		typeStr = typeStr &amp; &quot; a&quot; &amp; i
+	Next i
+
+	out.str = typeCtor._name &amp; &quot;.&quot; &amp; name &amp; &quot; :: &quot; &amp; typeStr
+	_newDataCtor = out
+End Function
+
+Function _newTypeCtor( _
+	name As String, _
+	arity As Integer, _
+	dataCtorDefs As Array _
+) As TypeCtor
 	Dim out As New TypeCtor
 	out._name = name
 	out.arity = arity
+	Dim lo As Integer : lo = LBound(dataCtorDefs)
+	Dim hi As Integer : hi = UBound(dataCtorDefs)
+	Dim n  As Integer : n = hi - lo + 1
+	If n = 0 Then
+		out.dataCtors = Array()
+	Else
+		n = CInt(n / 2)
+		Dim dataCtors(0 To n - 1)
+		Dim c As Object
+		Dim i As Integer : i = lo
+		Dim k As Integer : k = 0
+		Dim argTypes &apos; the types of the ctors arguments - NOT typeArgs!
+		Do Until i &gt; hi
+			c = _newDataCtor(out, dataCtorDefs(i), dataCtorDefs(i + 1))
+			dataCtors(k) = c
+			i = i + 2
+			k = k + 1
+		Loop
+		out.dataCtors = dataCtors
+	End If
 	_newTypeCtor = out
 End Function
 
@@ -45,12 +135,8 @@ End Function
 Function isDataType(x As Variant)
 	Dim out
 	out = False
-	If isObject(x) Then
-		If Not(isNull(x)) Then
-			On Local Error Goto isDataType_end
-			out = _isDataType(x) &apos; DON&apos;T .-access x here!! (simpler this way anyhow)
-		End If
-	End If
+	On Local Error Goto isDataType_end
+	out = _isDataType(x) &apos; DON&apos;T .-access x here!! (simpler this way anyhow)
 isDataType_end:
 	isDataType = out
 End Function
@@ -64,13 +150,20 @@ Function isType(t As Variant)
 	isType = isDataType(t) Or False
 End Function
 
-&apos; that&apos;s how to make a DataType:
+Function isArrowType(x As Variant)
+	Dim out
+	out = False
+	&apos; TODO: implent isArrowType
+	isArrowType = out
+End Function
+
+&apos; that&apos;s how to make a DataType: apply a typeCtor to some types
 Function applyTC(tc As TypeCtor, typeArgs As Array) As DataType
 	Dim out, n As Integer, k As Integer
 	k = LBound(typeArgs)
 	n = UBound(typeArgs) - k + 1
 	If (n &lt;&gt; tc.arity) Then
-		croak(&quot;applyTC: expected &quot; &amp; tc.arity _
+		croak(&quot;applyTC &quot; &amp; tc._name &amp; &quot;: expected &quot; &amp; tc.arity _
 			&amp; &quot; type arg&quot; &amp; IIf(tc.arity = 1, &quot;&quot;, &quot;s&quot;) &amp; &quot; but got &quot; &amp; n _
 			&amp; &quot;: &quot; &amp; NL &amp; toString(typeArgs) _
 		)
@@ -146,18 +239,20 @@ DataType_equ_end:
 	DataType_equ = out
 End Function
 
-
-Function newDataCtor( _
-	dataType As DataType, _
-	name As String, _
-	arity As Integer _
-)
-	Dim out As New DataCtor
-	out._name = name
-	out.dataType = dataType
-	out.arity = arity
-	out.str = name &amp; &quot; :: &quot; &amp; &quot;a -&gt; b&quot;
-	newDataCtor = out
+Function applyDC(ctor As DataCtor, args As Array)
+	Dim out
+	Dim n As Integer, k As Integer
+	n = UBound(args) - LBound(args) + 1
+	k = ctor.arity
+	If n &lt;&gt; k Then
+		croak(&quot;applyDC &quot; &amp; ctor.name &amp; &quot;: expected &quot; &amp; k &amp; &quot; args &quot; _
+			&amp; &quot; but got &quot; &amp; n
+	End If
+	out = New DataValue
+	out.ctor = ctor
+	out.fields = args
+		
+	applyDC = out
 End Function
 
 
@@ -223,15 +318,25 @@ Function isString(Optional x As Variant)
 	End If
 End Function
 
+Function isInteger(Optional x As Variant)
+	Dim out As Variant
+	If isMissing(x) Then : out = Fn.isInteger
+	Else 				 : out = (typeOf(x) = typeOf(0))
+	End If
+	isInteger = out
+End Function
+
 
 Function [test_Type======================================]
 	test_Type_typeOf()
 	test_Type_isObject()
 	test_Type_isString()
+	test_Type_isInteger()
 	
 	test_Type_isDataType()
 	test_Type_TypeCtor()
 	test_Type_DataCtor()
+	test_Type_DataValue()
 	test_Type_ctorOf()
 End Function
 
@@ -361,9 +466,6 @@ Function test_Type_isString()
 	assertEqual(isString(Array()),            False).x
 	assertEqual(isString(Array(42)),          False).x
 	assertEqual(isString(Array(42)),          False).x
-	assertEqual(isString(&quot;0&quot;),                 True).x
-	assertEqual(isString(&quot;1&quot;),                 True).x
-	assertEqual(isString(&quot;3.14&quot;),              True).x
 	
 	assertEqual(arity(Fn.isString),	1).x &apos; from Fn object
 	assertEqual(arity(isString),	1).x &apos; from 0-arg call
@@ -381,9 +483,37 @@ Function test_Type_isString()
 	assertEqual(apply(isString, Array()),   False).x
 	assertEqual(apply(isString, Array(42)), False).x
 	assertEqual(apply(isString, Array(42)), False).x
-	assertEqual(apply(isString, &quot;0&quot;),        True).x
-	assertEqual(apply(isString, &quot;1&quot;),        True).x
-	assertEqual(apply(isString, &quot;3.14&quot;),     True).x
+End Function
+
+&apos; isInteger: implemented above
+Function test_Type_isInteger()
+	assertEqual(isInteger(&quot;&quot;),                 False).x
+	assertEqual(isInteger(&quot;a&quot;),                False).x
+	assertEqual(isInteger(&quot;foobar&quot;),           False).x
+	assertEqual(isInteger(Nothing),            False).x
+	assertEqual(isInteger(Empty),              False).x
+	assertEqual(isInteger(True),               False).x
+	assertEqual(isInteger(False),              False).x
+	assertEqual(isInteger( 0),                  True).x
+	assertEqual(isInteger( 1),                  True).x
+	assertEqual(isInteger(-1),                  True).x
+	assertEqual(isInteger( 32766),              True).x &apos;0x7FFE
+	assertEqual(isInteger( 32767),              True).x &apos;0x7FFF
+	assertEqual(isInteger( 32768),             False).x &apos;0x8000 (!)
+	assertEqual(isInteger( 65534),             False).x &apos;0xFFFE
+	assertEqual(isInteger( 65535),             False).x &apos;0xFFFF
+	assertEqual(isInteger( 65536),             False).x &apos;0x80000
+	assertEqual(isInteger(-32766),              True).x &apos;0x8002
+	assertEqual(isInteger(-32767),              True).x &apos;0x8001
+	assertEqual(isInteger(-32768),              True).x &apos;0x8000
+	assertEqual(isInteger(-32769),             False).x &apos;0x17FFF (!)
+	assertEqual(isInteger(-65534),             False).x &apos;0xFFFE
+	assertEqual(isInteger(-65535),             False).x &apos;0xFFFF
+	assertEqual(isInteger(-65536),             False).x &apos;0x80000
+	assertEqual(isInteger(3.14),               False).x
+	assertEqual(isInteger(Array()),            False).x
+	assertEqual(isInteger(Array(42)),          False).x
+	assertEqual(isInteger(Array(42)),          False).x
 End Function
 
 Function test_Type_isDataType()
@@ -402,9 +532,6 @@ Function test_Type_isDataType()
 	assertEqual(isDataType(Array()),            False).x
 	assertEqual(isDataType(Array(42)),          False).x
 	assertEqual(isDataType(Array(42)),          False).x
-	assertEqual(isDataType(&quot;0&quot;),                False).x
-	assertEqual(isDataType(&quot;1&quot;),                False).x
-	assertEqual(isDataType(&quot;3.14&quot;),             False).x
 	
 	Dim o As Object
 	o = New TTest_Foo
@@ -413,13 +540,13 @@ End Function
 
 Function test_Type_TypeCtor()
 	Dim tc0, tc1
-	tc0 = _newTypeCtor(&quot;TC0&quot;, 0)
+	tc0 = _newTypeCtor(&quot;TC0&quot;, 0, Array())
 	assertEqual(isDataType(tc0),           False).x
 	assertEqual(tc0._name, &quot;TC0&quot;).x
 	assertEqual(tc0.arity, 	  0 ).x
 	assertEqual(TypeCtor_equ(tc0, tc0), 	True).x
 	
-	tc1 = _newTypeCtor(&quot;TC1&quot;, 1)
+	tc1 = _newTypeCtor(&quot;TC1&quot;, 1, Array())
 	assertEqual(tc1._name, &quot;TC1&quot;).x
 	assertEqual(tc1.arity, 	  1 ).x
 	assertEqual(TypeCtor_equ(tc1, tc1), 	True).x
@@ -464,12 +591,124 @@ End Function
 Function test_Type_DataCtor()
 	Dim tc
 	Dim c1, c2
-	Dim t1, t2
-	tc = _newTypeCtor(&quot;TC&quot;, 0)
-	t1 = applyTC(tc, Array())
+	Dim dtUnit, dtBool, dtMaybeUnit, dtMaybeBool
 	
-	c1 = newDataCtor(t1, &quot;Foo_C1&quot;, 0)
-	c2 = newDataCtor(t1, &quot;Foo_C2&quot;, 1)
+	&apos; no type args, only 1 zero-arg data ctor ~ Unit
+	tc = _newTypeCtor(&quot;TC_Unit&quot;, 0, _
+		Array( _
+			&quot;_Unit&quot;, Array() _
+		) _
+	)
+	c1 = tc.dataCtors(0)
+	assertEqual(c1._name, &quot;_Unit&quot;).x
+	assertEqual(c1.arity,       0).x
+	assertEqual(TypeCtor_equ(c1.typeCtor, tc), True).x
+	dtUnit = applyTC(tc, Array())
+	
+	&apos; no type args, 2 zero-arg data ctors ~ Bool
+	tc = _newTypeCtor(&quot;TC_Bool&quot;, 0, _
+		Array( _
+			&quot;_False&quot;, Array(), _
+			&quot;_True&quot;,  Array() _
+		) _
+	)
+	c1 = tc.dataCtors(0)
+	assertEqual(c1._name, &quot;_False&quot;).x
+	assertEqual(c1.arity,        0).x
+	assertEqual(TypeCtor_equ(c1.typeCtor, tc), True).x
+	c2 = tc.dataCtors(1)
+	assertEqual(c2._name, &quot;_True&quot;).x
+	assertEqual(c2.arity,       0).x
+	assertEqual(TypeCtor_equ(c2.typeCtor, tc), True).x
+	dtBool = applyTC(tc, Array())
+	
+	&apos; one type args, 2 data ctors ~ Maybe
+	tc = _newTypeCtor(&quot;TC_Maybe&quot;, 1, _
+		Array( _
+			&quot;_None&quot;, Array(), _
+			&quot;_Some&quot;, Array(0) _
+		) _
+	)
+	c1 = tc.dataCtors(0)
+	assertEqual(c1._name, &quot;_None&quot;).x
+	assertEqual(c1.arity,      0).x
+	assertEqual(TypeCtor_equ(c1.typeCtor, tc), True).x
+	c2 = tc.dataCtors(1)
+	assertEqual(c2._name, &quot;_Some&quot;).x
+	assertEqual(c2.arity,       1).x
+	assertEqual(TypeCtor_equ(c2.typeCtor, tc), True).x
+
+	&apos;show(c1.str, c2.str)
+
+	dtMaybeUnit = applyTC(tc, Array(dtUnit))
+	dtMaybeBool = applyTC(tc, Array(dtBool))
+	
+	&apos;show(dtMaybeUnit.str)
+
+	&apos; dataCtors may only refer to typeVars with index &lt; typeCtor.arity:
+	&apos;assertThrows(_newTypeCtor(&quot;TC_Foo&quot;, 0, Array(&quot;_Bar&quot;, Array(0)))).x
+	&apos;assertThrows(_newTypeCtor(&quot;TC_Foo&quot;, 1, Array(&quot;_Bar&quot;, Array(1)))).x
+		
+	&apos; two type args, one 2-arg data ctors ~ Pair
+	tc = _newTypeCtor(&quot;TC_Pair&quot;, 2, _
+		Array( _
+			&quot;_Pair&quot;, Array(0, 1) _
+		) _
+	)
+	c1 = tc.dataCtors(0)
+	assertEqual(c1._name, &quot;_Pair&quot;).x
+	assertEqual(c1.arity,       2).x
+	assertEqual(TypeCtor_equ(c1.typeCtor, tc), True).x
+
+	&apos; two type args, two 1-arg data ctors ~ Either
+	tc = _newTypeCtor(&quot;TC_Either&quot;, 2, _
+		Array( _
+			&quot;_Left&quot;,  Array(0), _
+			&quot;_Right&quot;, Array(1) _
+		) _
+	)
+	c1 = tc.dataCtors(0)
+	assertEqual(c1._name, &quot;_Left&quot;).x
+	assertEqual(c1.arity,       1).x
+	assertEqual(TypeCtor_equ(c1.typeCtor, tc), True).x
+	c2 = tc.dataCtors(1)
+	assertEqual(c2._name, &quot;_Right&quot;).x
+	assertEqual(c2.arity,       1).x
+	assertEqual(TypeCtor_equ(c2.typeCtor, tc), True).x
+	
+	
+	&apos;-- data ctors with non-var argument types:
+
+	&apos; one type arg, 1 data ctors ~ package together something and a Bool
+	tc = _newTypeCtor(&quot;TC_Foo&quot;, 1, _
+		Array( _
+			&quot;_Bar&quot;, Array(0, dtMaybeBool) _
+		) _
+	)
+	c1 = tc.dataCtors(0)
+	assertEqual(c1._name, &quot;_Bar&quot;).x
+	assertEqual(c1.arity,      2).x
+	assertEqual(TypeCtor_equ(c1.typeCtor, tc), True).x
+	
+	&apos;show(c1.str)
+
+End Function
+
+
+Function test_Type_DataValue()
+	Dim tc, dt
+	Dim c1, c2
+	Dim v1, v2
+	
+	tc = _newTypeCtor(&quot;TC_Unit&quot;, 0, Array( _
+		&quot;_Unit&quot;, Array() _
+	))
+	dt = applyTC(tc, Array())
+	c1 = tc.dataCtors(0)
+	assertEqual(c1.arity, 0).x
+	v1 = applyDC(c1, Array())
+	show(v1.ctor.str, c1.str)
+	assertEqual(DataType_equ(v1.dataType, dt), True).x
 End Function
 
 
