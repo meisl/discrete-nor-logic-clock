@@ -4,11 +4,161 @@
 Option Explicit
 
 
+Type TypeCtor
+	_name	As String	&apos; cannot use just &quot;name&quot;, that&apos;s a BASIC directive
+	arity	As Integer
+End Type
+
+Type DataType
+	str		 As String	&apos; debugger shows that in inspector
+	arity	 As Integer
+	typeArgs As Array
+	typeCtor As TypeCtor
+End Type
+
+
+Type DataCtor
+	str		 As String	&apos; debugger shows that in inspector
+	_name	 As String	&apos; see TypeCtor._name
+	arity    As Integer
+	dataType As DataType
+End Type
+
 
 Sub Main
 	[test_Type======================================]
 End Sub
 
+Function _newTypeCtor(name As String, arity As Integer) As TypeCtor
+	Dim out As New TypeCtor
+	out._name = name
+	out.arity = arity
+	_newTypeCtor = out
+End Function
+
+Function TypeCtor_equ(a As TypeCtor, b As TypeCtor)
+	Dim out
+	out = (a._name = b._name)
+	TypeCtor_equ = out
+End Function
+
+Function isDataType(x As Variant)
+	Dim out
+	out = False
+	If isObject(x) Then
+		If Not(isNull(x)) Then
+			On Local Error Goto isDataType_end
+			out = _isDataType(x) &apos; DON&apos;T .-access x here!! (simpler this way anyhow)
+		End If
+	End If
+isDataType_end:
+	isDataType = out
+End Function
+
+&apos; provokes an error if x isn&apos;t a DataType
+Function _isDataType(x As DataType) As Boolean
+	_isDataType = Not(isNull(x.typeCtor)) And isArray(x.typeArgs)
+End Function
+
+Function isType(t As Variant)
+	isType = isDataType(t) Or False
+End Function
+
+&apos; that&apos;s how to make a DataType:
+Function applyTC(tc As TypeCtor, typeArgs As Array) As DataType
+	Dim out, n As Integer, k As Integer
+	k = LBound(typeArgs)
+	n = UBound(typeArgs) - k + 1
+	If (n &lt;&gt; tc.arity) Then
+		croak(&quot;applyTC: expected &quot; &amp; tc.arity _
+			&amp; &quot; type arg&quot; &amp; IIf(tc.arity = 1, &quot;&quot;, &quot;s&quot;) &amp; &quot; but got &quot; &amp; n _
+			&amp; &quot;: &quot; &amp; NL &amp; toString(typeArgs) _
+		)
+	End If
+	out = New DataType
+	out.typeCtor = tc
+	Dim str As String
+	str = tc._name
+	If n = 0 Then
+		out.typeArgs = Array()
+	Else
+		Dim tas(0 To n - 1)
+		Dim a
+		Dim i As Integer
+		For i = 0 To n - 1
+			a = typeArgs(k)
+			If isType(a) Then
+				If isDataType(a) Then
+					If a.typeCtor.arity = 0 Then
+						str = str &amp; &quot; &quot; &amp; a.str
+					Else
+						str = str &amp; &quot; (&quot; &amp; a.str &amp; &quot;)&quot;
+					End If
+				&apos;ElseIf isBaseType(a) Or isTypeVar(a) Then
+				&apos;	str = str &amp; &quot; &quot; a._name
+				End If
+			Else
+				croak(&quot;applyTc: invalid type arg &quot; _
+					&amp; &quot;- expected a Type, not &quot; &amp; typeOf(a) _
+					&amp; &quot;: &quot; &amp; NL &amp; toString(a) _
+				)
+			End If
+			tas(i) = a
+			k = k + 1
+		Next i
+		out.typeArgs = tas
+	End If
+	out.str = str
+	applyTC = out
+End Function
+
+
+Function Type_equ(a As Object, b As Object)
+	Dim out
+	out = False
+	If isType(a) And isType(b) Then
+		If isDataType(a) And isDataType(b) Then
+			out = DataType_equ(a, b)
+		&apos;ElseIf ... &apos;TODO: Type_equ for other Types
+		End If
+	Else
+		croak(&quot;Type_equ: cannot compare &quot; &amp; typeOf(a) _
+			&amp; &quot; and &quot; &amp; typeOf(b))
+	End If
+	Type_equ = out
+End Function
+
+Function DataType_equ(a As DataType, b As DataType)
+	Dim out
+	out = False
+	If TypeCtor_equ(a.typeCtor, b.typeCtor) Then
+		Dim aArgs : aArgs = a.typeArgs
+		Dim bArgs : bArgs = b.typeArgs
+		Dim i As Integer
+		For i = 0 To UBound(aArgs)
+			If Not(Type_equ(aArgs(i), bArgs(i))) Then
+				Goto DataType_equ_end
+			End If
+		Next i
+		out = True
+	End If
+DataType_equ_end:
+	DataType_equ = out
+End Function
+
+
+Function newDataCtor( _
+	dataType As DataType, _
+	name As String, _
+	arity As Integer _
+)
+	Dim out As New DataCtor
+	out._name = name
+	out.dataType = dataType
+	out.arity = arity
+	out.str = name &amp; &quot; :: &quot; &amp; &quot;a -&gt; b&quot;
+	newDataCtor = out
+End Function
 
 
 Function typeOf(x As Variant)
@@ -75,12 +225,17 @@ End Function
 
 
 Function [test_Type======================================]
-	test_typeOf()
-	test_ctorOf()
-	test_isString()
+	test_Type_typeOf()
+	test_Type_isObject()
+	test_Type_isString()
+	
+	test_Type_isDataType()
+	test_Type_TypeCtor()
+	test_Type_DataCtor()
+	test_Type_ctorOf()
 End Function
 
-	
+
 Type TTest_NoTyname
 End Type
 
@@ -88,12 +243,16 @@ Type TTest_Tyname
 	tyname As String
 End Type
 
+Type TTest_Foo
+	bar As Integer
+End Type
+
 Type TTest_Ctor
 	ctor As Variant
 End Type
 
 
-Function test_typeOf()
+Function test_Type_typeOf()
 	assertEqual(typeOf(0), &quot;Integer&quot;).x
 	assertEqual(typeOf(1), &quot;Integer&quot;).x
 	assertEqual(typeOf(-42), &quot;Integer&quot;).x
@@ -117,7 +276,7 @@ Function test_typeOf()
 	assertEqual(typeOf(t2), &quot;Object/foobar&quot;).x
 End Function
 	
-Function test_ctorOf()
+Function test_Type_ctorOf()
 	assertEqual(ctorOf(Nothing),	Empty).x
 	assertEqual(ctorOf(Empty),		Empty).x
 	assertEqual(ctorOf(True),		Empty).x
@@ -165,7 +324,7 @@ End Function
 
 &apos; isObject is a BASIC function:
 &apos; make sure we know exactly what it does
-Function test_isObject()
+Function test_Type_isObject()
 	Dim o As Object
 
 	assertEqual(isObject(Nothing),	True).x
@@ -188,7 +347,7 @@ Function test_isObject()
 End Function
 
 &apos; isString: implemented above
-Function test_isString()
+Function test_Type_isString()
 	assertEqual(isString(&quot;&quot;),                  True).x
 	assertEqual(isString(&quot;a&quot;),                 True).x
 	assertEqual(isString(&quot;foobar&quot;),            True).x
@@ -226,5 +385,92 @@ Function test_isString()
 	assertEqual(apply(isString, &quot;1&quot;),        True).x
 	assertEqual(apply(isString, &quot;3.14&quot;),     True).x
 End Function
+
+Function test_Type_isDataType()
+	&apos; positive tests below in test_TypeCtor
+	&apos; main thing to prove is that it doesn&apos;t throw
+	assertEqual(isDataType(Nothing),            False).x
+	assertEqual(isDataType(Empty),              False).x
+	assertEqual(isDataType(True),               False).x
+	assertEqual(isDataType(False),              False).x
+	assertEqual(isDataType(&quot;&quot;),                 False).x
+	assertEqual(isDataType(&quot;a&quot;),                False).x
+	assertEqual(isDataType(&quot;foobar&quot;),           False).x
+	assertEqual(isDataType(0),                  False).x
+	assertEqual(isDataType(1),                  False).x
+	assertEqual(isDataType(3.14),               False).x
+	assertEqual(isDataType(Array()),            False).x
+	assertEqual(isDataType(Array(42)),          False).x
+	assertEqual(isDataType(Array(42)),          False).x
+	assertEqual(isDataType(&quot;0&quot;),                False).x
+	assertEqual(isDataType(&quot;1&quot;),                False).x
+	assertEqual(isDataType(&quot;3.14&quot;),             False).x
+	
+	Dim o As Object
+	o = New TTest_Foo
+	assertEqual(isDataType(o), False).x
+End Function
+
+Function test_Type_TypeCtor()
+	Dim tc0, tc1
+	tc0 = _newTypeCtor(&quot;TC0&quot;, 0)
+	assertEqual(isDataType(tc0),           False).x
+	assertEqual(tc0._name, &quot;TC0&quot;).x
+	assertEqual(tc0.arity, 	  0 ).x
+	assertEqual(TypeCtor_equ(tc0, tc0), 	True).x
+	
+	tc1 = _newTypeCtor(&quot;TC1&quot;, 1)
+	assertEqual(tc1._name, &quot;TC1&quot;).x
+	assertEqual(tc1.arity, 	  1 ).x
+	assertEqual(TypeCtor_equ(tc1, tc1), 	True).x
+
+	assertEqual(TypeCtor_equ(tc0, tc1), 	False).x
+	assertEqual(TypeCtor_equ(tc1, tc0), 	False).x
+	
+	Dim dt0, args
+	args = Array()
+	dt0 = applyTC(tc0, args)
+	assertEqual(isDataType(dt0), True).x
+	assertEqual(LBound(dt0.typeArgs),  0).x
+	assertEqual(UBound(dt0.typeArgs), -1).x
+	assertEqual(TypeCtor_equ(tc0, dt0.typeCtor), True).x
+	
+	Redim args(0 To 1)
+	assertEqual(UBound(dt0.typeArgs), -1).x
+
+	Dim dt1
+	&apos;assertThrows(Fn.applyTC, Array(tc1, Array(tc1)) ).x
+	args = Array(dt0)
+	dt1 = applyTC(tc1, args)
+	assertEqual(LBound(dt1.typeArgs),  0).x
+	assertEqual(UBound(dt1.typeArgs),  0).x
+	assertEqual(TypeCtor_equ(tc1, dt1.typeCtor), True).x
+	assertEqual(DataType_equ(dt1.typeArgs(0), dt0), True).x
+
+	&apos; the typeArgs array cannot be changed via ByRef var:
+	args(0) = dt1
+	assertEqual(DataType_equ(dt1.typeArgs(0), dt0), True).x
+
+	Dim dt1b
+	args = Array(dt0)
+	dt1b = applyTC(tc1, args)
+	assertEqual(DataType_equ(dt1b, dt1), True).x
+	
+	args = Array(dt1) &apos; TC1 (TC1 TC0) is also a proper DataType
+	dt1b = applyTC(tc1, args) &apos; but different from TC1 TC0:
+	assertEqual(DataType_equ(dt1b, dt1), False).x
+End Function
+
+Function test_Type_DataCtor()
+	Dim tc
+	Dim c1, c2
+	Dim t1, t2
+	tc = _newTypeCtor(&quot;TC&quot;, 0)
+	t1 = applyTC(tc, Array())
+	
+	c1 = newDataCtor(t1, &quot;Foo_C1&quot;, 0)
+	c2 = newDataCtor(t1, &quot;Foo_C2&quot;, 1)
+End Function
+
 
 </script:module>

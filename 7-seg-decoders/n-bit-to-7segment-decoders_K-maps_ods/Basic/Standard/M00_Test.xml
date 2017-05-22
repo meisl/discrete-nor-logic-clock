@@ -161,7 +161,8 @@ Function assertEqual(actual As Variant, expected As Variant)
 	tx = typeOf(expected)
 	If (ta &lt;&gt; tx) Then
 		If ((ta = &quot;Long&quot;) And (tx = &quot;Integer&quot;))_
-		Or ((ta = &quot;Integer&quot;) And (tx = &quot;Long&quot;))Then
+		Or ((ta = &quot;Integer&quot;) And (tx = &quot;Long&quot;))_
+		Then
 			If (actual = expected) Then
 				Goto assertEqual_passed
 			End If
@@ -201,10 +202,15 @@ Function assertEqual(actual As Variant, expected As Variant)
 		Goto assertEqual_passed
 	End If
 assertEqual_failed:
-	assertEqual = mkFail(actual, expected, _
-			&quot;expected &quot; &amp; toString(actual) _
-				&amp; CR &amp; &quot;     to equal &quot; &amp; toString(expected) _
-		)
+	Dim msg As String
+	If ta &lt;&gt; tx Then
+		msg = &quot;expected &quot; &amp; ta &amp; &quot;: &quot; &amp; toString(actual) _
+				&amp; CR &amp; &quot;     to equal &quot; &amp; tx &amp; &quot;: &quot; &amp; toString(expected)
+	Else
+		msg = &quot;expected &quot; &amp; toString(actual) _
+				&amp; CR &amp; &quot;     to equal &quot; &amp; toString(expected)	
+	End If
+	assertEqual = mkFail(actual, expected, msg)
 	Exit Function
 assertEqual_passed:
 	assertEqual = mkPass()
