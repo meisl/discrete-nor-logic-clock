@@ -14,6 +14,7 @@
  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M01_Common.xml"/>
  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M00_Test.xml"/>
  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/script-lb.xml"/>
+ <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M12_Type.xml"/>
  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M06_AST.xml"/>
  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M08_PrsGrammar.xml"/>
  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="Basic/Standard/M07_PrsLogic.xml"/>

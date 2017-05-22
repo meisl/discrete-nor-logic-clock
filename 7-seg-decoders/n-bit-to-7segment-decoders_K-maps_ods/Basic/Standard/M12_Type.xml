@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="M12_Type" script:language="StarBasic">REM  *****  BASIC  *****
+Option Explicit
+
+
+
+Sub Main
+	[test_Type======================================]
+End Sub
+
+
+
+Function typeOf(x As Variant)
+	Dim out As String
+	out = TypeName(x)
+	If out = &quot;Object&quot; Then
+		out = _typeOf(x) &apos; DONT access fields in here!
+	ElseIf IsArray(x) Then
+		out = &quot;Array&quot;
+	End If
+	typeOf = out
+End Function
+
+Function _typeOf(o As Object)
+	Dim out As String
+	out = &quot;Object&quot;
+	On Local Error Goto _typeOf_end
+	out = out &amp; &quot;/&quot; &amp; _tyname(o)
+_typeOf_end:
+	_typeOf = out
+End Function
+
+Function _tyname(o As Object)
+	_tyname = o.tyname
+End Function
+
+Function ctorOf(Optional x As Variant)
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.ctorOf : End If
+	Dim out As Variant
+	If isMissing(x) Then : out = oFn
+	Else
+		out = Empty
+		If isObject(x) Then
+			If Not(isNull(x)) Then
+				On Local Error Goto ctorOf_end
+				out = _ctor(x) &apos; DONT access fields in here!
+				If Not(isFn(out)) Then
+					On Local Error Goto ctorOf_error
+					out.provoke_an_error
+				End If
+			End If
+		End If
+	End If
+ctorOf_end:
+	ctorOf = out
+	Exit Function
+ctorOf_error:
+	croak(&quot;ctorOf: object with invalid .ctor :: &quot; &amp; typeOf(out) &amp; NL &amp; toString(out))
+End Function
+
+Function _ctor(o As Object)
+	_ctor = o.ctor
+End Function
+
+
+
+Function isString(Optional x As Variant)
+	If isMissing(x) Then
+		isString = Fn.isString
+	Else
+		isString = (typeOf(x) = typeOf(&quot;&quot;))
+	End If
+End Function
+
+
+Function [test_Type======================================]
+	test_typeOf()
+	test_ctorOf()
+	test_isString()
+End Function
+
+	
+Type TTest_NoTyname
+End Type
+
+Type TTest_Tyname
+	tyname As String
+End Type
+
+Type TTest_Ctor
+	ctor As Variant
+End Type
+
+
+Function test_typeOf()
+	assertEqual(typeOf(0), &quot;Integer&quot;).x
+	assertEqual(typeOf(1), &quot;Integer&quot;).x
+	assertEqual(typeOf(-42), &quot;Integer&quot;).x
+	
+	assertEqual(typeOf(&quot;&quot;), &quot;String&quot;).x
+	assertEqual(typeOf(&quot;1&quot;), &quot;String&quot;).x
+	
+	assertEqual(typeOf(3.14), &quot;Double&quot;).x
+
+	assertEqual(typeOf(Array()), &quot;Array&quot;).x
+
+	assertEqual(typeOf(Empty), &quot;Empty&quot;).x
+	assertEqual(typeOf(Nothing), &quot;Object&quot;).x
+
+
+	Dim t1 As New TTest_NoTyName
+	assertEqual(typeOf(t1), &quot;Object&quot;).x
+
+	Dim t2 As New TTest_TyName
+	t2.tyname = &quot;foobar&quot;
+	assertEqual(typeOf(t2), &quot;Object/foobar&quot;).x
+End Function
+	
+Function test_ctorOf()
+	assertEqual(ctorOf(Nothing),	Empty).x
+	assertEqual(ctorOf(Empty),		Empty).x
+	assertEqual(ctorOf(True),		Empty).x
+	assertEqual(ctorOf(False),		Empty).x
+	assertEqual(ctorOf(&quot;&quot;),			Empty).x
+	assertEqual(ctorOf(&quot;blah&quot;),		Empty).x
+	assertEqual(ctorOf( 0),			Empty).x
+	assertEqual(ctorOf( 1),			Empty).x
+	assertEqual(ctorOf(-1),			Empty).x
+	assertEqual(ctorOf(3.1415),		Empty).x
+
+	Dim o As Object, act As Variant
+	
+	&apos; an object without member .ctor:
+	o = New TTest_TyName
+	assertEqual(ctorOf(o), Empty).x
+	o.tyname = &quot;foo&quot;
+	assertEqual(ctorOf(o), Empty).x
+
+	&apos; an object with a member .ctor:
+	o = New TTest_Ctor
+	o.ctor = Empty		: assertThrows(ctorOf, Array(o)).x
+	o.ctor = Nothing	: assertThrows(ctorOf, Array(o)).x
+	o.ctor = True		: assertThrows(ctorOf, Array(o)).x
+	o.ctor = False		: assertThrows(ctorOf, Array(o)).x
+	o.ctor = &quot;&quot;			: assertThrows(ctorOf, Array(o)).x
+	o.ctor = &quot;foo&quot;		: assertThrows(ctorOf, Array(o)).x
+	o.ctor =  0			: assertThrows(ctorOf, Array(o)).x
+	o.ctor =  1			: assertThrows(ctorOf, Array(o)).x
+	o.ctor = -1			: assertThrows(ctorOf, Array(o)).x
+	o.ctor = 3.1415		: assertThrows(ctorOf, Array(o)).x
+	o.ctor = Array()	: assertThrows(ctorOf, Array(o)).x
+	
+	o.ctor = New TTest_TyName
+	assertThrows(ctorOf, Array(o)).x
+	o.ctor.tyname = &quot;foo&quot;
+	assertThrows(ctorOf, Array(o)).x
+
+	o.ctor = Fn.cons
+	act = ctorOf(o)
+	assertEqual(isFn(act), True).x
+	assertEqual(getFnName(act), getFnName(Fn.cons)).x
+	assertEqual(arity(act), arity(Fn.cons)).x
+End Function
+
+&apos; isObject is a BASIC function:
+&apos; make sure we know exactly what it does
+Function test_isObject()
+	Dim o As Object
+
+	assertEqual(isObject(Nothing),	True).x
+
+	assertEqual(isObject(Empty),	False).x
+	assertEqual(isObject(True),		False).x
+	assertEqual(isObject(False),	False).x
+	assertEqual(isObject(&quot;&quot;),		False).x
+	assertEqual(isObject(&quot;foobar&quot;),	False).x
+	assertEqual(isObject( 0),		False).x
+	assertEqual(isObject( 1),		False).x
+	assertEqual(isObject(-1),		False).x
+	assertEqual(isObject(3.1415),	False).x
+	assertEqual(isObject(Array()),	False).x
+
+	o = New TTest_Foo
+	assertEqual(isObject(o), True).x
+	o.bar = 4711
+	assertEqual(isObject(o), True).x
+End Function
+
+&apos; isString: implemented above
+Function test_isString()
+	assertEqual(isString(&quot;&quot;),                  True).x
+	assertEqual(isString(&quot;a&quot;),                 True).x
+	assertEqual(isString(&quot;foobar&quot;),            True).x
+	assertEqual(isString(Nothing),            False).x
+	assertEqual(isString(Empty),              False).x
+	assertEqual(isString(True),               False).x
+	assertEqual(isString(False),              False).x
+	assertEqual(isString(0),                  False).x
+	assertEqual(isString(1),                  False).x
+	assertEqual(isString(3.14),               False).x
+	assertEqual(isString(Array()),            False).x
+	assertEqual(isString(Array(42)),          False).x
+	assertEqual(isString(Array(42)),          False).x
+	assertEqual(isString(&quot;0&quot;),                 True).x
+	assertEqual(isString(&quot;1&quot;),                 True).x
+	assertEqual(isString(&quot;3.14&quot;),              True).x
+	
+	assertEqual(arity(Fn.isString),	1).x &apos; from Fn object
+	assertEqual(arity(isString),	1).x &apos; from 0-arg call
+	
+	assertEqual(apply(isString, &quot;&quot;),         True).x
+	assertEqual(apply(isString, &quot;a&quot;),        True).x
+	assertEqual(apply(isString, &quot;foobar&quot;),   True).x
+	assertEqual(apply(isString, Nothing),   False).x
+	assertEqual(apply(isString, Empty),     False).x
+	assertEqual(apply(isString, True),      False).x
+	assertEqual(apply(isString, False),     False).x
+	assertEqual(apply(isString, 0),         False).x
+	assertEqual(apply(isString, 1),         False).x
+	assertEqual(apply(isString, 3.14),      False).x
+	assertEqual(apply(isString, Array()),   False).x
+	assertEqual(apply(isString, Array(42)), False).x
+	assertEqual(apply(isString, Array(42)), False).x
+	assertEqual(apply(isString, &quot;0&quot;),        True).x
+	assertEqual(apply(isString, &quot;1&quot;),        True).x
+	assertEqual(apply(isString, &quot;3.14&quot;),     True).x
+End Function
+
+</script:module>
