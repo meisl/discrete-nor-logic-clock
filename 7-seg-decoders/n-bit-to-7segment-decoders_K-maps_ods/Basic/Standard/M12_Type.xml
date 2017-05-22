@@ -7,7 +7,7 @@ Option Explicit
 Type TypeCtor
 	_name	  As String	 &apos; cannot use just &quot;name&quot;, that&apos;s a BASIC directive
 	arity	  As Integer &apos; the nr of typeArgs
-	dataCtors As Array
+	dataCtors As DataCtor Array
 End Type
 
 Type DataType
@@ -28,7 +28,6 @@ End Type
 Type DataValue
 	str		 As String	&apos; debugger shows that in inspector
 	ctor	 As DataCtor
-	dataType As DataType
 	fields   As Array
 End Type
 
@@ -126,12 +125,6 @@ Function _newTypeCtor( _
 	_newTypeCtor = out
 End Function
 
-Function TypeCtor_equ(a As TypeCtor, b As TypeCtor)
-	Dim out
-	out = (a._name = b._name)
-	TypeCtor_equ = out
-End Function
-
 Function isDataType(x As Variant)
 	Dim out
 	out = False
@@ -205,20 +198,12 @@ Function applyTC(tc As TypeCtor, typeArgs As Array) As DataType
 	applyTC = out
 End Function
 
+&apos; --- equ ---
 
-Function Type_equ(a As Object, b As Object)
+Function TypeCtor_equ(a As TypeCtor, b As TypeCtor)
 	Dim out
-	out = False
-	If isType(a) And isType(b) Then
-		If isDataType(a) And isDataType(b) Then
-			out = DataType_equ(a, b)
-		&apos;ElseIf ... &apos;TODO: Type_equ for other Types
-		End If
-	Else
-		croak(&quot;Type_equ: cannot compare &quot; &amp; typeOf(a) _
-			&amp; &quot; and &quot; &amp; typeOf(b))
-	End If
-	Type_equ = out
+	out = (a._name = b._name)
+	TypeCtor_equ = out
 End Function
 
 Function DataType_equ(a As DataType, b As DataType)
@@ -239,19 +224,79 @@ DataType_equ_end:
 	DataType_equ = out
 End Function
 
-Function applyDC(ctor As DataCtor, args As Array)
+Function DataCtor_equ(a As DataCtor, b As DataCtor)
 	Dim out
-	Dim n As Integer, k As Integer
-	n = UBound(args) - LBound(args) + 1
-	k = ctor.arity
-	If n &lt;&gt; k Then
-		croak(&quot;applyDC &quot; &amp; ctor.name &amp; &quot;: expected &quot; &amp; k &amp; &quot; args &quot; _
-			&amp; &quot; but got &quot; &amp; n
+	out = False
+	If a._name = b._name Then
+		out = TypeCtor_equ(a.typeCtor, b.typeCtor)
 	End If
-	out = New DataValue
-	out.ctor = ctor
+	DataCtor_equ = out
+End Function
+
+Function Type_equ(a As Object, b As Object)
+	Dim out
+	out = False
+	If isType(a) And isType(b) Then
+		If isDataType(a) And isDataType(b) Then
+			out = DataType_equ(a, b)
+		&apos;ElseIf ... &apos;TODO: Type_equ for other Types
+		End If
+	Else
+		croak(&quot;Type_equ: cannot compare &quot; &amp; typeOf(a) _
+			&amp; &quot; and &quot; &amp; typeOf(b))
+	End If
+	Type_equ = out
+End Function
+
+
+
+Function _newDataValue(ctor As DataCtor, ByRef args As Array)
+	Dim out As New DataValue
+	out.ctor   = ctor
 	out.fields = args
-		
+
+	Goto _newDataValue_check_count_only	&apos; can comment out
+	&apos;Goto _newDataValue_check_types		&apos; can comment out
+
+_newDataValue_end:	&apos; to make &quot;no-checks&quot; the shortest path
+	_newDataValue = out
+	Exit Function
+	
+_newDataValue_check_types:
+	croak(&quot;_newDataValue_check_types: NYI&quot;)
+	Goto _newDataValue_end
+	
+_newDataValue_check_count_only:
+	Dim x As Integer : x = ctor.arity
+	Dim a As Integer : a = UBound(args) + 1
+	If x &lt;&gt; a Then
+		croak(&quot;_newDataValue: DataCtor &quot; &amp; ctor._name _
+			&amp; &quot; requires &quot; &amp; x &amp; IIf(x = 1, &quot; arg&quot;, &quot; args&quot;) _
+			&amp; &quot; - got &quot; &amp; a _
+		)
+	End If
+	Goto _newDataValue_end
+End Function
+
+
+Function applyDC(c As DataCtor, _
+	Optional a0, _
+	Optional a1, _
+	Optional a2, _
+	Optional a3, _
+	Optional a4 _
+)
+	Dim out As Object
+	If     isMissing(a0) Then :	out = _newDataValue(c, emptyArray)
+	ElseIf isMissing(a1) Then :	out = _newDataValue(c, Array(a0))
+	ElseIf isMissing(a2) Then :	out = _newDataValue(c, Array(a0, a1))
+	ElseIf isMissing(a3) Then :	out = _newDataValue(c, Array(a0, a1, a2))
+	ElseIf isMissing(a4) Then :	out = _newDataValue(c, Array(a0, a1, a2, a3))
+	Else
+		croak(&quot;applyDC &quot; &amp; ctor.name &amp; &quot;: &quot; _
+			&amp; &quot; only up to 4 args supported - got 5&quot; _
+		)
+	End If
 	applyDC = out
 End Function
 
@@ -691,7 +736,32 @@ Function test_Type_DataCtor()
 	assertEqual(TypeCtor_equ(c1.typeCtor, tc), True).x
 	
 	&apos;show(c1.str)
+	
+	&apos; List a b = Nil
+	&apos;          | Cons a List b a
 
+	&apos; Now for *recursive* dataTypes, such as List a
+	tc = _newTypeCtor(&quot;TC_List&quot;, 1, _
+		Array( _
+			&quot;_Nil&quot;,  Array(), _
+			&quot;_Cons&quot;, Array(0, tc), _
+		) _
+	)
+	c1 = tc.dataCtors(0)
+	c2 = tc.dataCtors(1)
+	show(c2.str)
+	&apos; close the loop:
+	c2.argTypes(1) = tc
+	show(c2.str)
+	
+	assertEqual(c1._name, &quot;_Nil&quot;).x
+	assertEqual(c1.arity,      0).x
+	assertEqual(TypeCtor_equ(c1.typeCtor, tc), True).x
+	assertEqual(c2._name, &quot;_Cons&quot;).x
+	assertEqual(c2.arity,       2).x
+	assertEqual(TypeCtor_equ(c2.typeCtor, tc), True).x
+	
+	show(applyTC(tc, Array(dtBool)).str)
 End Function
 
 
@@ -706,7 +776,12 @@ Function test_Type_DataValue()
 	dt = applyTC(tc, Array())
 	c1 = tc.dataCtors(0)
 	assertEqual(c1.arity, 0).x
+	
+	v1 = applyDC(c1)
+	assertEqual(DataCtor_equ(v1.ctor, c1), True).x
+	assertEqual(UBound(v1.fields), UBound(Array())).x
 	v1 = applyDC(c1, Array())
+
 	show(v1.ctor.str, c1.str)
 	assertEqual(DataType_equ(v1.dataType, dt), True).x
 End Function

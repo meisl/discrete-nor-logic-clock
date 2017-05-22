@@ -7,6 +7,13 @@ Sub Main
 	test_Array()
 End Sub
 
+Function emptyArray()
+	Static out As Variant
+	If isEmpty(out) Then
+		out = Array()
+	End If
+	emptyArray = out
+End Function
 
 Function getBounds(a As Array)
 	Dim result As Variant, i As Integer, lo As Integer, hi As Integer
@@ -55,6 +62,7 @@ Function test_Array()
 	test_getBounds()
 	test_getSizes()
 	test_getDim()
+	test_Array_emptyArray()
 	test_Array_toString()
 End Function
 
@@ -107,7 +115,7 @@ Function test_getSizes()
 	Dim a(1 To 5, -7 To 2)
 	bs = getSizes(a)
 	assertEqual(typeOf(bs), &quot;Object/TList&quot;).x
-	assertEqual(toString(bs), &quot;[5, 10]&quot;).x
+	assert_toString_equals(bs, List(5, 10)).x
 End Function
 
 
@@ -115,6 +123,14 @@ Function test_getDim()
 	assertEqual(getDim(Array()), 1).x
 	assertEqual(getDim(DimArray(1, 4)), 2).x
 	assertEqual(getDim(DimArray(1, 5, 3)), 3).x
+End Function
+
+Function test_Array_emptyArray()
+	assertEqual(isArray(emptyArray), True).x
+	assertEqual(getDim(emptyArray), 1).x
+	assertEqual(CInt(UBound(emptyArray) - LBound(emptyArray)), -1).x
+	assert_toString_equals(getSizes(emptyArray), List(0)).x
+	assertEqual(LBound(emptyArray), 0).x
 End Function
 
 Function test_Array_toString()
