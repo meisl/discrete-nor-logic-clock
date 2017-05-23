@@ -38,6 +38,7 @@ Const DataTypeCtor_dataCtors = 2
 		
 Type DataValue
 	str		 As String	&apos; debugger shows that in inspector
+	id		 As Long
 	ctor	 As DataCtor
 	fields   As Array
 End Type
@@ -48,9 +49,13 @@ End Sub
 
 
 Function _newDataValue(ctor As DataValue, ByRef args As Array)
+	Static instanceCount As Long
 	Dim out As New DataValue
 	out.ctor   = ctor
 	out.fields = args
+	out.id	   = instanceCount
+	instanceCount = instanceCount + 1
+
 	If Not(isNull(ctor)) Then
 		_validate(out)
 	End If
@@ -121,6 +126,10 @@ Function field(idx As Integer, v As DataValue)
 End Function
 
 
+Function DataValue_same(a As DataValue, b As DataValue)
+	DataValue_same = (a.id = b.id)
+End Function
+
 Function DataValue_genericToString(v As DataValue)
 	Dim out
 	Dim ctor   As Variant : ctor   = v.ctor
@@ -128,7 +137,11 @@ Function DataValue_genericToString(v As DataValue)
 	Dim cStr   As String
 	Dim fStr   As String
 	If isDataValue(ctor) Then
-		cStr = cStr &amp; DataValue_genericToString(ctor)
+		If DataValue_same(v, ctor) Then
+			cStr = cStr &amp; &quot;-&gt;self&quot;
+		Else
+			cStr = cStr &amp; DataValue_genericToString(ctor)
+		End If
 	Else
 		cStr = toString(ctor)
 	End If
@@ -782,6 +795,22 @@ Function bootStrap()
 	)
 	assertEqual(isDataValue(cFoo), True).x
 	
+	&apos; There&apos;s a member .id on each DataValue which is unique to
+	&apos; the particular instance. This yields a notion of sameness:
+	assertEqual(DataValue_same(cFoo, cFoo), True).x
+	&apos; Even if we provide the very same values, we&apos;ll get a
+	&apos; different instance:
+	v = _newDataValue(Nothing, Array( _
+		&quot;Foo&quot;, _
+		emptyArray, _
+		Nothing _
+	)
+	assertEqual(DataValue_same(v, cFoo), False).x
+	&apos; &quot;Sameness&quot; is of course symmetric, ie x same y iff y same x:
+	assertEqual(DataValue_same(cFoo, v), False).x
+	&apos; ...and it is of course reflexive, ie forall x: x same x
+	assertEqual(DataValue_same(v, v), True).x
+	
 	&apos; The function DataValue_genericToString provides a way to
 	&apos; see what&apos;s inside a DataValue:
 	Dim cFooStr As String
@@ -894,7 +923,25 @@ Function bootStrap()
 	&apos; But we&apos;ve created a problem with traversing the structure
 	&apos; in order to create a string representation. 
 	&apos; TODO: infinite regression in toString(cDataCtor) via .ctor
+	&apos; In the special case at hand, DataCtor, it&apos;s enough to not
+	&apos; go down the .ctor member if it&apos;s the same as the current
+	&apos; instance. This is indicated by &quot;-&gt;self&quot;:
 	cDataCtorStr = DataValue_genericToString(cDataCtor)
+	assertEqual( _
+		cDataCtorStr, _
+		 &quot;{&quot; _ 
+		 	&amp; &quot;ctor: -&gt;self, &quot; _
+			&amp; &quot;fields: Array(&quot; _
+				&amp; &quot;&apos;DataCtor&apos;, &quot; _ 
+				&amp; &quot;Array(&quot; _
+					&amp; &quot;&apos;String&apos;, &quot; _
+					&amp; &quot;&apos;List_of_TypeExpr&apos;, &quot; _
+					&amp; &quot;&apos;TDataTypeCtor&apos;&quot; _
+				&amp; &quot;), &quot; _ 
+				&amp; &quot;Nothing&quot; _
+			&amp; &quot;)&quot; _
+		&amp; &quot;}&quot; _
+	).x
 	
 	
 	&apos; So what&apos;s the type of cDataCtor, ie what should we put it&apos;s 
@@ -954,8 +1001,53 @@ Function bootStrap()
 	&apos; This will stick in the repeated cDataCtor as .ctor member and
 	&apos; Array(&quot;String&quot;, &quot;Integer&quot;, &quot;List_of_DataCtor&quot;) as argType field
 	
-	&apos; Now we&apos;ll make a value from that cTypeCtor that&apos;ll serve as the
-	&apos; type ctor for DataCtor:
+	&apos; Let&apos;s inspect cDataTypeCtor.
+	Dim cDataTypeCtorStr As String
+	cDataTypeCtorStr = DataValue_genericToString(cDataTypeCtor)
+	assertEqual(cDataTypeCtorStr, _
+		 &quot;{&quot; _ 
+		 	&amp; &quot;ctor: &quot; &amp; cDataCtorStr &amp; &quot;, &quot; _
+			&amp; &quot;fields: Array(&quot; _
+				&amp; &quot;&apos;DataTypeCtor&apos;, &quot; _ 
+				&amp; &quot;Array(&quot; _
+					&amp; &quot;&apos;String&apos;, &quot; _
+					&amp; &quot;&apos;Integer&apos;, &quot; _
+					&amp; &quot;&apos;List_of_DataCtor&apos;&quot; _
+				&amp; &quot;), &quot; _ 
+				&amp; &quot;Nothing&quot; _
+			&amp; &quot;)&quot; _
+		&amp; &quot;}&quot; _
+	).x
+	&apos; Or the whole picture:
+	assertEqual(cDataTypeCtorStr, _
+		 &quot;{&quot; _ 
+		 	&amp; &quot;ctor: {&quot; _
+				&amp; &quot;ctor: -&gt;self, &quot; _
+				&amp; &quot;fields: Array(&quot; _
+					&amp; &quot;&apos;DataCtor&apos;, &quot; _ 
+					&amp; &quot;Array(&quot; _
+						&amp; &quot;&apos;String&apos;, &quot; _
+						&amp; &quot;&apos;List_of_TypeExpr&apos;, &quot; _
+						&amp; &quot;&apos;TDataTypeCtor&apos;&quot; _
+					&amp; &quot;), &quot; _ 
+					&amp; &quot;Nothing&quot; _
+				&amp; &quot;)&quot; _ 
+			&amp; &quot;}, &quot; _
+			&amp; &quot;fields: Array(&quot; _
+				&amp; &quot;&apos;DataTypeCtor&apos;, &quot; _ 
+				&amp; &quot;Array(&quot; _
+					&amp; &quot;&apos;String&apos;, &quot; _
+					&amp; &quot;&apos;Integer&apos;, &quot; _
+					&amp; &quot;&apos;List_of_DataCtor&apos;&quot; _
+				&amp; &quot;), &quot; _ 
+				&amp; &quot;Nothing&quot; _
+			&amp; &quot;)&quot; _
+		&amp; &quot;}&quot; _
+	).x
+	
+	
+	&apos; Now we&apos;ll make a value from that cDataTypeCtor, and that value
+	&apos; will serve as the typeCtor for DataCtor:
 	Dim tcDat As DataValue
 	tcDat = _applyDataCtor_lax(cDataTypeCtor, Array( _
 		&quot;TDataCtor&quot;, _
