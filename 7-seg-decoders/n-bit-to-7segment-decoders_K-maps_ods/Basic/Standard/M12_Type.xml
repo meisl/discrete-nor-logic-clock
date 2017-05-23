@@ -25,6 +25,12 @@ Type DataCtor
 	arity    As Integer
 End Type
 
+
+
+Const DataCtor_name     = 0
+Const DataCtor_argTypes = 1
+Const DataCtor_typeCtor = 2
+
 Type DataValue
 	str		 As String	&apos; debugger shows that in inspector
 	ctor	 As DataCtor
@@ -34,6 +40,67 @@ End Type
 Sub Main
 	[test_Type======================================]
 End Sub
+
+
+Function _newDataValue(ctor As DataValue, ByRef args As Array)
+	Dim out As New DataValue
+	out.ctor   = ctor
+	out.fields = args
+	&apos;_validate(out)
+	_newDataValue = out
+End Function
+
+&apos; duck-type like test:
+&apos; - does it have member .ctor of (BASIC) type Object?
+&apos; - does it have member .fields of (BASIC) type Array?
+Function isDataValue(x As Variant)
+	Dim out
+	out = False
+	&apos; TODO: isDataValue: check isObject &amp; Not isNull first
+	On Local Error Goto isDataValue_end
+	If isObject(_ctor(x)) And isArray(_fields(x)) Then
+		out = True
+	End If
+isDataValue_end:
+	isDataValue = out
+End Function
+
+Function _ctor(o As Object)
+	_ctor = o.ctor
+End Function
+
+Function _fields(o As Object)
+	_fields = o.fields
+End Function
+
+
+
+Function _validate(v As DataValue)
+	Goto _validate_check_count_only	&apos; can comment out
+	&apos;Goto _validate_check_types		&apos; can comment out
+
+_validate_end:	&apos; to make &quot;no-checks&quot; the shortest path
+	Exit Function
+	
+_validate_check_types:
+	croak(&quot;_validate: NYI&quot;)
+	Goto _validate_end
+	
+_validate_check_count_only:
+	Dim x As Integer : x = v.ctor.fields(DataCtor_arity)
+	Dim a As Integer : a = UBound(v.fields) + 1
+	If x &lt;&gt; a Then
+		croak(&quot;_validate: DataCtor &quot; &amp; v.ctor.fields(DataCtor_name) _
+			&amp; &quot; requires &quot; &amp; x &amp; IIf(x = 1, &quot; arg&quot;, &quot; args&quot;) _
+			&amp; &quot; - got &quot; &amp; a _
+		)
+	End If
+	Goto _validate_end
+End Function
+
+
+
+
 
 
 Function _newDataCtor( _
@@ -250,33 +317,7 @@ End Function
 
 
 
-Function _newDataValue(ctor As DataCtor, ByRef args As Array)
-	Dim out As New DataValue
-	out.ctor   = ctor
-	out.fields = args
 
-	Goto _newDataValue_check_count_only	&apos; can comment out
-	&apos;Goto _newDataValue_check_types		&apos; can comment out
-
-_newDataValue_end:	&apos; to make &quot;no-checks&quot; the shortest path
-	_newDataValue = out
-	Exit Function
-	
-_newDataValue_check_types:
-	croak(&quot;_newDataValue_check_types: NYI&quot;)
-	Goto _newDataValue_end
-	
-_newDataValue_check_count_only:
-	Dim x As Integer : x = ctor.arity
-	Dim a As Integer : a = UBound(args) + 1
-	If x &lt;&gt; a Then
-		croak(&quot;_newDataValue: DataCtor &quot; &amp; ctor._name _
-			&amp; &quot; requires &quot; &amp; x &amp; IIf(x = 1, &quot; arg&quot;, &quot; args&quot;) _
-			&amp; &quot; - got &quot; &amp; a _
-		)
-	End If
-	Goto _newDataValue_end
-End Function
 
 
 Function applyDC(c As DataCtor, _
@@ -335,7 +376,7 @@ Function ctorOf(Optional x As Variant)
 			If Not(isNull(x)) Then
 				On Local Error Goto ctorOf_end
 				out = _ctor(x) &apos; DONT access fields in here!
-				If Not(isFn(out)) Then
+				If Not(isDataValue(out)) Then
 					On Local Error Goto ctorOf_error
 					out.provoke_an_error
 				End If
@@ -347,10 +388,6 @@ ctorOf_end:
 	Exit Function
 ctorOf_error:
 	croak(&quot;ctorOf: object with invalid .ctor :: &quot; &amp; typeOf(out) &amp; NL &amp; toString(out))
-End Function
-
-Function _ctor(o As Object)
-	_ctor = o.ctor
 End Function
 
 
@@ -378,11 +415,13 @@ Function [test_Type======================================]
 	test_Type_isString()
 	test_Type_isInteger()
 	
-	test_Type_isDataType()
-	test_Type_TypeCtor()
-	test_Type_DataCtor()
+	test_Type_isDataValue()
 	test_Type_DataValue()
 	test_Type_ctorOf()
+		
+	&apos;test_Type_isDataType()
+	&apos;test_Type_TypeCtor()
+	&apos;test_Type_DataCtor()
 End Function
 
 
@@ -425,52 +464,7 @@ Function test_Type_typeOf()
 	t2.tyname = &quot;foobar&quot;
 	assertEqual(typeOf(t2), &quot;Object/foobar&quot;).x
 End Function
-	
-Function test_Type_ctorOf()
-	assertEqual(ctorOf(Nothing),	Empty).x
-	assertEqual(ctorOf(Empty),		Empty).x
-	assertEqual(ctorOf(True),		Empty).x
-	assertEqual(ctorOf(False),		Empty).x
-	assertEqual(ctorOf(&quot;&quot;),			Empty).x
-	assertEqual(ctorOf(&quot;blah&quot;),		Empty).x
-	assertEqual(ctorOf( 0),			Empty).x
-	assertEqual(ctorOf( 1),			Empty).x
-	assertEqual(ctorOf(-1),			Empty).x
-	assertEqual(ctorOf(3.1415),		Empty).x
 
-	Dim o As Object, act As Variant
-	
-	&apos; an object without member .ctor:
-	o = New TTest_TyName
-	assertEqual(ctorOf(o), Empty).x
-	o.tyname = &quot;foo&quot;
-	assertEqual(ctorOf(o), Empty).x
-
-	&apos; an object with a member .ctor:
-	o = New TTest_Ctor
-	o.ctor = Empty		: assertThrows(ctorOf, Array(o)).x
-	o.ctor = Nothing	: assertThrows(ctorOf, Array(o)).x
-	o.ctor = True		: assertThrows(ctorOf, Array(o)).x
-	o.ctor = False		: assertThrows(ctorOf, Array(o)).x
-	o.ctor = &quot;&quot;			: assertThrows(ctorOf, Array(o)).x
-	o.ctor = &quot;foo&quot;		: assertThrows(ctorOf, Array(o)).x
-	o.ctor =  0			: assertThrows(ctorOf, Array(o)).x
-	o.ctor =  1			: assertThrows(ctorOf, Array(o)).x
-	o.ctor = -1			: assertThrows(ctorOf, Array(o)).x
-	o.ctor = 3.1415		: assertThrows(ctorOf, Array(o)).x
-	o.ctor = Array()	: assertThrows(ctorOf, Array(o)).x
-	
-	o.ctor = New TTest_TyName
-	assertThrows(ctorOf, Array(o)).x
-	o.ctor.tyname = &quot;foo&quot;
-	assertThrows(ctorOf, Array(o)).x
-
-	o.ctor = Fn.cons
-	act = ctorOf(o)
-	assertEqual(isFn(act), True).x
-	assertEqual(getFnName(act), getFnName(Fn.cons)).x
-	assertEqual(arity(act), arity(Fn.cons)).x
-End Function
 
 &apos; isObject is a BASIC function:
 &apos; make sure we know exactly what it does
@@ -560,6 +554,146 @@ Function test_Type_isInteger()
 	assertEqual(isInteger(Array(42)),          False).x
 	assertEqual(isInteger(Array(42)),          False).x
 End Function
+
+Function test_Type_isDataValue()
+	&apos; positive tests below
+	assertEqual(isDataValue(&quot;&quot;),                 False).x
+	assertEqual(isDataValue(&quot;a&quot;),                False).x
+	assertEqual(isDataValue(&quot;foobar&quot;),           False).x
+	assertEqual(isDataValue(Nothing),            False).x
+	assertEqual(isDataValue(Empty),              False).x
+	assertEqual(isDataValue(True),               False).x
+	assertEqual(isDataValue(False),              False).x
+	assertEqual(isDataValue( 0),                 False).x
+	assertEqual(isDataValue( 1),                 False).x
+	assertEqual(isDataValue(-1),                 False).x
+	assertEqual(isDataValue( 32766),             False).x &apos;0x7FFE
+	assertEqual(isDataValue( 32767),             False).x &apos;0x7FFF
+	assertEqual(isDataValue( 32768),             False).x &apos;0x8000 (!)
+	assertEqual(isDataValue( 65534),             False).x &apos;0xFFFE
+	assertEqual(isDataValue( 65535),             False).x &apos;0xFFFF
+	assertEqual(isDataValue( 65536),             False).x &apos;0x80000
+	assertEqual(isDataValue(-32766),             False).x &apos;0x8002
+	assertEqual(isDataValue(-32767),             False).x &apos;0x8001
+	assertEqual(isDataValue(-32768),             False).x &apos;0x8000
+	assertEqual(isDataValue(-32769),             False).x &apos;0x17FFF (!)
+	assertEqual(isDataValue(-65534),             False).x &apos;0xFFFE
+	assertEqual(isDataValue(-65535),             False).x &apos;0xFFFF
+	assertEqual(isDataValue(-65536),             False).x &apos;0x80000
+	assertEqual(isDataValue(3.14),               False).x
+	assertEqual(isDataValue(Array()),            False).x
+	assertEqual(isDataValue(Array(42)),          False).x
+	assertEqual(isDataValue(Array(42)),          False).x
+End Function
+
+Function test_Type_DataValue()
+	Dim v, c
+	v = _newDataValue(Nothing, emptyArray)
+	assertEqual(v.ctor, Nothing)
+	assertEqual(LBound(v.fields),  0).x
+	assertEqual(UBound(v.fields), -1).x
+	assertEqual(isDataValue(v), True).x
+
+	v = _newDataValue(Nothing, Array(42))
+	assertEqual(v.ctor, Nothing)
+	assertEqual(UBound(v.fields), 0).x
+	assertEqual(v.fields(0), 42).x 
+	assertEqual(isDataValue(v), True).x
+
+	v = _newDataValue(Nothing, Array(&quot;foo&quot;, 4711))
+	assertEqual(v.ctor, Nothing)
+	assertEqual(UBound(v.fields), 1).x
+	assertEqual(v.fields(0), &quot;foo&quot;).x 
+	assertEqual(v.fields(1), 4711).x 
+	assertEqual(isDataValue(v), True).x
+End Function
+
+	
+Function test_Type_ctorOf()
+	assertEqual(ctorOf(Nothing),	Empty).x
+	assertEqual(ctorOf(Empty),		Empty).x
+	assertEqual(ctorOf(True),		Empty).x
+	assertEqual(ctorOf(False),		Empty).x
+	assertEqual(ctorOf(&quot;&quot;),			Empty).x
+	assertEqual(ctorOf(&quot;blah&quot;),		Empty).x
+	assertEqual(ctorOf( 0),			Empty).x
+	assertEqual(ctorOf( 1),			Empty).x
+	assertEqual(ctorOf(-1),			Empty).x
+	assertEqual(ctorOf(3.1415),		Empty).x
+
+	Dim o As Object, act As Variant
+	
+	&apos; an object without member .ctor:
+	o = New TTest_TyName
+	assertEqual(ctorOf(o), Empty).x
+	o.tyname = &quot;foo&quot;
+	assertEqual(ctorOf(o), Empty).x
+
+	&apos; an object with a member .ctor:
+	o = New TTest_Ctor
+	o.ctor = Empty		: assertThrows(ctorOf, Array(o)).x
+	o.ctor = Nothing	: assertThrows(ctorOf, Array(o)).x
+	o.ctor = True		: assertThrows(ctorOf, Array(o)).x
+	o.ctor = False		: assertThrows(ctorOf, Array(o)).x
+	o.ctor = &quot;&quot;			: assertThrows(ctorOf, Array(o)).x
+	o.ctor = &quot;foo&quot;		: assertThrows(ctorOf, Array(o)).x
+	o.ctor =  0			: assertThrows(ctorOf, Array(o)).x
+	o.ctor =  1			: assertThrows(ctorOf, Array(o)).x
+	o.ctor = -1			: assertThrows(ctorOf, Array(o)).x
+	o.ctor = 3.1415		: assertThrows(ctorOf, Array(o)).x
+	o.ctor = Array()	: assertThrows(ctorOf, Array(o)).x
+	&apos; even a fn object:
+	o.ctor = ctorOf		: assertThrows(ctorOf, Array(o)).x
+
+	Dim c, v
+	&apos; let&apos;s make something that is (almost) a DataCtor
+	c = _newDataValue(Nothing, Array( _
+		&quot;Foo&quot;, _
+		emptyArray, _
+		Nothing _
+	)
+	assertEqual(isDataValue(c), True).x
+	
+	&apos; with that we can make a Foo value:
+	v = _newDataValue(c, emptyArray)
+	assertEqual(isDataValue(v), True).x
+	&apos; it has a constructor that ctorOf accepts:
+	assertEqual(isDataValue(ctorOf(v)), True).x
+
+	&apos; access ctor fields:
+	Dim fs As Variant
+	c = ctorOf(v)
+	fs = c.fields
+	assertEqual(           fs(DataCtor_name,     c), &quot;Foo&quot;).x
+	assert_toString_equals(fs(DataCtor_argTypes, c), emptyArray).x
+	assertEqual(           fs(DataCtor_typeCtor, c), Nothing).x
+End Function
+
+
+
+&apos; ##############################################
+Function test_Type_DataValue_old()	
+	Dim tc, dt
+	Dim c1, c2
+	Dim v1, v2
+	
+	tc = _newTypeCtor(&quot;TC_Unit&quot;, 0, Array( _
+		&quot;_Unit&quot;, Array() _
+	))
+	dt = applyTC(tc, Array())
+	c1 = tc.dataCtors(0)
+	assertEqual(c1.arity, 0).x
+	
+	v1 = applyDC(c1)
+	assertEqual(DataCtor_equ(v1.ctor, c1), True).x
+	assertEqual(UBound(v1.fields), UBound(Array())).x
+	v1 = applyDC(c1, Array())
+
+	show(v1.ctor.str, c1.str)
+	assertEqual(DataType_equ(v1.dataType, dt), True).x
+End Function
+
+
 
 Function test_Type_isDataType()
 	&apos; positive tests below in test_TypeCtor
@@ -764,27 +898,6 @@ Function test_Type_DataCtor()
 	show(applyTC(tc, Array(dtBool)).str)
 End Function
 
-
-Function test_Type_DataValue()
-	Dim tc, dt
-	Dim c1, c2
-	Dim v1, v2
-	
-	tc = _newTypeCtor(&quot;TC_Unit&quot;, 0, Array( _
-		&quot;_Unit&quot;, Array() _
-	))
-	dt = applyTC(tc, Array())
-	c1 = tc.dataCtors(0)
-	assertEqual(c1.arity, 0).x
-	
-	v1 = applyDC(c1)
-	assertEqual(DataCtor_equ(v1.ctor, c1), True).x
-	assertEqual(UBound(v1.fields), UBound(Array())).x
-	v1 = applyDC(c1, Array())
-
-	show(v1.ctor.str, c1.str)
-	assertEqual(DataType_equ(v1.dataType, dt), True).x
-End Function
 
 
 </script:module>
