@@ -31,6 +31,11 @@ Const DataCtor_name     = 0
 Const DataCtor_argTypes = 1
 Const DataCtor_typeCtor = 2
 
+Const DataTypeCtor_name  	 = 0
+Const DataTypeCtor_arity 	 = 1
+Const DataTypeCtor_dataCtors = 2
+
+		
 Type DataValue
 	str		 As String	&apos; debugger shows that in inspector
 	ctor	 As DataCtor
@@ -46,7 +51,9 @@ Function _newDataValue(ctor As DataValue, ByRef args As Array)
 	Dim out As New DataValue
 	out.ctor   = ctor
 	out.fields = args
-	&apos;_validate(out)
+	If Not(isNull(ctor)) Then
+		_validate(out)
+	End If
 	_newDataValue = out
 End Function
 
@@ -73,9 +80,19 @@ Function _fields(o As Object)
 	_fields = o.fields
 End Function
 
-
+Function field(idx As Integer, v As DataValue)
+	field = v.fields(idx)
+End Function
 
 Function _validate(v As DataValue)
+	Dim a As Integer : a = LBound(v.fields)
+	If a &lt;&gt; 0 Then
+		croak(&quot;_validate &quot; &amp; ctor.fields(DataCtor_name) &amp; &quot;:&quot; _
+			&amp; NL &amp; &quot;expected 0-based args Array&quot; _
+			&amp; NL &amp; &quot;but got a &quot; &amp; a &amp; &quot;-based one: &quot; _
+			&amp; NL &amp; toString(v.fields) _
+		)
+	End If
 	Goto _validate_check_count_only	&apos; can comment out
 	&apos;Goto _validate_check_types		&apos; can comment out
 
@@ -83,13 +100,16 @@ _validate_end:	&apos; to make &quot;no-checks&quot; the shortest path
 	Exit Function
 	
 _validate_check_types:
-	croak(&quot;_validate: NYI&quot;)
+	croak(&quot;_validate/type-check: NYI&quot;)
 	Goto _validate_end
 	
 _validate_check_count_only:
-	Dim x As Integer : x = v.ctor.fields(DataCtor_arity)
-	Dim a As Integer : a = UBound(v.fields) + 1
+	Dim x As Integer
+	a = UBound(v.fields)
+	x = UBound(v.ctor.fields(DataCtor_argTypes))
 	If x &lt;&gt; a Then
+		x = x + 1
+		a = a + 1
 		croak(&quot;_validate: DataCtor &quot; &amp; v.ctor.fields(DataCtor_name) _
 			&amp; &quot; requires &quot; &amp; x &amp; IIf(x = 1, &quot; arg&quot;, &quot; args&quot;) _
 			&amp; &quot; - got &quot; &amp; a _
@@ -98,10 +118,72 @@ _validate_check_count_only:
 	Goto _validate_end
 End Function
 
+Function _applyDataCtor_lax(ctor As DataValue, args As Array)
+	Dim x As Integer, a As Integer
+	a = LBound(args)
+	If a &lt;&gt; 0 Then
+		croak(&quot;_applyDataCtor_lax &quot; &amp; ctor.fields(DataCtor_name) &amp; &quot;:&quot; _
+			&amp; NL &amp; &quot;invalid &quot; &amp; a &amp; &quot;-based args Array&quot; _
+			&amp; NL &amp; &quot;expected 0-based Array&quot;)
+	Else
+		x = UBound(ctor.fields(DataCtor_argTypes))
+		a = UBound(args)
+		If a &lt;&gt; x Then
+			a = a + 1 : x = x + 1
+			croak(&quot;_applyDataCtor_lax &quot; &amp; ctor.fields(DataCtor_name) _
+				&amp; &quot;:&quot; _
+				&amp; NL &amp; &quot;expected &quot; &amp; x &amp; &quot; arg&quot; &amp; IIf(x = 1, &quot;&quot;, &quot;s&quot;) _
+				&amp; &quot; but got &quot; &amp; a _
+				&amp; NL &amp; toString(args))
+		End If
+	End If
+	_applyDataCtor_lax = _newDataValue(ctor, args)
+End Function
 
+Sub _setTypeCtor(dataCtor As DataValue, dataTypeCtor As DataValue)
+	&apos; TODO: check that dataCtor really is a DataCtor
+	&apos; TODO: check that dataTypeCtor really is a DatatypeCtor
+	dataCtor.fields(DataCtor_typeCtor) = dataTypeCtor
+End Sub
 
+Function isDataTypeCtor(tc As DataValue)
+	Dim out
+	out = False
+	Dim c As DataValue
+	c = tc.ctor
+	Dim cName As String
+	cName = c.fields(DataCtor_name)
+	If cName = &quot;DataTypeCtor&quot; Then
+		Dim tcName As String
+		tcName = c.fields(DataCtor_typeCtor).fields(DataTypeCtor_name) 
+		If tcName = &quot;TDataTypeCtor&quot; Then
+			out = True
+		End If
+	End If
+	isDataTypeCtor = out
+End Function
 
-
+Function isTypeOf(t As Object, v As DataValue)
+	Dim out
+	out = False
+	If Not(isDataValue(t)) Then
+		croak(&quot;isTypeOf/NYI: test against non-dataType type &quot; &amp; toString(t))
+	End If
+	If isDataTypeCtor(t) Then
+		Dim r As Integer
+		r = field(DataTypeCtor_arity, t)
+		If (r &lt;&gt; 0) Then
+			croak(&quot;isTypeOf/NYI: test against not-completely-applied TypeCtor &quot; &amp; toString(t))
+		End If
+		Dim c  As DataValue : c  = ctorOf(v)
+		Dim tc As DataValue : tc = field(DataCtor_typeCtor, c)
+		
+		out = field(DataTypeCtor_name, tc) = field(DataTypeCtor_name, t)
+	Else
+		croak(&quot;isTypeOf/NYI: test against type &quot; &amp; toString(t))
+	End If
+	isTypeOf = out
+End Function
 
 Function _newDataCtor( _
 	typeCtor As TypeCtor, _
@@ -378,7 +460,8 @@ Function ctorOf(Optional x As Variant)
 				out = _ctor(x) &apos; DONT access fields in here!
 				If Not(isDataValue(out)) Then
 					On Local Error Goto ctorOf_error
-					out.provoke_an_error
+					Dim null As Object
+					null.provoke_an_error
 				End If
 			End If
 		End If
@@ -387,7 +470,8 @@ ctorOf_end:
 	ctorOf = out
 	Exit Function
 ctorOf_error:
-	croak(&quot;ctorOf: object with invalid .ctor :: &quot; &amp; typeOf(out) &amp; NL &amp; toString(out))
+	croak(&quot;ctorOf: object with invalid .ctor :: &quot; _
+	    &amp; typeOf(out) &amp; NL &amp; toString(out))
 End Function
 
 
@@ -418,6 +502,8 @@ Function [test_Type======================================]
 	test_Type_isDataValue()
 	test_Type_DataValue()
 	test_Type_ctorOf()
+	
+	bootStrap()
 		
 	&apos;test_Type_isDataType()
 	&apos;test_Type_TypeCtor()
@@ -644,7 +730,9 @@ Function test_Type_ctorOf()
 	o.ctor = Array()	: assertThrows(ctorOf, Array(o)).x
 	&apos; even a fn object:
 	o.ctor = ctorOf		: assertThrows(ctorOf, Array(o)).x
+End Function
 
+Function bootStrap()
 	Dim cFoo, v
 	&apos; let&apos;s make something that is (almost) a DataCtor
 	cFoo = _newDataValue(Nothing, Array( _
@@ -653,51 +741,62 @@ Function test_Type_ctorOf()
 		Nothing _
 	)
 	assertEqual(isDataValue(cFoo), True).x
-	
+
 	&apos; with that we can make a Foo value:
 	v = _newDataValue(cFoo, emptyArray)
 	assertEqual(isDataValue(v), True).x
 	&apos; it has a constructor that ctorOf accepts:
 	assertEqual(isDataValue(ctorOf(v)), True).x
-
+	
 	&apos; access ctor fields:
-	Dim fs As Variant, c As DataValue
+	&apos; TODO: why not .fields ?
+	Dim c
 	c = ctorOf(v)
-	fs = c.fields
-	assertEqual(           fs(DataCtor_name,     c), &quot;Foo&quot;).x
-	assert_toString_equals(fs(DataCtor_argTypes, c), emptyArray).x
-	assertEqual(           fs(DataCtor_typeCtor, c), Nothing).x
+	assertEqual(           field(DataCtor_name,     c),      &quot;Foo&quot;).x
+	assert_toString_equals(field(DataCtor_argTypes, c), emptyArray).x
+	assertEqual(           field(DataCtor_typeCtor, c),    Nothing).x
 	
 	&apos; Since the ctor is itself a DataValue - what&apos;s the ctor of that ctor?
 	Dim cDataCtor As DataValue
-	&apos; it&apos;ll be a DataValue again, and it&apos;ll be a 
-	&apos; dataCtor with name &quot;DataCtor&quot; and two type args
-	&apos; (ignore third field for now)
-	Dim cName As String, typeArgs As Variant
+	&apos; it&apos;ll be a DataValue again, and it&apos;ll be a data ctor with
+	&apos; - name: &quot;DataCtor&quot;
+	&apos; - argTypes: a list of argument types
+	&apos; - and as the third field typeCtor: a DataTypeCtor
+	&apos; The typeCtor field will be left empty for now, but we must mention
+	&apos; it in the definition of DataCtor. Therefore there are not only
+	&apos; two entries in argTypes - &quot;String&quot; and &quot;List_of_TypeExpr&quot; - but three: the
+	&apos; third must be &quot;TDataTypeCtor&quot;.
+	Dim cName As String, argTypes As Variant
 	cName    = &quot;DataCtor&quot;
-	&apos; The typeArgs should be types (type expressions), which we don&apos;t have yet
+	&apos; The argTypes should be types (type expressions), which we don&apos;t have yet
 	&apos; But types (type expressions) may also be type variables. Let&apos;s
 	&apos; just use plain strings and pretend they&apos;re type vars.
-	typeArgs = Array(&quot;String&quot;, &quot;List_of_TypeExpr&quot;)
-	cDataCtor = _newDataValue(Nothing, Array(cName, typeArgs, Nothing))
+	argTypes = Array(&quot;String&quot;, &quot;List_of_TypeExpr&quot;, &quot;TDataTypeCtor&quot;)
+	cDataCtor = _newDataValue(Nothing, Array(cName, argTypes, Nothing))
 	c = cDataCtor
-	fs = c.fields
-	assertEqual(           fs(DataCtor_name,     c), cName).x
-	assert_toString_equals(fs(DataCtor_argTypes, c), typeArgs).x
-	assertEqual(           fs(DataCtor_typeCtor, c), Nothing).x
+	assertEqual(           field(DataCtor_name,     c), cName).x
+	assert_toString_equals(field(DataCtor_argTypes, c), argTypes).x
+	assertEqual(           field(DataCtor_typeCtor, c), Nothing).x
 
-	&apos; let&apos;s put this in as cFoo&apos;s dataCtor:
+	&apos; let&apos;s put this in as cFoo&apos;s .ctor:
 	cFoo.ctor = cDataCtor
 	
 	&apos; What&apos;s the ctor of cDataCtor?
-	&apos; It must be a DataCtor again. Hence a DataValue with three fields:
-	&apos; - 1st the String &quot;DataCtor&quot;
-	&apos; - 2nd a two-elem Array with types &quot;String&quot; and &quot;List_of_Type_Expr&quot;
-	&apos; - 3rd ...later
+	&apos; Since again, cDataCtor is just a DataValue, it&apos;s constructor
+	&apos; must be a data ctor as we have just described, ie have fields:
+	&apos; - 1st a String for the name - which we don&apos;t care about
+	&apos; - 2nd a three-elem list with types &quot;String&quot;, &quot;List_of_Type_Expr&quot;
+	&apos;       and &quot;TDataTypeCtor&quot;
+	&apos; - 3rd a a value of type &quot;TDataTypeCtor&quot; (still left empty)
 	&apos; But that&apos;s just cDataCtor itself!
 	cDataCtor.ctor = cDataCtor
+	&apos; Also: once we worked out the typeCtor field (left empty but we
+	&apos; already &quot;know&quot; it must be a value of type &quot;TDataTypeCtor&quot;)
+	&apos; - it&apos;ll work just fine as the typeCtor for both cDataCtor, and
+	&apos; its constructor. Proof: if it works for cDataCtor then it will
+	&apos; work for cDataCtor :)
 	
-	&apos; What&apos;s the type of cDataCtor, ie what should we put it&apos;s 
+	&apos; So what&apos;s the type of cDataCtor, ie what should we put it&apos;s 
 	&apos; typeCtor field?
 	&apos; It&apos;s the very simple data type
 	&apos;   TDataCtor = DataCtor Str (List TypeExpr)
@@ -712,36 +811,138 @@ Function test_Type_ctorOf()
 	&apos; - zero or more DataCtors
 	&apos; We can describe that by defining another data ctor - which itself,
 	&apos; as we saw, has DataCtor as it&apos;s (data) constructor:
-	Dim cTypeCtor As DataValue, arity As Integer
-	cTypeCtor = _newDataValue(cDataCtor, Array( _
+	Dim cDataTypeCtor As DataValue, arity As Integer
+	cDataTypeCtor = _newDataValue(cDataCtor, Array( _
 		&quot;DataTypeCtor&quot;, _
 		Array(&quot;String&quot;, &quot;Integer&quot;, &quot;List_of_DataCtor&quot;), _
 		Nothing _
 	))
+	&apos; Except for the typeCtor field - again left empty -
+	&apos; what we&apos;ve just done will be bread-and-butter: create a value
+	&apos; from a data ctor where the value&apos;s fields are filled with the
+	&apos; argument values - provided they comply with the data ctor&apos;s
+	&apos; typeArgs.
+	&apos; Let&apos;s factor this out:
+	cDataTypeCtor = _applyDataCtor_lax(cDataCtor, Array( _
+		&quot;DataTypeCtor&quot;, _
+		Array(&quot;String&quot;, &quot;Integer&quot;, &quot;List_of_DataCtor&quot;), _
+		Nothing _
+	))
+	&apos; The function _applyDataCtor_lax will check if the nr of arguments
+	&apos; is correct, but it will NOT try to check their types.
+	&apos; It will then create a DataValue and fill in members
+	&apos; .ctor and .fields
+	assertEqual(isDataValue(cDataTypeCtor), 		True).x
+	assertEqual(isDataValue(ctorOf(cDataTypeCtor)), True).x
+	assertEqual( _
+		field(DataCtor_name, ctorOf(cDataTypeCtor)), _
+		field(DataCtor_name, cDataCtor) _
+	).x
+	assert_toString_equals( _
+		field(DataCtor_argTypes, ctorOf(cDataTypeCtor)), _
+		field(DataCtor_argTypes, cDataCtor) _
+	).x
+	&apos; and also - even if still empty:
+	assert_toString_equals( _
+		field(DataCtor_typeCtor, ctorOf(cDataTypeCtor)), _
+		field(DataCtor_typeCtor, cDataCtor) _
+	).x
+	&apos;TODO: Another repeated pattern is that of making DataValues that serve
+	&apos; as DataCtor s:
+	&apos;cTypeCtor = _mkDataCtor(&quot;DataTypeCtor&quot;, Nothing)
+	&apos; This will stick in the repeated cDataCtor as .ctor member and
+	&apos; Array(&quot;String&quot;, &quot;Integer&quot;, &quot;List_of_DataCtor&quot;) as argType field
+	
 	&apos; Now we&apos;ll make a value from that cTypeCtor that&apos;ll serve as the
 	&apos; type ctor for DataCtor:
 	Dim tcDat As DataValue
-	tcDat = _newDataValue(cTypeCtor, Array( _
+	tcDat = _applyDataCtor_lax(cDataTypeCtor, Array( _
 		&quot;TDataCtor&quot;, _
 		0, _
 		Array(cDataCtor) _
 	)
 	&apos; Since cDataCtor is a (the only) data ctor of tcDat, cDataCtor&apos;s
-	&apos; &quot;typeCtor&quot; field points back to tcDat.
-	cDataCtor.fields(DataCtor_typeCtor) = tc
+	&apos; &quot;typeCtor&quot; field points back to tcDat. We could do this by indexing
+	&apos; into the .fields member and writing it there, like so:
+	&apos; cDataCtor.fields(DataCtor_typeCtor) = tcDat
+	&apos; But again, this pointer-fixing will occur everytime we create a new
+	&apos; data type (and its constructors), so:
+ 	assertEqual(field(DataCtor_typeCtor, cDataCtor), Nothing).x
+	&apos; was empty, now set it:
+	_setTypeCtor(cDataCtor, tcDat)
+	&apos; now it&apos;s set:
+	Dim it
+	it = field(DataCtor_typeCtor, cDataCtor)
+	assertEqual(isDataValue(it), True).x
+	&apos; we also have constants for accessing a DataTypeCtor&apos;s fields:	
+	assertEqual( _
+		field(DataTypeCtor_name, it), _
+		field(DataTypeCtor_name, tcDat) ).x
+	assertEqual( _
+		field(DataTypeCtor_arity, it), _
+		field(DataTypeCtor_arity, tcDat) ).x
+	assert_toString_equals( _
+		field(DataTypeCtor_dataCtors, it), _
+		field(DataTypeCtor_dataCtors, tcDat) ).x
+
+
 	&apos; What&apos;s still missing is a typeCtor for cDataTypeCtor. We already
 	&apos; have a ctor to construct DataTypeCtor s: cDataTypeCtor. It&apos;ll
 	&apos; be quite simple again, with only one data ctor (cDataTypeCtor),
 	&apos; and name &quot;TDataTypeCtor&quot;:
 	&apos; TDataTypeCtor = DataTypeCtor String Int (List DataCtor)
 	Dim tcTyp As DataValue
-	tcTyp = _newDataValue(cDataTypeCtor, Array( _
-		&quot;TDataTypeCtor&quot;,
-		0,
-		Array(cDataTypeCtor)
+	tcTyp = _applyDataCtor_lax(cDataTypeCtor, Array( _
+		&quot;TDataTypeCtor&quot;, _
+		0, _
+		Array(cDataTypeCtor) _
 	))
 	&apos; and fill in the back-pointer:
-	cDataTypeCtor.fields(DataCtor_typeCtor) = tcTyp
+	_setTypeCtor(cDataTypeCtor, tcTyp)
+	
+	&apos; Let&apos;s go back to old data ctor cFoo. It itself has got a proper
+	&apos; constructor (cDataCtor) but no DataTypeCtor in field typeCtor:
+	assertEqual(field(DataCtor_typeCtor, cFoo), Nothing).x
+	&apos; But before we go on to make one, let&apos;s make things a bit more 
+	&apos; interesting. Why not give him a brother:
+	Dim cBar As DataValue
+	cBar = _applyDataCtor_lax(cDataCtor, Array( _
+		&quot;Bar&quot;, _
+		emptyArray, _
+		Nothing _
+	)
+	&apos; Bar just looks like his twin Foo, only the names are different.
+	&apos; Of course they have the same &quot;parent&quot;:
+	Dim tcFooOrBar As DataValue
+	tcFooOrBar = _applyDataCtor_lax(cDataTypeCtor, Array( _
+		&quot;FooOrBar&quot;, _
+		0, _
+		Array(cFoo, cBar) _
+	)
+	_setTypeCtor(cFoo, tcFooOrBar)
+	_setTypeCtor(cBar, tcFooOrBar)
+	&apos; FooOrBar = Foo | Bar
+	&apos; We can now make values of type FooOrBar
+	Dim x, y, z
+	x = _applyDataCtor_lax(cFoo, Array())
+	y = _applyDataCtor_lax(cBar, Array())
+	z = _applyDataCtor_lax(cFoo, Array())
+	&apos; the function isTypeOf takes a type and a value, and tests
+	&apos; whether the value has the given type:
+	assertEqual(isTypeOf(tcFooOrBar, x), True).x
+	assertEqual(isTypeOf(tcFooOrBar, y), True).x
+	assertEqual(isTypeOf(tcFooOrBar, z), True).x
+	&apos; But of course, FooOrBar itself is NOT a FooOrBar
+	assertEqual(isTypeOf(tcFooOrBar, tcFooOrBar), False).x
+	&apos; Rather it is a TDataTypeCtor
+	assertEqual(isTypeOf(tcTyp, tcFooOrBar), True).x
+	&apos; Similarly, neither cFoo nor cBar are FooBar s:
+	assertEqual(isTypeOf(tcFooOrBar, cFoo), False).x
+	assertEqual(isTypeOf(tcFooOrBar, cBar), False).x
+	&apos; They&apos;re data constructors:
+	assertEqual(isTypeOf(tcDat, cFoo), True).x
+	assertEqual(isTypeOf(tcDat, cBar), True).x
+	
 	
 End Function
 
