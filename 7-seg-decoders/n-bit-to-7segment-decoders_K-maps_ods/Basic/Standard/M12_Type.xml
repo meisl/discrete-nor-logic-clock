@@ -474,6 +474,11 @@ ctorOf_error:
 	    &amp; typeOf(out) &amp; NL &amp; toString(out))
 End Function
 
+Function ctorName(v As DataValue)
+	Dim out
+	out = v.ctor.fields(DataCtor_name)
+	ctorName = out
+End Function
 
 
 Function isString(Optional x As Variant)
@@ -943,7 +948,84 @@ Function bootStrap()
 	assertEqual(isTypeOf(tcDat, cFoo), True).x
 	assertEqual(isTypeOf(tcDat, cBar), True).x
 	
+	&apos; We can also dispatch on the values&apos; ctors (names).
+	&apos; Since extracting the ctor&apos;s name will be common, we&apos;ll
+	&apos; extract that into another helper function:
+	assertEqual(ctorName(x), field(DataCtor_name, cFoo)).x
+	assertEqual(ctorName(y), field(DataCtor_name, cBar)).x
+	assertEqual(ctorName(z), field(DataCtor_name, cFoo)).x
+	&apos; With that in place:
+	Dim what As String, i As Integer, vs As Variant
+	what = &quot;&quot;
+	vs = Array(x, y, z)
+	For i = 0 To 2
+		Select Case ctorName(vs(i))
+			Case &quot;Foo&quot;: what = what &amp; &quot;aFoo &quot;
+			Case &quot;Bar&quot;: what = what &amp; &quot;aBar &quot;
+		End Select
+	Next i
+	assertEqual(what, &quot;aFoo aBar aFoo &quot;).x
 	
+	&apos; Well, FooOrBar seems a bit boring. However, imagine just
+	&apos; different names:
+	&apos; - &quot;Foo&quot;      -&gt; &quot;False&quot;
+	&apos; - &quot;Bar&quot;      -&gt; &quot;True&quot;
+	&apos; - &quot;FooOrBar&quot; -&gt; &quot;Bool&quot;
+	&apos; From that we can see that even simple enumerations like that
+	&apos; are useful. Let&apos;s enumerate some types we have in BASIC:
+	&apos; BasicType = Boolean | String | Integer | Long | Double | Object
+	Dim cBoolean, cString, cInteger, cLong, cDouble, cObject
+	cBoolean = _applyDataCtor_lax(cDataCtor, Array(&quot;Boolean&quot;, emptyArray, Nothing))
+	cString  = _applyDataCtor_lax(cDataCtor, Array(&quot;String&quot;,  emptyArray, Nothing))
+	cInteger = _applyDataCtor_lax(cDataCtor, Array(&quot;Integer&quot;, emptyArray, Nothing))
+	cLong    = _applyDataCtor_lax(cDataCtor, Array(&quot;Long&quot;,    emptyArray, Nothing))
+	cDouble  = _applyDataCtor_lax(cDataCtor, Array(&quot;Double&quot;,  emptyArray, Nothing))
+	cObject  = _applyDataCtor_lax(cDataCtor, Array(&quot;Object&quot;,  emptyArray, Nothing))
+	Dim dataCtors, tcBasicType
+	dataCtors = Array(cBoolean, cString, cInteger, cLong, cDouble, cObject)
+	tcBasicType = _applyDataCtor_lax(cDataTypeCtor, _
+		Array(&quot;BasicType&quot;, 0, dataCtors) _
+	)
+	For i = 0 To UBound(dataCtors)
+		_setTypeCtor(dataCtors(i), tcBasicType)
+	Next i
+	&apos; So now these are all proper data ctors:
+	For i = 0 To UBound(dataCtors)
+		assertEqual(isTypeOf(tcDat, dataCtors(i)), True).x
+	Next i
+
+	&apos; Values created from these constructors:
+	Dim vBoolean, vString, vInteger, vLong, vDouble, vObject
+	vBoolean = _applyDataCtor_lax(cBoolean, emptyArray)
+	vString  = _applyDataCtor_lax(cString,  emptyArray)
+	vInteger = _applyDataCtor_lax(cInteger, emptyArray)
+	vLong    = _applyDataCtor_lax(cLong,    emptyArray)
+	vDouble  = _applyDataCtor_lax(cDouble,  emptyArray)
+	vObject  = _applyDataCtor_lax(cObject,  emptyArray)
+	Dim vBasicTypes
+	vBasicTypes = Array(vBoolean, vString, vInteger, vLong, vDouble, vObject)
+	
+	&apos; They&apos;re all of type BasicType:
+	For i = 0 To UBound(dataCtors)
+		v = vBasicTypes(i)
+		assertEqual(isTypeOf(tcBasicType, v), True).x
+	Next i
+	&apos; And they&apos;re not FooOrBar s, or DataCtor s or whatever:
+	For i = 0 To UBound(dataCtors)
+		v = vBasicTypes(i)
+		assertEqual(isTypeOf(tcFooOrBar, v), False).x
+		assertEqual(isTypeOf(tcDat,		 v), False).x
+		assertEqual(isTypeOf(tcTyp,		 v), False).x
+	Next i
+	
+	&apos; With that we can replace the dummy strings &quot;String&quot; and &quot;Integer&quot;
+	&apos; that we used when defining DataCtor and DataTypeCtor:
+	cDataCtor.fields(DataCtor_argTypes)(0) = vString &apos; field name
+	&apos; TODO: (even before) set cDataCtor.argType(2) = tcTyp
+	cDataTypeCtor.fields(DataCtor_argTypes)(0) = vString  &apos; field name
+	cDataTypeCtor.fields(DataCtor_argTypes)(1) = vInteger &apos; field arity
+
+		
 End Function
 
 
