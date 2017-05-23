@@ -57,32 +57,6 @@ Function _newDataValue(ctor As DataValue, ByRef args As Array)
 	_newDataValue = out
 End Function
 
-&apos; duck-type like test:
-&apos; - does it have member .ctor of (BASIC) type Object?
-&apos; - does it have member .fields of (BASIC) type Array?
-Function isDataValue(x As Variant)
-	Dim out
-	out = False
-	&apos; TODO: isDataValue: check isObject &amp; Not isNull first
-	On Local Error Goto isDataValue_end
-	If isObject(_ctor(x)) And isArray(_fields(x)) Then
-		out = True
-	End If
-isDataValue_end:
-	isDataValue = out
-End Function
-
-Function _ctor(o As Object)
-	_ctor = o.ctor
-End Function
-
-Function _fields(o As Object)
-	_fields = o.fields
-End Function
-
-Function field(idx As Integer, v As DataValue)
-	field = v.fields(idx)
-End Function
 
 Function _validate(v As DataValue)
 	Dim a As Integer : a = LBound(v.fields)
@@ -117,6 +91,67 @@ _validate_check_count_only:
 	End If
 	Goto _validate_end
 End Function
+
+
+&apos; duck-type like test:
+&apos; - does it have member .ctor of (BASIC) type Object?
+&apos; - does it have member .fields of (BASIC) type Array?
+Function isDataValue(x As Variant)
+	Dim out
+	out = False
+	&apos; TODO: isDataValue: check isObject &amp; Not isNull first
+	On Local Error Goto isDataValue_end
+	If isObject(_ctor(x)) And isArray(_fields(x)) Then
+		out = True
+	End If
+isDataValue_end:
+	isDataValue = out
+End Function
+
+Function _ctor(o As Object)
+	_ctor = o.ctor
+End Function
+
+Function _fields(o As Object)
+	_fields = o.fields
+End Function
+
+Function field(idx As Integer, v As DataValue)
+	field = v.fields(idx)
+End Function
+
+
+Function DataValue_genericToString(v As DataValue)
+	Dim out
+	Dim ctor   As Variant : ctor   = v.ctor
+	Dim fields As Variant : fields = v.fields
+	Dim cStr   As String
+	Dim fStr   As String
+	If isDataValue(ctor) Then
+		cStr = cStr &amp; DataValue_genericToString(ctor)
+	Else
+		cStr = toString(ctor)
+	End If
+	If isArray(fields) Then
+		fStr = &quot;Array(&quot;
+		Dim i As Integer, w As Variant
+		For i = 0 To UBound(fields)
+			If i &gt; 0 Then : fStr = fStr &amp; &quot;, &quot; : End If
+			w = fields(i)
+			If isDataValue(w) Then
+				fStr = fStr &amp; DataValue_genericToString(w)
+			Else
+				fStr = fStr &amp; toString(w)
+			End If
+		Next i
+		fStr = fStr &amp; &quot;)&quot;
+	Else
+		fStr = toString(fields)
+	End If
+	out = &quot;{ctor: &quot; &amp; cStr &amp; &quot;, fields: &quot; &amp; fStr &amp; &quot;}&quot;
+	DataValue_genericToString = out
+End Function
+
 
 Function _applyDataCtor_lax(ctor As DataValue, args As Array)
 	Dim x As Integer, a As Integer
@@ -746,12 +781,34 @@ Function bootStrap()
 		Nothing _
 	)
 	assertEqual(isDataValue(cFoo), True).x
+	
+	&apos; The function DataValue_genericToString provides a way to
+	&apos; see what&apos;s inside a DataValue:
+	Dim cFooStr As String
+	cFooStr = DataValue_genericToString(cFoo)
+	assertEqual( _
+		cFooStr, _
+		 &quot;{&quot; _
+		 	&amp; &quot;ctor: Nothing, &quot; _
+			&amp; &quot;fields: Array(&quot; _
+				&amp; &quot;&apos;Foo&apos;, &quot; _ 
+				&amp; &quot;Array(), &quot; _ 
+				&amp; &quot;Nothing&quot; _
+			&amp; &quot;)&quot; _
+		&amp; &quot;}&quot; _
+	).x
 
 	&apos; with that we can make a Foo value:
 	v = _newDataValue(cFoo, emptyArray)
 	assertEqual(isDataValue(v), True).x
 	&apos; it has a constructor that ctorOf accepts:
 	assertEqual(isDataValue(ctorOf(v)), True).x
+	Dim vStr As String
+	vStr = DataValue_genericToString(v)
+	assertEqual( _
+		vStr, _
+		&quot;{ctor: &quot; &amp; cFooStr &amp; &quot;, fields: Array()}&quot; _
+	).x
 	
 	&apos; access ctor fields:
 	&apos; TODO: why not .fields ?
@@ -783,8 +840,41 @@ Function bootStrap()
 	assert_toString_equals(field(DataCtor_argTypes, c), argTypes).x
 	assertEqual(           field(DataCtor_typeCtor, c), Nothing).x
 
-	&apos; let&apos;s put this in as cFoo&apos;s .ctor:
+	&apos; What does it look like?
+	Dim cDataCtorStr As String
+	cDataCtorStr = DataValue_genericToString(cDataCtor)
+	assertEqual( _
+		cDataCtorStr, _
+		 &quot;{&quot; _ 
+		 	&amp; &quot;ctor: Nothing, &quot; _
+			&amp; &quot;fields: Array(&quot; _
+				&amp; &quot;&apos;DataCtor&apos;, &quot; _ 
+				&amp; &quot;Array(&quot; _
+					&amp; &quot;&apos;String&apos;, &quot; _
+					&amp; &quot;&apos;List_of_TypeExpr&apos;, &quot; _
+					&amp; &quot;&apos;TDataTypeCtor&apos;&quot; _
+				&amp; &quot;), &quot; _ 
+				&amp; &quot;Nothing&quot; _
+			&amp; &quot;)&quot; _
+		&amp; &quot;}&quot; _
+	).x
+
+	&apos; Let&apos;s put this in as cFoo&apos;s .ctor:
 	cFoo.ctor = cDataCtor
+	&apos; Now cFoo looks like this:
+	cFooStr = DataValue_genericToString(cFoo)
+	assertEqual( _
+		cFooStr, _
+		 &quot;{&quot; _
+		 	&amp; &quot;ctor: &quot; &amp; cDataCtorStr &amp; &quot;, &quot; _
+			&amp; &quot;fields: Array(&quot; _
+				&amp; &quot;&apos;Foo&apos;, &quot; _ 
+				&amp; &quot;Array(), &quot; _ 
+				&amp; &quot;Nothing&quot; _
+			&amp; &quot;)&quot; _
+		&amp; &quot;}&quot; _
+	).x
+	
 	
 	&apos; What&apos;s the ctor of cDataCtor?
 	&apos; Since again, cDataCtor is just a DataValue, it&apos;s constructor
@@ -800,6 +890,12 @@ Function bootStrap()
 	&apos; - it&apos;ll work just fine as the typeCtor for both cDataCtor, and
 	&apos; its constructor. Proof: if it works for cDataCtor then it will
 	&apos; work for cDataCtor :)
+	
+	&apos; But we&apos;ve created a problem with traversing the structure
+	&apos; in order to create a string representation. 
+	&apos; TODO: infinite regression in toString(cDataCtor) via .ctor
+	cDataCtorStr = DataValue_genericToString(cDataCtor)
+	
 	
 	&apos; So what&apos;s the type of cDataCtor, ie what should we put it&apos;s 
 	&apos; typeCtor field?
