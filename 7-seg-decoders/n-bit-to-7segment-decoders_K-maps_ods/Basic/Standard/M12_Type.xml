@@ -645,28 +645,104 @@ Function test_Type_ctorOf()
 	&apos; even a fn object:
 	o.ctor = ctorOf		: assertThrows(ctorOf, Array(o)).x
 
-	Dim c, v
+	Dim cFoo, v
 	&apos; let&apos;s make something that is (almost) a DataCtor
-	c = _newDataValue(Nothing, Array( _
+	cFoo = _newDataValue(Nothing, Array( _
 		&quot;Foo&quot;, _
 		emptyArray, _
 		Nothing _
 	)
-	assertEqual(isDataValue(c), True).x
+	assertEqual(isDataValue(cFoo), True).x
 	
 	&apos; with that we can make a Foo value:
-	v = _newDataValue(c, emptyArray)
+	v = _newDataValue(cFoo, emptyArray)
 	assertEqual(isDataValue(v), True).x
 	&apos; it has a constructor that ctorOf accepts:
 	assertEqual(isDataValue(ctorOf(v)), True).x
 
 	&apos; access ctor fields:
-	Dim fs As Variant
+	Dim fs As Variant, c As DataValue
 	c = ctorOf(v)
 	fs = c.fields
 	assertEqual(           fs(DataCtor_name,     c), &quot;Foo&quot;).x
 	assert_toString_equals(fs(DataCtor_argTypes, c), emptyArray).x
 	assertEqual(           fs(DataCtor_typeCtor, c), Nothing).x
+	
+	&apos; Since the ctor is itself a DataValue - what&apos;s the ctor of that ctor?
+	Dim cDataCtor As DataValue
+	&apos; it&apos;ll be a DataValue again, and it&apos;ll be a 
+	&apos; dataCtor with name &quot;DataCtor&quot; and two type args
+	&apos; (ignore third field for now)
+	Dim cName As String, typeArgs As Variant
+	cName    = &quot;DataCtor&quot;
+	&apos; The typeArgs should be types (type expressions), which we don&apos;t have yet
+	&apos; But types (type expressions) may also be type variables. Let&apos;s
+	&apos; just use plain strings and pretend they&apos;re type vars.
+	typeArgs = Array(&quot;String&quot;, &quot;List_of_TypeExpr&quot;)
+	cDataCtor = _newDataValue(Nothing, Array(cName, typeArgs, Nothing))
+	c = cDataCtor
+	fs = c.fields
+	assertEqual(           fs(DataCtor_name,     c), cName).x
+	assert_toString_equals(fs(DataCtor_argTypes, c), typeArgs).x
+	assertEqual(           fs(DataCtor_typeCtor, c), Nothing).x
+
+	&apos; let&apos;s put this in as cFoo&apos;s dataCtor:
+	cFoo.ctor = cDataCtor
+	
+	&apos; What&apos;s the ctor of cDataCtor?
+	&apos; It must be a DataCtor again. Hence a DataValue with three fields:
+	&apos; - 1st the String &quot;DataCtor&quot;
+	&apos; - 2nd a two-elem Array with types &quot;String&quot; and &quot;List_of_Type_Expr&quot;
+	&apos; - 3rd ...later
+	&apos; But that&apos;s just cDataCtor itself!
+	cDataCtor.ctor = cDataCtor
+	
+	&apos; What&apos;s the type of cDataCtor, ie what should we put it&apos;s 
+	&apos; typeCtor field?
+	&apos; It&apos;s the very simple data type
+	&apos;   TDataCtor = DataCtor Str (List TypeExpr)
+	&apos; The &quot;DataCtor&quot; on the rhs is just a data ctor as we have defined,
+	&apos; and it&apos;s name is &quot;DataCtor&quot;.
+	&apos; On the lhs, however, it&apos;s a DataTypeCtor and there&apos;s &quot;T&quot; as a name
+	&apos; prefix. We *could* have given it just the same name, but the &quot;T&quot; may
+	&apos; help to reduce confusion (a little bit...).
+	&apos; Now, a DataTypeCtor has
+	&apos; - a name (a String)
+	&apos; - an arity (an Integer), which is the nr of it&apos;s type parameters
+	&apos; - zero or more DataCtors
+	&apos; We can describe that by defining another data ctor - which itself,
+	&apos; as we saw, has DataCtor as it&apos;s (data) constructor:
+	Dim cTypeCtor As DataValue, arity As Integer
+	cTypeCtor = _newDataValue(cDataCtor, Array( _
+		&quot;DataTypeCtor&quot;, _
+		Array(&quot;String&quot;, &quot;Integer&quot;, &quot;List_of_DataCtor&quot;), _
+		Nothing _
+	))
+	&apos; Now we&apos;ll make a value from that cTypeCtor that&apos;ll serve as the
+	&apos; type ctor for DataCtor:
+	Dim tcDat As DataValue
+	tcDat = _newDataValue(cTypeCtor, Array( _
+		&quot;TDataCtor&quot;, _
+		0, _
+		Array(cDataCtor) _
+	)
+	&apos; Since cDataCtor is a (the only) data ctor of tcDat, cDataCtor&apos;s
+	&apos; &quot;typeCtor&quot; field points back to tcDat.
+	cDataCtor.fields(DataCtor_typeCtor) = tc
+	&apos; What&apos;s still missing is a typeCtor for cDataTypeCtor. We already
+	&apos; have a ctor to construct DataTypeCtor s: cDataTypeCtor. It&apos;ll
+	&apos; be quite simple again, with only one data ctor (cDataTypeCtor),
+	&apos; and name &quot;TDataTypeCtor&quot;:
+	&apos; TDataTypeCtor = DataTypeCtor String Int (List DataCtor)
+	Dim tcTyp As DataValue
+	tcTyp = _newDataValue(cDataTypeCtor, Array( _
+		&quot;TDataTypeCtor&quot;,
+		0,
+		Array(cDataTypeCtor)
+	))
+	&apos; and fill in the back-pointer:
+	cDataTypeCtor.fields(DataCtor_typeCtor) = tcTyp
+	
 End Function
 
 
