@@ -166,11 +166,11 @@ Function DataValue_genericToString(v As DataValue)
 End Function
 
 
-Function _applyDataCtor_lax(ctor As DataValue, args As Array)
+Function _mkValueFrom_lax(ctor As DataValue, args As Array)
 	Dim x As Integer, a As Integer
 	a = LBound(args)
 	If a &lt;&gt; 0 Then
-		croak(&quot;_applyDataCtor_lax &quot; &amp; ctor.fields(DataCtor_name) &amp; &quot;:&quot; _
+		croak(&quot;_mkValueFrom_lax &quot; &amp; ctor.fields(DataCtor_name) &amp; &quot;:&quot; _
 			&amp; NL &amp; &quot;invalid &quot; &amp; a &amp; &quot;-based args Array&quot; _
 			&amp; NL &amp; &quot;expected 0-based Array&quot;)
 	Else
@@ -178,14 +178,14 @@ Function _applyDataCtor_lax(ctor As DataValue, args As Array)
 		a = UBound(args)
 		If a &lt;&gt; x Then
 			a = a + 1 : x = x + 1
-			croak(&quot;_applyDataCtor_lax &quot; &amp; ctor.fields(DataCtor_name) _
+			croak(&quot;_mkValueFrom_lax &quot; &amp; ctor.fields(DataCtor_name) _
 				&amp; &quot;:&quot; _
 				&amp; NL &amp; &quot;expected &quot; &amp; x &amp; &quot; arg&quot; &amp; IIf(x = 1, &quot;&quot;, &quot;s&quot;) _
 				&amp; &quot; but got &quot; &amp; a _
 				&amp; NL &amp; toString(args))
 		End If
 	End If
-	_applyDataCtor_lax = _newDataValue(ctor, args)
+	_mkValueFrom_lax = _newDataValue(ctor, args)
 End Function
 
 Sub _setTypeCtor(dataCtor As DataValue, dataTypeCtor As DataValue)
@@ -830,8 +830,9 @@ Function bootStrap()
 	&apos; with that we can make a Foo value:
 	v = _newDataValue(cFoo, emptyArray)
 	assertEqual(isDataValue(v), True).x
-	&apos; it has a constructor that ctorOf accepts:
-	assertEqual(isDataValue(ctorOf(v)), True).x
+	&apos; It has a constructor that ctorOf accepts, and it is cFoo:
+	assertEqual(DataValue_same(ctorOf(v), cFoo), True).x
+	
 	Dim vStr As String
 	vStr = DataValue_genericToString(v)
 	assertEqual( _
@@ -969,32 +970,19 @@ Function bootStrap()
 	&apos; what we&apos;ve just done will be bread-and-butter: create a value
 	&apos; from a data ctor where the value&apos;s fields are filled with the
 	&apos; argument values - provided they comply with the data ctor&apos;s
-	&apos; typeArgs.
+	&apos; argTypes.
 	&apos; Let&apos;s factor this out:
-	cDataTypeCtor = _applyDataCtor_lax(cDataCtor, Array( _
+	cDataTypeCtor = _mkValueFrom_lax(cDataCtor, Array( _
 		&quot;DataTypeCtor&quot;, _
 		Array(&quot;String&quot;, &quot;Integer&quot;, &quot;List_of_DataCtor&quot;), _
 		Nothing _
 	))
-	&apos; The function _applyDataCtor_lax will check if the nr of arguments
+	&apos; The function _mkValueFrom_lax will check if the nr of arguments
 	&apos; is correct, but it will NOT try to check their types.
 	&apos; It will then create a DataValue and fill in members
 	&apos; .ctor and .fields
-	assertEqual(isDataValue(cDataTypeCtor), 		True).x
-	assertEqual(isDataValue(ctorOf(cDataTypeCtor)), True).x
-	assertEqual( _
-		field(DataCtor_name, ctorOf(cDataTypeCtor)), _
-		field(DataCtor_name, cDataCtor) _
-	).x
-	assert_toString_equals( _
-		field(DataCtor_argTypes, ctorOf(cDataTypeCtor)), _
-		field(DataCtor_argTypes, cDataCtor) _
-	).x
-	&apos; and also - even if still empty:
-	assert_toString_equals( _
-		field(DataCtor_typeCtor, ctorOf(cDataTypeCtor)), _
-		field(DataCtor_typeCtor, cDataCtor) _
-	).x
+	assertEqual(DataValue_same(ctorOf(cDataTypeCtor), cDataCtor), True).x
+
 	&apos;TODO: Another repeated pattern is that of making DataValues that serve
 	&apos; as DataCtor s:
 	&apos;cTypeCtor = _mkDataCtor(&quot;DataTypeCtor&quot;, Nothing)
@@ -1049,7 +1037,7 @@ Function bootStrap()
 	&apos; Now we&apos;ll make a value from that cDataTypeCtor, and that value
 	&apos; will serve as the typeCtor for DataCtor:
 	Dim tcDat As DataValue
-	tcDat = _applyDataCtor_lax(cDataTypeCtor, Array( _
+	tcDat = _mkValueFrom_lax(cDataTypeCtor, Array( _
 		&quot;TDataCtor&quot;, _
 		0, _
 		Array(cDataCtor) _
@@ -1066,7 +1054,7 @@ Function bootStrap()
 	&apos; now it&apos;s set:
 	Dim it
 	it = field(DataCtor_typeCtor, cDataCtor)
-	assertEqual(isDataValue(it), True).x
+	assertEqual(DataValue_same(it, tcDat), True).x
 	&apos; we also have constants for accessing a DataTypeCtor&apos;s fields:	
 	assertEqual( _
 		field(DataTypeCtor_name, it), _
@@ -1085,21 +1073,26 @@ Function bootStrap()
 	&apos; and name &quot;TDataTypeCtor&quot;:
 	&apos; TDataTypeCtor = DataTypeCtor String Int (List DataCtor)
 	Dim tcTyp As DataValue
-	tcTyp = _applyDataCtor_lax(cDataTypeCtor, Array( _
+	tcTyp = _mkValueFrom_lax(cDataTypeCtor, Array( _
 		&quot;TDataTypeCtor&quot;, _
 		0, _
 		Array(cDataTypeCtor) _
 	))
 	&apos; and fill in the back-pointer:
 	_setTypeCtor(cDataTypeCtor, tcTyp)
+	assertEqual(DataValue_same(field(DataCtor_typeCtor, cDataTypeCtor), tcTyp), True).x
 	
 	&apos; Let&apos;s go back to old data ctor cFoo. It itself has got a proper
 	&apos; constructor (cDataCtor) but no DataTypeCtor in field typeCtor:
 	assertEqual(field(DataCtor_typeCtor, cFoo), Nothing).x
+	
+	
+	
+	
 	&apos; But before we go on to make one, let&apos;s make things a bit more 
 	&apos; interesting. Why not give him a brother:
 	Dim cBar As DataValue
-	cBar = _applyDataCtor_lax(cDataCtor, Array( _
+	cBar = _mkValueFrom_lax(cDataCtor, Array( _
 		&quot;Bar&quot;, _
 		emptyArray, _
 		Nothing _
@@ -1107,7 +1100,7 @@ Function bootStrap()
 	&apos; Bar just looks like his twin Foo, only the names are different.
 	&apos; Of course they have the same &quot;parent&quot;:
 	Dim tcFooOrBar As DataValue
-	tcFooOrBar = _applyDataCtor_lax(cDataTypeCtor, Array( _
+	tcFooOrBar = _mkValueFrom_lax(cDataTypeCtor, Array( _
 		&quot;FooOrBar&quot;, _
 		0, _
 		Array(cFoo, cBar) _
@@ -1117,9 +1110,9 @@ Function bootStrap()
 	&apos; FooOrBar = Foo | Bar
 	&apos; We can now make values of type FooOrBar
 	Dim x, y, z
-	x = _applyDataCtor_lax(cFoo, Array())
-	y = _applyDataCtor_lax(cBar, Array())
-	z = _applyDataCtor_lax(cFoo, Array())
+	x = _mkValueFrom_lax(cFoo, Array())
+	y = _mkValueFrom_lax(cBar, Array())
+	z = _mkValueFrom_lax(cFoo, Array())
 	&apos; the function isTypeOf takes a type and a value, and tests
 	&apos; whether the value has the given type:
 	assertEqual(isTypeOf(tcFooOrBar, x), True).x
@@ -1163,15 +1156,15 @@ Function bootStrap()
 	&apos; are useful. Let&apos;s enumerate some types we have in BASIC:
 	&apos; BasicType = Boolean | String | Integer | Long | Double | Object
 	Dim cBoolean, cString, cInteger, cLong, cDouble, cObject
-	cBoolean = _applyDataCtor_lax(cDataCtor, Array(&quot;Boolean&quot;, emptyArray, Nothing))
-	cString  = _applyDataCtor_lax(cDataCtor, Array(&quot;String&quot;,  emptyArray, Nothing))
-	cInteger = _applyDataCtor_lax(cDataCtor, Array(&quot;Integer&quot;, emptyArray, Nothing))
-	cLong    = _applyDataCtor_lax(cDataCtor, Array(&quot;Long&quot;,    emptyArray, Nothing))
-	cDouble  = _applyDataCtor_lax(cDataCtor, Array(&quot;Double&quot;,  emptyArray, Nothing))
-	cObject  = _applyDataCtor_lax(cDataCtor, Array(&quot;Object&quot;,  emptyArray, Nothing))
+	cBoolean = _mkValueFrom_lax(cDataCtor, Array(&quot;Boolean&quot;, emptyArray, Nothing))
+	cString  = _mkValueFrom_lax(cDataCtor, Array(&quot;String&quot;,  emptyArray, Nothing))
+	cInteger = _mkValueFrom_lax(cDataCtor, Array(&quot;Integer&quot;, emptyArray, Nothing))
+	cLong    = _mkValueFrom_lax(cDataCtor, Array(&quot;Long&quot;,    emptyArray, Nothing))
+	cDouble  = _mkValueFrom_lax(cDataCtor, Array(&quot;Double&quot;,  emptyArray, Nothing))
+	cObject  = _mkValueFrom_lax(cDataCtor, Array(&quot;Object&quot;,  emptyArray, Nothing))
 	Dim dataCtors, tcBasicType
 	dataCtors = Array(cBoolean, cString, cInteger, cLong, cDouble, cObject)
-	tcBasicType = _applyDataCtor_lax(cDataTypeCtor, _
+	tcBasicType = _mkValueFrom_lax(cDataTypeCtor, _
 		Array(&quot;BasicType&quot;, 0, dataCtors) _
 	)
 	For i = 0 To UBound(dataCtors)
@@ -1184,12 +1177,12 @@ Function bootStrap()
 
 	&apos; Values created from these constructors:
 	Dim vBoolean, vString, vInteger, vLong, vDouble, vObject
-	vBoolean = _applyDataCtor_lax(cBoolean, emptyArray)
-	vString  = _applyDataCtor_lax(cString,  emptyArray)
-	vInteger = _applyDataCtor_lax(cInteger, emptyArray)
-	vLong    = _applyDataCtor_lax(cLong,    emptyArray)
-	vDouble  = _applyDataCtor_lax(cDouble,  emptyArray)
-	vObject  = _applyDataCtor_lax(cObject,  emptyArray)
+	vBoolean = _mkValueFrom_lax(cBoolean, emptyArray)
+	vString  = _mkValueFrom_lax(cString,  emptyArray)
+	vInteger = _mkValueFrom_lax(cInteger, emptyArray)
+	vLong    = _mkValueFrom_lax(cLong,    emptyArray)
+	vDouble  = _mkValueFrom_lax(cDouble,  emptyArray)
+	vObject  = _mkValueFrom_lax(cObject,  emptyArray)
 	Dim vBasicTypes
 	vBasicTypes = Array(vBoolean, vString, vInteger, vLong, vDouble, vObject)
 	
