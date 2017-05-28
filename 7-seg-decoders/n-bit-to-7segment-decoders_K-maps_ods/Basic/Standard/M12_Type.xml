@@ -83,9 +83,14 @@ _validate_check_types:
 	Goto _validate_end
 	
 _validate_check_count_only:
-	Dim x As Integer
+	Dim x As Integer, argTypes As Variant
 	a = UBound(v.fields)
-	x = UBound(v.ctor.fields(DataCtor_argTypes))
+	argTypes = v.ctor.fields(DataCtor_argTypes)
+	If isArray(argTypes) Then
+		x = UBound(argTypes)
+	Else
+		x = a	&apos; TODO: argTypes as List
+	End If
 	If x &lt;&gt; a Then
 		x = x + 1
 		a = a + 1
@@ -131,40 +136,74 @@ Function DataValue_same(a As DataValue, b As DataValue)
 End Function
 
 Function DataValue_genericToString(v As DataValue)
+	Dim seen As String : seen = &quot;&quot;
+	DataValue_genericToString = _DataValue_genericToString(v, 0, seen)
+End Function
+
+Function _DataValue_genericToString( _
+	ByVal v 	 As DataValue, _
+	ByVal indent As Integer, _
+	ByRef seen 	 As String _
+)
 	Dim out
 	Dim ctor   As Variant : ctor   = v.ctor
 	Dim fields As Variant : fields = v.fields
 	Dim cStr   As String
 	Dim fStr   As String
-	If isDataValue(ctor) Then
-		If DataValue_same(v, ctor) Then
-			cStr = cStr &amp; &quot;-&gt;self&quot;
+	
+	If inStr(seen, v.id &amp; &quot;&quot;) &lt;&gt; 0 Then
+		out = &quot;{ id: &quot; &amp; v.id &amp; &quot; }&quot;
+	Else
+		seen = v.id &amp; &quot; &quot; &amp; seen 
+		If isDataValue(ctor) Then
+			cStr = _DataValue_genericToString(ctor, indent + 2, seen)
 		Else
-			cStr = cStr &amp; DataValue_genericToString(ctor)
+			cStr = toString(ctor)
 		End If
-	Else
-		cStr = toString(ctor)
+		If isArray(fields) Then
+			fStr = _DataValue_genericToString_Array(fields, indent, seen)
+		Else
+			fStr = toString(fields)
+		End If
+		out = &quot;{ id: &quot; &amp; v.id &amp; &quot;,&quot;			&amp; NL &amp; space(indent) _
+			&amp; &quot;  ctor: &quot; &amp; cStr &amp; &quot;,&quot; 		&amp; NL &amp; space(indent) _
+			&amp; &quot;  fields: &quot; &amp; fStr 			&amp; NL &amp; space(indent) _
+			&amp; &quot;}&quot;
 	End If
-	If isArray(fields) Then
-		fStr = &quot;Array(&quot;
-		Dim i As Integer, w As Variant
-		For i = 0 To UBound(fields)
-			If i &gt; 0 Then : fStr = fStr &amp; &quot;, &quot; : End If
-			w = fields(i)
-			If isDataValue(w) Then
-				fStr = fStr &amp; DataValue_genericToString(w)
-			Else
-				fStr = fStr &amp; toString(w)
-			End If
-		Next i
-		fStr = fStr &amp; &quot;)&quot;
-	Else
-		fStr = toString(fields)
-	End If
-	out = &quot;{ctor: &quot; &amp; cStr &amp; &quot;, fields: &quot; &amp; fStr &amp; &quot;}&quot;
-	DataValue_genericToString = out
+	_DataValue_genericToString = out
 End Function
 
+Function _DataValue_genericToString_Array( _
+	ByVal a 	 As Array, _
+	ByVal indent As Integer, _
+	ByRef seen 	 As String _
+)
+	Dim out
+	out = &quot;Array(&quot;
+	If UBound(a) &lt; 0 Then
+		out = out &amp; &quot;)&quot;
+	Else
+		out = out &amp; NL &amp; space(indent + 4)
+		Dim i As Integer, w As Variant
+		For i = 0 To UBound(a)
+			If i &gt; 0 Then
+				out = out &amp; &quot;,&quot; &amp; NL &amp; space(indent + 4)
+			End If
+			w = a(i)
+			If isArray(w) Then
+				out = out &amp; _
+				_DataValue_genericToString_Array(w, indent + 2, seen)
+			ElseIf isDataValue(w) Then
+				out = out &amp; _
+				_DataValue_genericToString(w, indent + 4, seen)
+			Else
+				out = out &amp; toString(w)
+			End If
+		Next i
+		out = out &amp; NL &amp; space(indent + 2) &amp; &quot;)&quot;
+	End If	
+	_DataValue_genericToString_Array = out
+End Function
 
 Function _mkValueFrom_lax(ctor As DataValue, args As Array)
 	Dim x As Integer, a As Integer
@@ -786,65 +825,78 @@ Function test_Type_ctorOf()
 End Function
 
 Function bootStrap()
-	Dim cFoo, v
+	Dim cNil
 	&apos; let&apos;s make something that is (almost) a DataCtor
-	cFoo = _newDataValue(Nothing, Array( _
-		&quot;Foo&quot;, _
+	cNil = _newDataValue(Nothing, Array( _
+		&quot;Nil&quot;, _
 		emptyArray, _
 		Nothing _
 	)
-	assertEqual(isDataValue(cFoo), True).x
+	assertEqual(isDataValue(cNil), True).x
 	
 	&apos; There&apos;s a member .id on each DataValue which is unique to
 	&apos; the particular instance. This yields a notion of sameness:
-	assertEqual(DataValue_same(cFoo, cFoo), True).x
+	assertEqual(DataValue_same(cNil, cNil), True).x
 	&apos; Even if we provide the very same values, we&apos;ll get a
 	&apos; different instance:
-	v = _newDataValue(Nothing, Array( _
-		&quot;Foo&quot;, _
+	Dim x
+	x = _newDataValue(Nothing, Array( _
+		&quot;Nil&quot;, _
 		emptyArray, _
 		Nothing _
 	)
-	assertEqual(DataValue_same(v, cFoo), False).x
+	assertEqual(DataValue_same(x, cNil), False).x
 	&apos; &quot;Sameness&quot; is of course symmetric, ie x same y iff y same x:
-	assertEqual(DataValue_same(cFoo, v), False).x
+	assertEqual(DataValue_same(cNil, x), False).x
 	&apos; ...and it is of course reflexive, ie forall x: x same x
-	assertEqual(DataValue_same(v, v), True).x
+	assertEqual(DataValue_same(x, x), True).x
 	
 	&apos; The function DataValue_genericToString provides a way to
 	&apos; see what&apos;s inside a DataValue:
-	Dim cFooStr As String
-	cFooStr = DataValue_genericToString(cFoo)
+	Dim cNilStr As String
+	cNilStr = DataValue_genericToString(cNil)
 	assertEqual( _
-		cFooStr, _
-		 &quot;{&quot; _
-		 	&amp; &quot;ctor: Nothing, &quot; _
-			&amp; &quot;fields: Array(&quot; _
-				&amp; &quot;&apos;Foo&apos;, &quot; _ 
-				&amp; &quot;Array(), &quot; _ 
-				&amp; &quot;Nothing&quot; _
-			&amp; &quot;)&quot; _
-		&amp; &quot;}&quot; _
+		cNilStr, _
+		&quot;{ id: &quot; &amp; cNil.id &amp; &quot;,&quot;	&amp; NL &amp; _
+		&quot;  ctor: Nothing,&quot;			&amp; NL &amp; _
+		&quot;  fields: Array(&quot;			&amp; NL &amp; _
+		&quot;    &apos;Nil&apos;,&quot;				&amp; NL &amp; _ 
+		&quot;    Array(),&quot;				&amp; NL &amp; _ 
+		&quot;    Nothing&quot;				&amp; NL &amp; _
+		&quot;  )&quot;						&amp; NL &amp; _
+		&quot;}&quot;							       _
 	).x
 
-	&apos; with that we can make a Foo value:
-	v = _newDataValue(cFoo, emptyArray)
-	assertEqual(isDataValue(v), True).x
-	&apos; It has a constructor that ctorOf accepts, and it is cFoo:
-	assertEqual(DataValue_same(ctorOf(v), cFoo), True).x
+	&apos; with that we can make a Nil value:
+	Dim vNil
+	vNil = _newDataValue(cNil, emptyArray)
+	assertEqual(isDataValue(vNil), True).x
+	&apos; It has a constructor that ctorOf accepts, and that is cFoo:
+	assertEqual(DataValue_same(ctorOf(vNil), cNil), True).x
 	
-	Dim vStr As String
-	vStr = DataValue_genericToString(v)
+	Dim vNilStr As String
+	vNilStr = DataValue_genericToString(vNil)
 	assertEqual( _
-		vStr, _
-		&quot;{ctor: &quot; &amp; cFooStr &amp; &quot;, fields: Array()}&quot; _
+		vNilStr, _
+	    &quot;{ id: &quot; &amp; vNil.id	&amp; &quot;,&quot;			&amp; NL &amp; _
+		&quot;  ctor: { id: &quot; &amp; cNil.id &amp; &quot;,&quot;	&amp; NL &amp; _
+		&quot;    ctor: Nothing,&quot;				&amp; NL &amp; _
+		&quot;    fields: Array(&quot;				&amp; NL &amp; _
+		&quot;      &apos;Nil&apos;,&quot;						&amp; NL &amp; _ 
+		&quot;      Array(),&quot;					&amp; NL &amp; _ 
+		&quot;      Nothing&quot;						&amp; NL &amp; _
+		&quot;    )&quot;								&amp; NL &amp; _
+		&quot;  },&quot;								&amp; NL &amp; _
+		&quot;  fields: Array()&quot;					&amp; NL &amp; _
+		&quot;}&quot;									       _
 	).x
+	
 	
 	&apos; access ctor fields:
 	&apos; TODO: why not .fields ?
 	Dim c
-	c = ctorOf(v)
-	assertEqual(           field(DataCtor_name,     c),      &quot;Foo&quot;).x
+	c = ctorOf(vNil)
+	assertEqual(           field(DataCtor_name,     c),      &quot;Nil&quot;).x
 	assert_toString_equals(field(DataCtor_argTypes, c), emptyArray).x
 	assertEqual(           field(DataCtor_typeCtor, c),    Nothing).x
 	
@@ -860,9 +912,13 @@ Function bootStrap()
 	&apos; third must be &quot;TDataTypeCtor&quot;.
 	Dim cName As String, argTypes As Variant
 	cName    = &quot;DataCtor&quot;
-	&apos; The argTypes should be types (type expressions), which we don&apos;t have yet
+	&apos; The argTypes should be types (type expressions), which we don&apos;t
+	&apos; have yet.
 	&apos; But types (type expressions) may also be type variables. Let&apos;s
 	&apos; just use plain strings and pretend they&apos;re type vars.
+	&apos; Similarly, since we don&apos;t have the List data type yet, we&apos;ll
+	&apos; use a native Array instead for argTypes and pretend it were a
+	&apos; List.
 	argTypes = Array(&quot;String&quot;, &quot;List_of_TypeExpr&quot;, &quot;TDataTypeCtor&quot;)
 	cDataCtor = _newDataValue(Nothing, Array(cName, argTypes, Nothing))
 	c = cDataCtor
@@ -873,36 +929,48 @@ Function bootStrap()
 	&apos; What does it look like?
 	Dim cDataCtorStr As String
 	cDataCtorStr = DataValue_genericToString(cDataCtor)
+	&apos;msgbox(cDataCtorStr)
 	assertEqual( _
 		cDataCtorStr, _
-		 &quot;{&quot; _ 
-		 	&amp; &quot;ctor: Nothing, &quot; _
-			&amp; &quot;fields: Array(&quot; _
-				&amp; &quot;&apos;DataCtor&apos;, &quot; _ 
-				&amp; &quot;Array(&quot; _
-					&amp; &quot;&apos;String&apos;, &quot; _
-					&amp; &quot;&apos;List_of_TypeExpr&apos;, &quot; _
-					&amp; &quot;&apos;TDataTypeCtor&apos;&quot; _
-				&amp; &quot;), &quot; _ 
-				&amp; &quot;Nothing&quot; _
-			&amp; &quot;)&quot; _
-		&amp; &quot;}&quot; _
+		&quot;{ id: &quot; &amp; cDataCtor.id &amp; &quot;,&quot;	&amp; NL &amp; _
+		&quot;  ctor: Nothing,&quot;				&amp; NL &amp; _
+		&quot;  fields: Array(&quot;				&amp; NL &amp; _
+		&quot;    &apos;DataCtor&apos;,&quot;				&amp; NL &amp; _ 
+		&quot;    Array(&quot;					&amp; NL &amp; _
+		&quot;      &apos;String&apos;,&quot;				&amp; NL &amp; _
+		&quot;      &apos;List_of_TypeExpr&apos;,&quot;		&amp; NL &amp; _
+		&quot;      &apos;TDataTypeCtor&apos;&quot;			&amp; NL &amp; _
+		&quot;    ),&quot;						&amp; NL &amp; _
+		&quot;    Nothing&quot;					&amp; NL &amp; _
+		&quot;  )&quot;							&amp; NL &amp; _
+		&quot;}&quot;							           _
 	).x
 
 	&apos; Let&apos;s put this in as cFoo&apos;s .ctor:
-	cFoo.ctor = cDataCtor
+	cNil.ctor = cDataCtor
 	&apos; Now cFoo looks like this:
-	cFooStr = DataValue_genericToString(cFoo)
+	cNilStr = DataValue_genericToString(cNil)
 	assertEqual( _
-		cFooStr, _
-		 &quot;{&quot; _
-		 	&amp; &quot;ctor: &quot; &amp; cDataCtorStr &amp; &quot;, &quot; _
-			&amp; &quot;fields: Array(&quot; _
-				&amp; &quot;&apos;Foo&apos;, &quot; _ 
-				&amp; &quot;Array(), &quot; _ 
-				&amp; &quot;Nothing&quot; _
-			&amp; &quot;)&quot; _
-		&amp; &quot;}&quot; _
+		cNilStr, _
+		&quot;{ id: &quot; &amp; cNil.id &amp; &quot;,&quot;				&amp; NL &amp; _
+		&quot;  ctor: { id: &quot; &amp; cDataCtor.id &amp; &quot;,&quot;	&amp; NL &amp; _
+		&quot;    ctor: Nothing,&quot;					&amp; NL &amp; _
+		&quot;    fields: Array(&quot;					&amp; NL &amp; _
+		&quot;      &apos;DataCtor&apos;,&quot;						&amp; NL &amp; _ 
+		&quot;      Array(&quot;							&amp; NL &amp; _ 
+		&quot;        &apos;String&apos;,&quot;						&amp; NL &amp; _ 
+		&quot;        &apos;List_of_TypeExpr&apos;,&quot;			&amp; NL &amp; _ 
+		&quot;        &apos;TDataTypeCtor&apos;&quot;				&amp; NL &amp; _ 
+		&quot;      ),&quot;								&amp; NL &amp; _
+		&quot;      Nothing&quot;							&amp; NL &amp; _
+		&quot;    )&quot;									&amp; NL &amp; _
+		&quot;  },&quot;									&amp; NL &amp; _
+		&quot;  fields: Array(&quot;						&amp; NL &amp; _
+		&quot;    &apos;Nil&apos;,&quot;							&amp; NL &amp; _
+		&quot;    Array(),&quot;							&amp; NL &amp; _
+		&quot;    Nothing&quot;							&amp; NL &amp; _
+		&quot;  )&quot;									&amp; NL &amp; _
+		&quot;}&quot; _
 	).x
 	
 	
@@ -930,18 +998,18 @@ Function bootStrap()
 	cDataCtorStr = DataValue_genericToString(cDataCtor)
 	assertEqual( _
 		cDataCtorStr, _
-		 &quot;{&quot; _ 
-		 	&amp; &quot;ctor: -&gt;self, &quot; _
-			&amp; &quot;fields: Array(&quot; _
-				&amp; &quot;&apos;DataCtor&apos;, &quot; _ 
-				&amp; &quot;Array(&quot; _
-					&amp; &quot;&apos;String&apos;, &quot; _
-					&amp; &quot;&apos;List_of_TypeExpr&apos;, &quot; _
-					&amp; &quot;&apos;TDataTypeCtor&apos;&quot; _
-				&amp; &quot;), &quot; _ 
-				&amp; &quot;Nothing&quot; _
-			&amp; &quot;)&quot; _
-		&amp; &quot;}&quot; _
+		&quot;{ id: &quot; &amp; cDataCtor.id &amp; &quot;,&quot;			&amp; NL &amp; _
+		&quot;  ctor: { id: &quot; &amp; cDataCtor.id &amp; &quot; },&quot;	&amp; NL &amp; _
+		&quot;  fields: Array(&quot;						&amp; NL &amp; _
+		&quot;    &apos;DataCtor&apos;,&quot;						&amp; NL &amp; _
+		&quot;    Array(&quot;							&amp; NL &amp; _
+		&quot;      &apos;String&apos;,&quot;						&amp; NL &amp; _
+		&quot;      &apos;List_of_TypeExpr&apos;,&quot;				&amp; NL &amp; _
+		&quot;      &apos;TDataTypeCtor&apos;&quot;					&amp; NL &amp; _
+		&quot;    ),&quot;								&amp; NL &amp; _
+		&quot;    Nothing&quot;							&amp; NL &amp; _
+		&quot;  )&quot;									&amp; NL &amp; _
+		&quot;}&quot; _
 	).x
 	
 	
@@ -950,7 +1018,7 @@ Function bootStrap()
 	&apos; It&apos;s the very simple data type
 	&apos;   TDataCtor = DataCtor Str (List TypeExpr)
 	&apos; The &quot;DataCtor&quot; on the rhs is just a data ctor as we have defined,
-	&apos; and it&apos;s name is &quot;DataCtor&quot;.
+	&apos; and its name is &quot;DataCtor&quot;.
 	&apos; On the lhs, however, it&apos;s a DataTypeCtor and there&apos;s &quot;T&quot; as a name
 	&apos; prefix. We *could* have given it just the same name, but the &quot;T&quot; may
 	&apos; help to reduce confusion (a little bit...).
@@ -971,20 +1039,17 @@ Function bootStrap()
 	&apos; from a data ctor where the value&apos;s fields are filled with the
 	&apos; argument values - provided they comply with the data ctor&apos;s
 	&apos; argTypes.
-	&apos; Let&apos;s factor this out:
-	cDataTypeCtor = _mkValueFrom_lax(cDataCtor, Array( _
+	&apos; However, we cannot factor this pattern out until we&apos;ve completed
+	&apos; the bootstrap.
+	cDataTypeCtor = _newDataValue(cDataCtor, Array( _
 		&quot;DataTypeCtor&quot;, _
 		Array(&quot;String&quot;, &quot;Integer&quot;, &quot;List_of_DataCtor&quot;), _
 		Nothing _
 	))
-	&apos; The function _mkValueFrom_lax will check if the nr of arguments
-	&apos; is correct, but it will NOT try to check their types.
-	&apos; It will then create a DataValue and fill in members
-	&apos; .ctor and .fields
 	assertEqual(DataValue_same(ctorOf(cDataTypeCtor), cDataCtor), True).x
 
 	&apos;TODO: Another repeated pattern is that of making DataValues that serve
-	&apos; as DataCtor s:
+	&apos; serve as DataCtor s:
 	&apos;cTypeCtor = _mkDataCtor(&quot;DataTypeCtor&quot;, Nothing)
 	&apos; This will stick in the repeated cDataCtor as .ctor member and
 	&apos; Array(&quot;String&quot;, &quot;Integer&quot;, &quot;List_of_DataCtor&quot;) as argType field
@@ -992,52 +1057,38 @@ Function bootStrap()
 	&apos; Let&apos;s inspect cDataTypeCtor.
 	Dim cDataTypeCtorStr As String
 	cDataTypeCtorStr = DataValue_genericToString(cDataTypeCtor)
-	assertEqual(cDataTypeCtorStr, _
-		 &quot;{&quot; _ 
-		 	&amp; &quot;ctor: &quot; &amp; cDataCtorStr &amp; &quot;, &quot; _
-			&amp; &quot;fields: Array(&quot; _
-				&amp; &quot;&apos;DataTypeCtor&apos;, &quot; _ 
-				&amp; &quot;Array(&quot; _
-					&amp; &quot;&apos;String&apos;, &quot; _
-					&amp; &quot;&apos;Integer&apos;, &quot; _
-					&amp; &quot;&apos;List_of_DataCtor&apos;&quot; _
-				&amp; &quot;), &quot; _ 
-				&amp; &quot;Nothing&quot; _
-			&amp; &quot;)&quot; _
-		&amp; &quot;}&quot; _
-	).x
-	&apos; Or the whole picture:
-	assertEqual(cDataTypeCtorStr, _
-		 &quot;{&quot; _ 
-		 	&amp; &quot;ctor: {&quot; _
-				&amp; &quot;ctor: -&gt;self, &quot; _
-				&amp; &quot;fields: Array(&quot; _
-					&amp; &quot;&apos;DataCtor&apos;, &quot; _ 
-					&amp; &quot;Array(&quot; _
-						&amp; &quot;&apos;String&apos;, &quot; _
-						&amp; &quot;&apos;List_of_TypeExpr&apos;, &quot; _
-						&amp; &quot;&apos;TDataTypeCtor&apos;&quot; _
-					&amp; &quot;), &quot; _ 
-					&amp; &quot;Nothing&quot; _
-				&amp; &quot;)&quot; _ 
-			&amp; &quot;}, &quot; _
-			&amp; &quot;fields: Array(&quot; _
-				&amp; &quot;&apos;DataTypeCtor&apos;, &quot; _ 
-				&amp; &quot;Array(&quot; _
-					&amp; &quot;&apos;String&apos;, &quot; _
-					&amp; &quot;&apos;Integer&apos;, &quot; _
-					&amp; &quot;&apos;List_of_DataCtor&apos;&quot; _
-				&amp; &quot;), &quot; _ 
-				&amp; &quot;Nothing&quot; _
-			&amp; &quot;)&quot; _
-		&amp; &quot;}&quot; _
+	assertEqual( _
+		cDataTypeCtorStr, _
+		&quot;{ id: &quot; &amp; cDataTypeCtor.id &amp; &quot;,&quot;			&amp; NL &amp; _
+		&quot;  ctor: { id: &quot; &amp; cDataCtor.id &amp; &quot;,&quot;		&amp; NL &amp; _
+		&quot;    ctor: { id: &quot; &amp; cDataCtor.id &amp; &quot; },&quot;	&amp; NL &amp; _
+		&quot;    fields: Array(&quot;						&amp; NL &amp; _
+		&quot;      &apos;DataCtor&apos;,&quot;							&amp; NL &amp; _
+		&quot;      Array(&quot;								&amp; NL &amp; _
+		&quot;        &apos;String&apos;,&quot;							&amp; NL &amp; _
+		&quot;        &apos;List_of_TypeExpr&apos;,&quot;				&amp; NL &amp; _
+		&quot;        &apos;TDataTypeCtor&apos;&quot;					&amp; NL &amp; _
+		&quot;      ),&quot;									&amp; NL &amp; _
+		&quot;      Nothing&quot;								&amp; NL &amp; _
+		&quot;    )&quot;										&amp; NL &amp; _
+		&quot;  },&quot;										&amp; NL &amp; _
+		&quot;  fields: Array(&quot;							&amp; NL &amp; _
+		&quot;    &apos;DataTypeCtor&apos;,&quot;						&amp; NL &amp; _
+		&quot;    Array(&quot;								&amp; NL &amp; _
+		&quot;      &apos;String&apos;,&quot;							&amp; NL &amp; _
+		&quot;      &apos;Integer&apos;,&quot;							&amp; NL &amp; _
+		&quot;      &apos;List_of_DataCtor&apos;&quot;					&amp; NL &amp; _
+		&quot;    ),&quot;									&amp; NL &amp; _
+		&quot;    Nothing&quot;								&amp; NL &amp; _
+		&quot;  )&quot;										&amp; NL &amp; _
+		&quot;}&quot; _
 	).x
 	
 	
 	&apos; Now we&apos;ll make a value from that cDataTypeCtor, and that value
 	&apos; will serve as the typeCtor for DataCtor:
 	Dim tcDat As DataValue
-	tcDat = _mkValueFrom_lax(cDataTypeCtor, Array( _
+	tcDat = _newDataValue(cDataTypeCtor, Array( _
 		&quot;TDataCtor&quot;, _
 		0, _
 		Array(cDataCtor) _
@@ -1062,11 +1113,50 @@ Function bootStrap()
 	assertEqual( _
 		field(DataTypeCtor_arity, it), _
 		field(DataTypeCtor_arity, tcDat) ).x
-	assert_toString_equals( _
-		field(DataTypeCtor_dataCtors, it), _
-		field(DataTypeCtor_dataCtors, tcDat) ).x
-
-
+	
+	it = field(DataTypeCtor_dataCtors, tcDat)
+	assertEqual(isArray(it), True).x
+	assertEqual(DataValue_same(it(0), cDataCtor), True).x
+	
+	Dim tcDatStr As String
+	tcDatStr = DataValue_genericToString(tcDat)
+	
+	&apos;msgbox(tcDatStr &amp; NL &amp; NL &amp; _
+	assertEqual(tcDatStr, _
+		&quot;{ id: &quot; &amp; tcDat.id &amp; &quot;,&quot;					&amp; NL &amp; _
+		&quot;  ctor: { id: &quot; &amp; cDataTypeCtor.id &amp; &quot;,&quot;	&amp; NL &amp; _
+		&quot;    ctor: { id: &quot; &amp; cDataCtor.id &amp; &quot;,&quot;		&amp; NL &amp; _
+		&quot;      ctor: { id: &quot; &amp; cDataCtor.id &amp; &quot; },&quot;	&amp; NL &amp; _
+		&quot;      fields: Array(&quot;						&amp; NL &amp; _
+		&quot;        &apos;DataCtor&apos;,&quot;						&amp; NL &amp; _
+		&quot;        Array(&quot;							&amp; NL &amp; _
+		&quot;          &apos;String&apos;,&quot;						&amp; NL &amp; _
+		&quot;          &apos;List_of_TypeExpr&apos;,&quot;				&amp; NL &amp; _
+		&quot;          &apos;TDataTypeCtor&apos;&quot;					&amp; NL &amp; _
+		&quot;        ),&quot;								&amp; NL &amp; _
+		&quot;        { id: &quot; &amp; tcDat.id &amp; &quot; }&quot;			&amp; NL &amp; _
+		&quot;      )&quot;									&amp; NL &amp; _
+		&quot;    },&quot;									&amp; NL &amp; _
+		&quot;    fields: Array(&quot;						&amp; NL &amp; _
+		&quot;      &apos;DataTypeCtor&apos;,&quot;						&amp; NL &amp; _
+		&quot;      Array(&quot;								&amp; NL &amp; _
+		&quot;        &apos;String&apos;,&quot;							&amp; NL &amp; _
+		&quot;        &apos;Integer&apos;,&quot;						&amp; NL &amp; _
+		&quot;        &apos;List_of_DataCtor&apos;&quot;				&amp; NL &amp; _
+		&quot;      ),&quot;									&amp; NL &amp; _
+		&quot;      Nothing&quot;								&amp; NL &amp; _
+		&quot;    )&quot;										&amp; NL &amp; _
+		&quot;  },&quot;										&amp; NL &amp; _
+		&quot;  fields: Array(&quot;							&amp; NL &amp; _
+		&quot;    &apos;TDataCtor&apos;,&quot;							&amp; NL &amp; _
+		&quot;    0,&quot;									&amp; NL &amp; _
+		&quot;    Array(&quot;								&amp; NL &amp; _
+		&quot;      { id: &quot; &amp; cDataCtor.id &amp; &quot; }&quot;		&amp; NL &amp; _
+		&quot;    )&quot;										&amp; NL &amp; _
+		&quot;  )&quot;										&amp; NL &amp; _
+		&quot;}&quot; _
+	).x
+	
 	&apos; What&apos;s still missing is a typeCtor for cDataTypeCtor. We already
 	&apos; have a ctor to construct DataTypeCtor s: cDataTypeCtor. It&apos;ll
 	&apos; be quite simple again, with only one data ctor (cDataTypeCtor),
@@ -1082,12 +1172,94 @@ Function bootStrap()
 	_setTypeCtor(cDataTypeCtor, tcTyp)
 	assertEqual(DataValue_same(field(DataCtor_typeCtor, cDataTypeCtor), tcTyp), True).x
 	
-	&apos; Let&apos;s go back to old data ctor cFoo. It itself has got a proper
+	Dim tcTypStr As String
+	tcTypStr = DataValue_genericToString(tcTyp)
+	
+	&apos;msgbox(tcTypStr &amp; NL &amp; NL &amp; _
+	assertEqual(tcTypStr, _
+		&quot;{ id: &quot; &amp; tcTyp.id &amp; &quot;,&quot;							&amp; NL &amp; _
+		&quot;  ctor: { id: &quot; &amp; cDataTypeCtor.id &amp; &quot;,&quot;			&amp; NL &amp; _
+		&quot;    ctor: { id: &quot; &amp; cDataCtor.id &amp; &quot;,&quot;				&amp; NL &amp; _
+		&quot;      ctor: { id: &quot; &amp; cDataCtor.id &amp; &quot; },&quot;			&amp; NL &amp; _
+		&quot;      fields: Array(&quot;								&amp; NL &amp; _
+		&quot;        &apos;DataCtor&apos;,&quot;								&amp; NL &amp; _
+		&quot;        Array(&quot;									&amp; NL &amp; _
+		&quot;          &apos;String&apos;,&quot;								&amp; NL &amp; _
+		&quot;          &apos;List_of_TypeExpr&apos;,&quot;						&amp; NL &amp; _
+		&quot;          &apos;TDataTypeCtor&apos;&quot;							&amp; NL &amp; _
+		&quot;        ),&quot;										&amp; NL &amp; _
+		&quot;        { id: &quot; &amp; tcDat.id &amp; &quot;,&quot;					&amp; NL &amp; _
+		&quot;          ctor: { id: &quot; &amp; cDataTypeCtor.id &amp; &quot; },&quot;	&amp; NL &amp; _
+		&quot;          fields: Array(&quot;							&amp; NL &amp; _
+		&quot;            &apos;TDataCtor&apos;,&quot;							&amp; NL &amp; _
+		&quot;            0,&quot;									&amp; NL &amp; _
+		&quot;            Array(&quot;								&amp; NL &amp; _
+		&quot;              { id: &quot; &amp; cDataCtor.id &amp; &quot; }&quot;		&amp; NL &amp; _
+		&quot;            )&quot;										&amp; NL &amp; _
+		&quot;          )&quot;										&amp; NL &amp; _
+		&quot;        }&quot;											&amp; NL &amp; _
+		&quot;      )&quot;											&amp; NL &amp; _
+		&quot;    },&quot;											&amp; NL &amp; _
+		&quot;    fields: Array(&quot;								&amp; NL &amp; _
+		&quot;      &apos;DataTypeCtor&apos;,&quot;								&amp; NL &amp; _
+		&quot;      Array(&quot;										&amp; NL &amp; _
+		&quot;        &apos;String&apos;,&quot;									&amp; NL &amp; _
+		&quot;        &apos;Integer&apos;,&quot;								&amp; NL &amp; _
+		&quot;        &apos;List_of_DataCtor&apos;&quot;						&amp; NL &amp; _
+		&quot;      ),&quot;											&amp; NL &amp; _
+		&quot;      { id: &quot; &amp; tcTyp.id &amp; &quot; }&quot;					&amp; NL &amp; _
+		&quot;    )&quot;												&amp; NL &amp; _
+		&quot;  },&quot;												&amp; NL &amp; _
+		&quot;  fields: Array(&quot;									&amp; NL &amp; _
+		&quot;    &apos;TDataTypeCtor&apos;,&quot;								&amp; NL &amp; _
+		&quot;    0,&quot;											&amp; NL &amp; _
+		&quot;    Array(&quot;										&amp; NL &amp; _
+		&quot;      { id: &quot; &amp; cDataTypeCtor.id &amp; &quot; }&quot;			&amp; NL &amp; _
+		&quot;    )&quot;												&amp; NL &amp; _
+		&quot;  )&quot;												&amp; NL &amp; _
+		&quot;}&quot; _
+	).x
+		
+	
+	&apos; Let&apos;s go back to old data ctor cNil. It itself has got a proper
 	&apos; constructor (cDataCtor) but no DataTypeCtor in field typeCtor:
-	assertEqual(field(DataCtor_typeCtor, cFoo), Nothing).x
+	assertEqual(field(DataCtor_typeCtor, cNil), Nothing).x
 	
+	&apos; So let&apos;s make one:
+	Dim tcList As DataValue
+	tcList = _newDataValue(cDataTypeCtor, Array( _
+		&quot;List&quot;, 1, Nothing _
+	))
+	_setTypeCtor(cNil, tcList)
+	&apos; There are two things that are different from what we did before:
+	&apos;   - the arity field is set to 1, rather than 0
+	&apos;   - the dataCtors field is left empty
+	&apos; The former is to say that List will have a type parameter,
+	&apos; and the latter is because we will be using *a List* again
+	&apos; for this field - and once we have it do the same to the other
+	&apos; TDataTypeCtor s we have.
+	&apos; But before we can do so we need another data ctor for List:
+	Dim cCons As DataValue
+	cCons = _newDataValue(cDataCtor, Array( _
+		&quot;Cons&quot;, Nothing, tcList _
+	))
+	&apos; There we have left empty the argTypes field, again because we
+	&apos; a List itself there. But we already filled in the type ctor:
+	assertEqual(DataValue_same(field(DataCtor_typeCtor, cCons), tcList), True).x
 	
-	
+	&apos; With those two data ctors we can now make List values.
+	&apos; We already made one from cNil : vNil. It represents the 
+	&apos; empty List. But that is exactly the argTypes list that 
+	&apos; we want for the 0-arity data ctor cNil.
+	cNil.fields(DataCtor_argTypes) = vNil
+	&apos; A singleton list that contains just the data ctor cCons is this:
+	x = _newDataValue(cCons, Array(cCons, vNil))
+	&apos; ...and the two-elem list that contains both data ctors, cNil and
+	&apos; and cCons - which we want for tcList&apos;s dataCtors field:
+	tcList.fields(DataTypeCtor_dataCtors) = _newDataValue( _
+		cCons, Array(cNil, x) _
+	)
+	msgbox(DataValue_genericToString(tcList))
 	
 	&apos; But before we go on to make one, let&apos;s make things a bit more 
 	&apos; interesting. Why not give him a brother:
@@ -1109,7 +1281,7 @@ Function bootStrap()
 	_setTypeCtor(cBar, tcFooOrBar)
 	&apos; FooOrBar = Foo | Bar
 	&apos; We can now make values of type FooOrBar
-	Dim x, y, z
+	Dim y, z
 	x = _mkValueFrom_lax(cFoo, Array())
 	y = _mkValueFrom_lax(cBar, Array())
 	z = _mkValueFrom_lax(cFoo, Array())
