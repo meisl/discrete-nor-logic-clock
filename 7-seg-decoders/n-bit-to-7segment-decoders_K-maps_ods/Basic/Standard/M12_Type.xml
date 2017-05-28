@@ -1253,43 +1253,43 @@ Function bootStrap()
 	
 	&apos; Now we&apos;ll make a value from that cDataTypeCtor, and that value
 	&apos; will serve as the typeCtor for DataCtor:
-	Dim tcDat As DataValue
-	tcDat = _newDataValue(cDataTypeCtor, Array( _
+	Dim tcDataCtor As DataValue
+	tcDataCtor = _newDataValue(cDataTypeCtor, Array( _
 		&quot;TDataCtor&quot;, _
 		0, _
 		Array(cDataCtor) _
 	)
-	&apos; Since cDataCtor is a (the only) data ctor of tcDat, cDataCtor&apos;s
-	&apos; &quot;typeCtor&quot; field points back to tcDat. We could do this by indexing
+	&apos; Since cDataCtor is a (the only) data ctor of tcDataCtor, cDataCtor&apos;s
+	&apos; &quot;typeCtor&quot; field points back to tcDataCtor. We could do this by indexing
 	&apos; into the .fields member and writing it there, like so:
-	&apos; cDataCtor.fields(DataCtor_typeCtor) = tcDat
+	&apos; cDataCtor.fields(DataCtor_typeCtor) = tcDataCtor
 	&apos; But again, this pointer-fixing will occur everytime we create a new
 	&apos; data type (and its constructors), so:
  	assertEqual(field(DataCtor_typeCtor, cDataCtor), Nothing).x
 	&apos; was empty, now set it:
-	_setTypeCtor(cDataCtor, tcDat)
+	_setTypeCtor(cDataCtor, tcDataCtor)
 	&apos; now it&apos;s set:
 	Dim it
 	it = field(DataCtor_typeCtor, cDataCtor)
-	assertEqual(DataValue_same(it, tcDat), True).x
+	assertEqual(DataValue_same(it, tcDataCtor), True).x
 	&apos; we also have constants for accessing a DataTypeCtor&apos;s fields:	
 	assertEqual( _
 		field(DataTypeCtor_name, it), _
-		field(DataTypeCtor_name, tcDat) ).x
+		field(DataTypeCtor_name, tcDataCtor) ).x
 	assertEqual( _
 		field(DataTypeCtor_arity, it), _
-		field(DataTypeCtor_arity, tcDat) ).x
+		field(DataTypeCtor_arity, tcDataCtor) ).x
 	
-	it = field(DataTypeCtor_dataCtors, tcDat)
+	it = field(DataTypeCtor_dataCtors, tcDataCtor)
 	assertEqual(isArray(it), True).x
 	assertEqual(DataValue_same(it(0), cDataCtor), True).x
 	
 	Dim tcDatStr As String
-	tcDatStr = DataValue_genericToString(tcDat)
+	tcDatStr = DataValue_genericToString(tcDataCtor)
 	
 	&apos;msgbox(tcDatStr &amp; NL &amp; NL &amp; _
 	assertEqual(tcDatStr, _
-		&quot;{ id: &quot; &amp; tcDat.id &amp; &quot;,&quot;					&amp; NL &amp; _
+		&quot;{ id: &quot; &amp; tcDataCtor.id &amp; &quot;,&quot;				&amp; NL &amp; _
 		&quot;  ctor: { id: &quot; &amp; cDataTypeCtor.id &amp; &quot;,&quot;	&amp; NL &amp; _
 		&quot;    ctor: { id: &quot; &amp; cDataCtor.id &amp; &quot;,&quot;		&amp; NL &amp; _
 		&quot;      ctor: { id: &quot; &amp; cDataCtor.id &amp; &quot; },&quot;	&amp; NL &amp; _
@@ -1300,7 +1300,7 @@ Function bootStrap()
 		&quot;          &apos;List_of_TypeExpr&apos;,&quot;				&amp; NL &amp; _
 		&quot;          &apos;TDataTypeCtor&apos;&quot;					&amp; NL &amp; _
 		&quot;        ),&quot;								&amp; NL &amp; _
-		&quot;        { id: &quot; &amp; tcDat.id &amp; &quot; }&quot;			&amp; NL &amp; _
+		&quot;        { id: &quot; &amp; tcDataCtor.id &amp; &quot; }&quot;		&amp; NL &amp; _
 		&quot;      )&quot;									&amp; NL &amp; _
 		&quot;    },&quot;									&amp; NL &amp; _
 		&quot;    fields: Array(&quot;						&amp; NL &amp; _
@@ -1356,7 +1356,7 @@ Function bootStrap()
 		&quot;          &apos;List_of_TypeExpr&apos;,&quot;						&amp; NL &amp; _
 		&quot;          &apos;TDataTypeCtor&apos;&quot;							&amp; NL &amp; _
 		&quot;        ),&quot;										&amp; NL &amp; _
-		&quot;        { id: &quot; &amp; tcDat.id &amp; &quot;,&quot;					&amp; NL &amp; _
+		&quot;        { id: &quot; &amp; tcDataCtor.id &amp; &quot;,&quot;				&amp; NL &amp; _
 		&quot;          ctor: { id: &quot; &amp; cDataTypeCtor.id &amp; &quot; },&quot;	&amp; NL &amp; _
 		&quot;          fields: Array(&quot;							&amp; NL &amp; _
 		&quot;            &apos;TDataCtor&apos;,&quot;							&amp; NL &amp; _
@@ -1395,7 +1395,7 @@ Function bootStrap()
 	&apos; With that we can make more concise String representations of DataValue s.
 	assertEqual(DataValue_toString(tcDataTypeCtor), _
 		&quot;(TDataTypeCtor.DataTypeCtor &apos;TDataTypeCtor&apos; 0 Array(DataTypeCtor))&quot;).x
-	assertEqual(DataValue_toString(tcDat), _
+	assertEqual(DataValue_toString(tcDataCtor), _
 		&quot;(TDataTypeCtor.DataTypeCtor &apos;TDataCtor&apos; 0 Array(DataCtor))&quot;).x
 	assertEqual(DataValue_toString(cDataTypeCtor), _
 		&quot;(TDataCtor.DataCtor &apos;DataTypeCtor&apos; Array(&apos;String&apos;, &apos;Integer&apos;, &apos;List_of_DataCtor&apos;) TDataTypeCtor)&quot;).x
@@ -1547,12 +1547,12 @@ Function bootStrap()
 		&quot;(TDataCtor.DataCtor &apos;DataCtor&apos; [String, (TypeApp List Type), TDataTypeCtor] TDataCtor)&quot;).x
 	
 	
-	tcDat.fields(DataTypeCtor_dataCtors) = _newDataValue(cCons, Array(cDataCtor , vNil))
-	assertEqual(DataValue_toString(tcDat), _
+	tcDataCtor.fields(DataTypeCtor_dataCtors) = _newDataValue(cCons, Array(cDataCtor , vNil))
+	assertEqual(DataValue_toString(tcDataCtor), _
 		&quot;(TDataTypeCtor.DataTypeCtor &apos;TDataCtor&apos; 0 [DataCtor])&quot;).x
 
 
-	vApp = _newDataValue(cApp, Array(tcList, tcDat))
+	vApp = _newDataValue(cApp, Array(tcList, tcDataCtor))
 	argTypes = vNil
 	argTypes = _newDataValue(cCons, Array(vApp, argTypes))
 	argTypes = _newDataValue(cCons, Array(vInt,  argTypes))
@@ -1608,8 +1608,8 @@ Function bootStrap()
 	assertEqual(isTypeOf(tcFooOrBar, cFoo), False).x
 	assertEqual(isTypeOf(tcFooOrBar, cBar), False).x
 	&apos; They&apos;re data constructors:
-	assertEqual(isTypeOf(tcDat, cFoo), True).x
-	assertEqual(isTypeOf(tcDat, cBar), True).x
+	assertEqual(isTypeOf(tcDataCtor, cFoo), True).x
+	assertEqual(isTypeOf(tcDataCtor, cBar), True).x
 	
 	&apos; We can also dispatch on the values&apos; ctors (names).
 	&apos; Since extracting the ctor&apos;s name will be common, we&apos;ll
