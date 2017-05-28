@@ -233,6 +233,172 @@ Sub _setTypeCtor(dataCtor As DataValue, dataTypeCtor As DataValue)
 	dataCtor.fields(DataCtor_typeCtor) = dataTypeCtor
 End Sub
 
+Function DataValue_toString(v As DataValue)
+	Dim seen As String
+	seen = &quot;&quot;
+	DataValue_toString = _DataValue_toString(v, seen)
+End Function
+
+Function _DataValue_toString(v As DataValue, ByRef seen As String)
+	Dim out As String
+	Dim typeStr As String, ctorStr As String
+	Dim ctor As DataValue, fields As Variant
+	If inStr(seen, v.id &amp; &quot;&quot;) &lt;&gt; 0 Then
+		out = &quot;{ id: &quot; &amp; v.id &amp; &quot; }&quot;
+	Else
+		seen = seen &amp; &quot; &quot; &amp; v.id
+		ctor   = v.ctor
+		fields = v.fields
+		typeStr = field(DataTypeCtor_name, field(DataCtor_typeCtor, ctor))
+		ctorStr = field(DataCtor_name, ctor)
+		out = typeStr &amp; &quot;.&quot; &amp; ctorStr
+		If UBound(fields) &gt;= 0 Then
+			Dim argsStr As String, i As Integer, first As Boolean
+			Dim tc As DataValue
+					
+			If typeStr = &quot;TDataTypeCtor&quot; Then
+				argsStr = toString(field(DataTypeCtor_name, v)) &amp; &quot; &quot; &amp; field(DataTypeCtor_arity, v) &amp; &quot; &quot; 
+				Dim dataCtors As Variant, dc As DataValue
+				dataCtors = field(DataTypeCtor_dataCtors, v)
+				If isArray(dataCtors) Then
+					argsStr = argsStr &amp; &quot;Array(&quot;
+					For i = 0 To UBound(dataCtors)
+						If i &gt; 0 Then : argsStr = argsStr &amp; &quot;, &quot; : End If
+						dc = dataCtors(i)
+						argsStr = argsStr &amp; field(DataCtor_name, dc)
+					Next i
+					argsStr = argsStr &amp; &quot;)&quot;
+				ElseIf isDataValue(dataCtors) Then
+					ctor = ctorOf(dataCtors)
+					tc = field(DataCtor_typeCtor, ctor)
+					If field(DataTypeCtor_name, tc) = &quot;List&quot; Then
+						argsStr = argsStr &amp; &quot;[&quot;
+						first = True
+						Do Until ctorName(dataCtors) = &quot;Nil&quot;
+							If first Then
+								first = False
+							Else
+								argsStr = argsStr &amp; &quot;, &quot;
+							End If
+							dc = field(0, dataCtors) &apos; &quot;car&quot;
+							argsStr = argsStr &amp; field(DataCtor_name, dc)
+							dataCtors = field(1, dataCtors) &apos; &quot;cdr&quot;
+						Loop
+						argsStr = argsStr &amp; &quot;]&quot; 
+					Else
+						argsStr = argsStr &amp; _DataValue_toString(dataCtors, seen)
+					End If
+				Else
+					croak(&quot;DataValue_toString/non-array, non-dataValue dataCtors: NYI&quot;)
+				End If
+			ElseIf typeStr = &quot;TDataCtor&quot; Then
+				argsStr = toString(field(DataTypeCtor_name, v)) &amp; &quot; &quot; 
+				Dim argTypes As Variant, at As Variant
+				argTypes = field(DataCtor_argTypes, v)
+				If isArray(argTypes) Then
+					argsStr = argsStr &amp; &quot;Array(&quot;
+					For i = 0 To UBound(argTypes)
+						If i &gt; 0 Then : argsStr = argsStr &amp; &quot;, &quot; : End If
+						at = argTypes(i)
+						If isDataValue(at) Then
+							argsStr = argStr &amp; _DataValue_toString_Type(at, seen)	&apos; &lt;------ type-to-string here
+						Else
+							argsStr = argsStr &amp; toString(at)
+						End If
+					Next i
+					argsStr = argsStr &amp; &quot;)&quot;
+				ElseIf isDataValue(argTypes) Then
+					ctor = ctorOf(argTypes)
+					tc = field(DataCtor_typeCtor, ctor)
+					If field(DataTypeCtor_name, tc) = &quot;List&quot; Then
+						argsStr = argsStr &amp; &quot;[&quot;
+						first = True
+						Do Until ctorName(argTypes) = &quot;Nil&quot;
+							If first Then
+								first = False
+							Else
+								argsStr = argsStr &amp; &quot;, &quot;
+							End If
+							at = field(0, argTypes) &apos; &quot;car&quot;
+							argsStr = argsStr &amp; _DataValue_toString_Type(at, seen)	&apos; &lt;------ type-to-string here
+							argTypes = field(1, argTypes) &apos; &quot;cdr&quot;
+						Loop
+						argsStr = argsStr &amp; &quot;]&quot; 
+					Else
+						argsStr = argsStr &amp; _DataValue_toString(argTypes, seen)
+					End If
+				Else
+					argsStr = argsStr &amp; toString(argTypes, seen)
+					&apos;croak(&quot;DataValue_toString/non-array, non-dataValue argTypes: NYI&quot; &amp; NL &amp; NL &amp; toString(argTypes))
+				End If
+				argsStr = argsStr &amp; &quot; &quot; &amp; field(DataTypeCtor_name, field(DataCtor_typeCtor, v))
+			Else
+				argsStr = _DataValue_toString_Array(fields, seen)
+			End If
+			out = &quot;(&quot; &amp; out &amp; &quot; &quot; &amp; argsStr &amp; &quot;)&quot;
+		End If
+	End If
+	_DataValue_toString = out
+End Function
+
+Function _DataValue_toString_Array(a As Array, ByRef seen As String)
+	Dim out As String, i As Integer, x As Variant
+	out = &quot;&quot;
+	For i = 0 To UBound(a)
+		If i &gt; 0 Then : out = out &amp; &quot; &quot; : End If
+		x = a(i)
+		If isDataValue(x) Then
+			out = out &amp; _DataValue_toString(x, seen)
+		ElseIf isArray(x) Then
+			out = out &amp; &quot;Array(&quot; &amp; _DataValue_toString_Array(x, seen) &amp; &quot;)&quot;
+		Else
+			out = out &amp; toString(x)
+		End If
+	Next i
+	
+	_DataValue_toString_Array = out
+End Function
+
+
+Function _DataValue_toString_Type(v As DataValue, ByRef seen As String)
+	Dim out As String : out = &quot;&quot;
+	If isDataTypeCtor(v) Then
+		out = field(DataTypeCtor_name, v)
+	Else
+		Dim c As DataValue : c = ctorOf(v)
+		If ctorName(c) = &quot;DataCtor&quot; Then
+			Dim t As DataValue : t = field(DataCtor_typeCtor, c)
+			If field(DataTypeCtor_name, t) = &quot;Type&quot; Then
+				Dim cName As String
+				cName = ctorName(v)
+				out = cName
+				Dim args   As Variant, a As Variant
+				Dim i As Integer, n As Integer
+				args = _fields(v)
+				n = UBound(args)
+				If n &gt;= 0 Then
+					out = out &amp; &quot; &quot;
+					Select Case cName
+						Case &quot;TypeParam&quot; &apos; TypeParam Integer
+							out = out &amp; args(0)
+						Case &quot;TypeApp&quot;	&apos; TypeApp TDataTypeCtor Type
+							out = out &amp; field(DataTypeCtor_name, args(0)) _
+								&amp; &quot; &quot; &amp; _DataValue_toString_Type(args(1), seen)
+						Case Else
+							croak(&quot;_DataValue_toString_Type/NYI: Type instance &quot; &amp; cName &amp; &quot; ...&quot;)
+					End Select
+					out = &quot;(&quot; &amp; out &amp; &quot;)&quot;
+				End If
+			End If
+		End If
+		If out = &quot;&quot; Then
+			croak(&quot;_DataValue_toString_Type: invalid Type instance &quot; &amp; DataValue_toString(v))
+		End If
+	End If
+	_DataValue_toString_Type = out
+End Function
+
+
 Function isDataTypeCtor(tc As DataValue)
 	Dim out
 	out = False
@@ -1163,7 +1329,7 @@ Function bootStrap()
 	&apos; and name &quot;TDataTypeCtor&quot;:
 	&apos; TDataTypeCtor = DataTypeCtor String Int (List DataCtor)
 	Dim tcTyp As DataValue
-	tcTyp = _mkValueFrom_lax(cDataTypeCtor, Array( _
+	tcTyp = _newDataValue(cDataTypeCtor, Array( _
 		&quot;TDataTypeCtor&quot;, _
 		0, _
 		Array(cDataTypeCtor) _
@@ -1219,7 +1385,23 @@ Function bootStrap()
 		&quot;  )&quot;												&amp; NL &amp; _
 		&quot;}&quot; _
 	).x
-		
+	
+	&apos; We have now established a structure of DataValue s where every
+	&apos; DataValue has a
+	&apos;   - a .ctor member which was made by &quot;applying&quot; cDataCtor to some arguments 
+	&apos;   - a type ctor associated to it, and that is the .ctor&apos;s typeCtor field
+	&apos; With that we can make more concise String representations of DataValue s.
+	assertEqual(DataValue_toString(tcTyp), _
+		&quot;(TDataTypeCtor.DataTypeCtor &apos;TDataTypeCtor&apos; 0 Array(DataTypeCtor))&quot;).x
+	assertEqual(DataValue_toString(tcDat), _
+		&quot;(TDataTypeCtor.DataTypeCtor &apos;TDataCtor&apos; 0 Array(DataCtor))&quot;).x
+	assertEqual(DataValue_toString(cDataTypeCtor), _
+		&quot;(TDataCtor.DataCtor &apos;DataTypeCtor&apos; Array(&apos;String&apos;, &apos;Integer&apos;, &apos;List_of_DataCtor&apos;) TDataTypeCtor)&quot;).x
+	assertEqual(DataValue_toString(cDataCtor), _
+		&quot;(TDataCtor.DataCtor &apos;DataCtor&apos; Array(&apos;String&apos;, &apos;List_of_TypeExpr&apos;, &apos;TDataTypeCtor&apos;) TDataCtor)&quot;).x
+	
+	&apos; The List data type
+	&apos; ------------------
 	
 	&apos; Let&apos;s go back to old data ctor cNil. It itself has got a proper
 	&apos; constructor (cDataCtor) but no DataTypeCtor in field typeCtor:
@@ -1241,7 +1423,7 @@ Function bootStrap()
 	&apos; But before we can do so we need another data ctor for List:
 	Dim cCons As DataValue
 	cCons = _newDataValue(cDataCtor, Array( _
-		&quot;Cons&quot;, Nothing, tcList _
+		&quot;Cons&quot;, vNil, tcList _
 	))
 	&apos; There we have left empty the argTypes field, again because we
 	&apos; a List itself there. But we already filled in the type ctor:
@@ -1259,7 +1441,133 @@ Function bootStrap()
 	tcList.fields(DataTypeCtor_dataCtors) = _newDataValue( _
 		cCons, Array(cNil, x) _
 	)
-	msgbox(DataValue_genericToString(tcList))
+
+	assertEqual(DataValue_toString(tcList), _
+		&quot;(TDataTypeCtor.DataTypeCtor &apos;List&apos; 1 [Nil, Cons])&quot;).x
+	assertEqual(DataValue_toString(cCons), _
+		&quot;(TDataCtor.DataCtor &apos;Cons&apos; [] List)&quot;).x
+	assertEqual(DataValue_toString(cNil), _
+		&quot;(TDataCtor.DataCtor &apos;Nil&apos; [] List)&quot;).x
+	
+	
+	&apos; Now, we had given cCons an empty argTypes list, which needs to be fixed.
+	&apos; We will express Types as yet another data type:
+	Dim tcType As DataValue
+	tcType = _newDataValue(cDataTypeCtor, Array(&quot;Type&quot;, 0, vNil))
+	Dim cStr As DataValue, vStr As DataValue
+	cStr = _newDataValue(cDataCtor, Array(&quot;String&quot;, vNil, tcType))
+	&apos; add to dataCtors
+	tcType.fields(DataTypeCtor_dataCtors) = _newDataValue(cCons, Array( _
+		cStr, _
+		field(DataTypeCtor_dataCtors, tcType) _
+	))
+	assertEqual(DataValue_toString(tcType), _
+		&quot;(TDataTypeCtor.DataTypeCtor &apos;Type&apos; 0 [String])&quot;).x
+	assertEqual(DataValue_toString(cStr), _
+		&quot;(TDataCtor.DataCtor &apos;String&apos; [] Type)&quot;).x
+	vStr = _newDataValue(cStr, Array())
+	assertEqual(DataValue_toString(vStr), _
+		&quot;Type.String&quot;).x
+	
+	
+	Dim cInt As DataValue, vInt As DataValue
+	cInt = _newDataValue(cDataCtor, Array(&quot;Integer&quot;, vNil, tcType))
+	&apos; add to dataCtors
+	tcType.fields(DataTypeCtor_dataCtors) = _newDataValue(cCons, Array( _
+		cInt, _
+		field(DataTypeCtor_dataCtors, tcType) _
+	))
+	assertEqual(DataValue_toString(tcType), _
+		&quot;(TDataTypeCtor.DataTypeCtor &apos;Type&apos; 0 [Integer, String])&quot;).x
+	assertEqual(DataValue_toString(cInt), _
+		&quot;(TDataCtor.DataCtor &apos;Integer&apos; [] Type)&quot;).x
+	vInt = _newDataValue(cInt, Array())
+	assertEqual(DataValue_toString(vInt), _
+		&quot;Type.Integer&quot;).x
+	
+	
+	Dim cParam As DataValue
+	cParam = _newDataValue(cDataCtor, Array( _
+		&quot;TypeParam&quot;, _
+		_newDataValue(cCons, Array(vInt, vNil)), _
+		tcType _
+	))
+	&apos; add to dataCtors
+	tcType.fields(DataTypeCtor_dataCtors) = _newDataValue(cCons, Array( _
+		cParam, _
+		field(DataTypeCtor_dataCtors, tcType) _
+	))
+	assertEqual(DataValue_toString(tcType), _
+		&quot;(TDataTypeCtor.DataTypeCtor &apos;Type&apos; 0 [TypeParam, Integer, String])&quot;).x
+	Dim vParam As DataValue
+	vParam = _newDataValue(cParam, Array(0))
+	assertEqual(DataValue_toString(vParam), _
+		&quot;(Type.TypeParam 0)&quot;).x
+	
+	Dim cApp As DataValue
+	cApp = _newDataValue(cDataCtor, Array( _
+		&quot;TypeApp&quot;, _
+		_newDataValue(cCons, Array(tcTyp, _newDataValue(cCons, Array(tcType, vNil)))), _
+		tcType _
+	))
+	&apos; add to dataCtors
+	tcType.fields(DataTypeCtor_dataCtors) = _newDataValue(cCons, Array( _
+		cApp, _
+		field(DataTypeCtor_dataCtors, tcType) _
+	))
+	assertEqual(DataValue_toString(tcType), _
+		&quot;(TDataTypeCtor.DataTypeCtor &apos;Type&apos; 0 [TypeApp, TypeParam, Integer, String])&quot;).x
+	assertEqual(DataValue_toString(cApp), _
+		&quot;(TDataCtor.DataCtor &apos;TypeApp&apos; [TDataTypeCtor, Type] Type)&quot;).x
+	Dim vApp As DataValue
+	vApp = _newDataValue(cApp, Array(tcList, vParam))
+	assertEqual(DataValue_toString(vApp), _
+		&quot;(Type.TypeApp (TDataTypeCtor.DataTypeCtor &apos;List&apos; 1 [Nil, Cons]) (Type.TypeParam 0))&quot;).x
+	
+	&apos; With vParam and vApp we can fix the argTypes List of cCons:
+	argTypes = _
+		_newDataValue(cCons, Array(vParam, _
+		_newDataValue(cCons, Array(vApp, _
+		vNil))))
+	cCons.fields(DataCtor_argTypes) = argTypes
+	assertEqual(DataValue_toString(cCons), _
+		&quot;(TDataCtor.DataCtor &apos;Cons&apos; [(TypeParam 0), (TypeApp List (TypeParam 0))] List)&quot;).x
+	
+	
+	&apos; fix the rest
+	vApp = _newDataValue(cApp, Array(tcList, tcType))
+	argTypes = vNil
+	argTypes = _newDataValue(cCons, Array(tcTyp, argTypes))
+	argTypes = _newDataValue(cCons, Array(vApp,  argTypes))
+	argTypes = _newDataValue(cCons, Array(vStr,  argTypes))
+	cDataCtor.fields(DataCtor_argTypes) = argTypes
+	assertEqual(DataValue_toString(cDataCtor), _
+		&quot;(TDataCtor.DataCtor &apos;DataCtor&apos; [String, (TypeApp List Type), TDataTypeCtor] TDataCtor)&quot;).x
+	
+	
+	tcDat.fields(DataTypeCtor_dataCtors) = _newDataValue(cCons, Array(cDataCtor , vNil))
+	assertEqual(DataValue_toString(tcDat), _
+		&quot;(TDataTypeCtor.DataTypeCtor &apos;TDataCtor&apos; 0 [DataCtor])&quot;).x
+
+
+	vApp = _newDataValue(cApp, Array(tcList, tcDat))
+	argTypes = vNil
+	argTypes = _newDataValue(cCons, Array(vApp, argTypes))
+	argTypes = _newDataValue(cCons, Array(vInt,  argTypes))
+	argTypes = _newDataValue(cCons, Array(vStr,  argTypes))
+	cDataTypeCtor.fields(DataCtor_argTypes) = argTypes
+	assertEqual(DataValue_toString(cDataTypeCtor), _
+		&quot;(TDataCtor.DataCtor &apos;DataTypeCtor&apos; [String, Integer, (TypeApp List TDataCtor)] TDataTypeCtor)&quot;).x
+	
+	
+	tcTyp.fields(DataTypeCtor_dataCtors) = _newDataValue(cCons, Array(cDataTypeCtor , vNil))
+	assertEqual(DataValue_toString(tcTyp), _
+		&quot;(TDataTypeCtor.DataTypeCtor &apos;TDataTypeCtor&apos; 0 [DataTypeCtor])&quot;).x
+	
+	
+	
+	
+	
 	
 	&apos; But before we go on to make one, let&apos;s make things a bit more 
 	&apos; interesting. Why not give him a brother:
@@ -1319,64 +1627,6 @@ Function bootStrap()
 	Next i
 	assertEqual(what, &quot;aFoo aBar aFoo &quot;).x
 	
-	&apos; Well, FooOrBar seems a bit boring. However, imagine just
-	&apos; different names:
-	&apos; - &quot;Foo&quot;      -&gt; &quot;False&quot;
-	&apos; - &quot;Bar&quot;      -&gt; &quot;True&quot;
-	&apos; - &quot;FooOrBar&quot; -&gt; &quot;Bool&quot;
-	&apos; From that we can see that even simple enumerations like that
-	&apos; are useful. Let&apos;s enumerate some types we have in BASIC:
-	&apos; BasicType = Boolean | String | Integer | Long | Double | Object
-	Dim cBoolean, cString, cInteger, cLong, cDouble, cObject
-	cBoolean = _mkValueFrom_lax(cDataCtor, Array(&quot;Boolean&quot;, emptyArray, Nothing))
-	cString  = _mkValueFrom_lax(cDataCtor, Array(&quot;String&quot;,  emptyArray, Nothing))
-	cInteger = _mkValueFrom_lax(cDataCtor, Array(&quot;Integer&quot;, emptyArray, Nothing))
-	cLong    = _mkValueFrom_lax(cDataCtor, Array(&quot;Long&quot;,    emptyArray, Nothing))
-	cDouble  = _mkValueFrom_lax(cDataCtor, Array(&quot;Double&quot;,  emptyArray, Nothing))
-	cObject  = _mkValueFrom_lax(cDataCtor, Array(&quot;Object&quot;,  emptyArray, Nothing))
-	Dim dataCtors, tcBasicType
-	dataCtors = Array(cBoolean, cString, cInteger, cLong, cDouble, cObject)
-	tcBasicType = _mkValueFrom_lax(cDataTypeCtor, _
-		Array(&quot;BasicType&quot;, 0, dataCtors) _
-	)
-	For i = 0 To UBound(dataCtors)
-		_setTypeCtor(dataCtors(i), tcBasicType)
-	Next i
-	&apos; So now these are all proper data ctors:
-	For i = 0 To UBound(dataCtors)
-		assertEqual(isTypeOf(tcDat, dataCtors(i)), True).x
-	Next i
-
-	&apos; Values created from these constructors:
-	Dim vBoolean, vString, vInteger, vLong, vDouble, vObject
-	vBoolean = _mkValueFrom_lax(cBoolean, emptyArray)
-	vString  = _mkValueFrom_lax(cString,  emptyArray)
-	vInteger = _mkValueFrom_lax(cInteger, emptyArray)
-	vLong    = _mkValueFrom_lax(cLong,    emptyArray)
-	vDouble  = _mkValueFrom_lax(cDouble,  emptyArray)
-	vObject  = _mkValueFrom_lax(cObject,  emptyArray)
-	Dim vBasicTypes
-	vBasicTypes = Array(vBoolean, vString, vInteger, vLong, vDouble, vObject)
-	
-	&apos; They&apos;re all of type BasicType:
-	For i = 0 To UBound(dataCtors)
-		v = vBasicTypes(i)
-		assertEqual(isTypeOf(tcBasicType, v), True).x
-	Next i
-	&apos; And they&apos;re not FooOrBar s, or DataCtor s or whatever:
-	For i = 0 To UBound(dataCtors)
-		v = vBasicTypes(i)
-		assertEqual(isTypeOf(tcFooOrBar, v), False).x
-		assertEqual(isTypeOf(tcDat,		 v), False).x
-		assertEqual(isTypeOf(tcTyp,		 v), False).x
-	Next i
-	
-	&apos; With that we can replace the dummy strings &quot;String&quot; and &quot;Integer&quot;
-	&apos; that we used when defining DataCtor and DataTypeCtor:
-	cDataCtor.fields(DataCtor_argTypes)(0) = vString &apos; field name
-	&apos; TODO: (even before) set cDataCtor.argType(2) = tcTyp
-	cDataTypeCtor.fields(DataCtor_argTypes)(0) = vString  &apos; field name
-	cDataTypeCtor.fields(DataCtor_argTypes)(1) = vInteger &apos; field arity
 
 		
 End Function
