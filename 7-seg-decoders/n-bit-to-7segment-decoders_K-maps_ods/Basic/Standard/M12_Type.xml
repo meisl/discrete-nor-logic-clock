@@ -1328,22 +1328,24 @@ Function bootStrap()
 	&apos; be quite simple again, with only one data ctor (cDataTypeCtor),
 	&apos; and name &quot;TDataTypeCtor&quot;:
 	&apos; TDataTypeCtor = DataTypeCtor String Int (List DataCtor)
-	Dim tcTyp As DataValue
-	tcTyp = _newDataValue(cDataTypeCtor, Array( _
+	Dim tcDataTypeCtor As DataValue
+	tcDataTypeCtor = _newDataValue(cDataTypeCtor, Array( _
 		&quot;TDataTypeCtor&quot;, _
 		0, _
 		Array(cDataTypeCtor) _
 	))
 	&apos; and fill in the back-pointer:
-	_setTypeCtor(cDataTypeCtor, tcTyp)
-	assertEqual(DataValue_same(field(DataCtor_typeCtor, cDataTypeCtor), tcTyp), True).x
+	_setTypeCtor(cDataTypeCtor, tcDataTypeCtor)
+	assertEqual(DataValue_same( _
+		field(DataCtor_typeCtor, cDataTypeCtor), _
+		tcDataTypeCtor), True).x
 	
-	Dim tcTypStr As String
-	tcTypStr = DataValue_genericToString(tcTyp)
+	Dim tcDataTypeCtorStr As String
+	tcDataTypeCtorStr = DataValue_genericToString(tcDataTypeCtor)
 	
-	&apos;msgbox(tcTypStr &amp; NL &amp; NL &amp; _
-	assertEqual(tcTypStr, _
-		&quot;{ id: &quot; &amp; tcTyp.id &amp; &quot;,&quot;							&amp; NL &amp; _
+	&apos;msgbox(tcDataTypeCtorStr &amp; NL &amp; NL &amp; _
+	assertEqual(tcDataTypeCtorStr, _
+		&quot;{ id: &quot; &amp; tcDataTypeCtor.id &amp; &quot;,&quot;					&amp; NL &amp; _
 		&quot;  ctor: { id: &quot; &amp; cDataTypeCtor.id &amp; &quot;,&quot;			&amp; NL &amp; _
 		&quot;    ctor: { id: &quot; &amp; cDataCtor.id &amp; &quot;,&quot;				&amp; NL &amp; _
 		&quot;      ctor: { id: &quot; &amp; cDataCtor.id &amp; &quot; },&quot;			&amp; NL &amp; _
@@ -1373,7 +1375,7 @@ Function bootStrap()
 		&quot;        &apos;Integer&apos;,&quot;								&amp; NL &amp; _
 		&quot;        &apos;List_of_DataCtor&apos;&quot;						&amp; NL &amp; _
 		&quot;      ),&quot;											&amp; NL &amp; _
-		&quot;      { id: &quot; &amp; tcTyp.id &amp; &quot; }&quot;					&amp; NL &amp; _
+		&quot;      { id: &quot; &amp; tcDataTypeCtor.id &amp; &quot; }&quot;			&amp; NL &amp; _
 		&quot;    )&quot;												&amp; NL &amp; _
 		&quot;  },&quot;												&amp; NL &amp; _
 		&quot;  fields: Array(&quot;									&amp; NL &amp; _
@@ -1391,7 +1393,7 @@ Function bootStrap()
 	&apos;   - a .ctor member which was made by &quot;applying&quot; cDataCtor to some arguments 
 	&apos;   - a type ctor associated to it, and that is the .ctor&apos;s typeCtor field
 	&apos; With that we can make more concise String representations of DataValue s.
-	assertEqual(DataValue_toString(tcTyp), _
+	assertEqual(DataValue_toString(tcDataTypeCtor), _
 		&quot;(TDataTypeCtor.DataTypeCtor &apos;TDataTypeCtor&apos; 0 Array(DataTypeCtor))&quot;).x
 	assertEqual(DataValue_toString(tcDat), _
 		&quot;(TDataTypeCtor.DataTypeCtor &apos;TDataCtor&apos; 0 Array(DataCtor))&quot;).x
@@ -1507,7 +1509,7 @@ Function bootStrap()
 	Dim cApp As DataValue
 	cApp = _newDataValue(cDataCtor, Array( _
 		&quot;TypeApp&quot;, _
-		_newDataValue(cCons, Array(tcTyp, _newDataValue(cCons, Array(tcType, vNil)))), _
+		_newDataValue(cCons, Array(tcDataTypeCtor, _newDataValue(cCons, Array(tcType, vNil)))), _
 		tcType _
 	))
 	&apos; add to dataCtors
@@ -1537,7 +1539,7 @@ Function bootStrap()
 	&apos; fix the rest
 	vApp = _newDataValue(cApp, Array(tcList, tcType))
 	argTypes = vNil
-	argTypes = _newDataValue(cCons, Array(tcTyp, argTypes))
+	argTypes = _newDataValue(cCons, Array(tcDataTypeCtor, argTypes))
 	argTypes = _newDataValue(cCons, Array(vApp,  argTypes))
 	argTypes = _newDataValue(cCons, Array(vStr,  argTypes))
 	cDataCtor.fields(DataCtor_argTypes) = argTypes
@@ -1560,8 +1562,8 @@ Function bootStrap()
 		&quot;(TDataCtor.DataCtor &apos;DataTypeCtor&apos; [String, Integer, (TypeApp List TDataCtor)] TDataTypeCtor)&quot;).x
 	
 	
-	tcTyp.fields(DataTypeCtor_dataCtors) = _newDataValue(cCons, Array(cDataTypeCtor , vNil))
-	assertEqual(DataValue_toString(tcTyp), _
+	tcDataTypeCtor.fields(DataTypeCtor_dataCtors) = _newDataValue(cCons, Array(cDataTypeCtor , vNil))
+	assertEqual(DataValue_toString(tcDataTypeCtor), _
 		&quot;(TDataTypeCtor.DataTypeCtor &apos;TDataTypeCtor&apos; 0 [DataTypeCtor])&quot;).x
 	
 	
@@ -1601,7 +1603,7 @@ Function bootStrap()
 	&apos; But of course, FooOrBar itself is NOT a FooOrBar
 	assertEqual(isTypeOf(tcFooOrBar, tcFooOrBar), False).x
 	&apos; Rather it is a TDataTypeCtor
-	assertEqual(isTypeOf(tcTyp, tcFooOrBar), True).x
+	assertEqual(isTypeOf(tcDataTypeCtor, tcFooOrBar), True).x
 	&apos; Similarly, neither cFoo nor cBar are FooBar s:
 	assertEqual(isTypeOf(tcFooOrBar, cFoo), False).x
 	assertEqual(isTypeOf(tcFooOrBar, cBar), False).x
