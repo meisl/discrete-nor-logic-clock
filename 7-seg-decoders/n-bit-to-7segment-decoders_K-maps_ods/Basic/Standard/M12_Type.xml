@@ -364,6 +364,15 @@ Function List_nth(ByVal n As Integer, ByVal xs As Variant)
 	List_nth = List_car(xs)
 End Function
 
+Function List_length(ByVal xs As Variant)
+	Dim out As Integer
+	Do Until List_isNil(xs)
+		out = out + 1
+		xs = List_cdr(xs)
+	Loop
+	List_length = out
+End Function
+
 
 Function StringType() &apos; singleton data ctor; return the singleton value
 	Static out As Object
@@ -393,9 +402,8 @@ Function TypeParam(Optional i As Integer)
 		Do While(True)
 			c = List_car(ctors)
 			argTypes = field(DataCtor_argTypes, c)
-			If Not(List_isNil(argTypes)) Then
-				If List_isNil(List_cdr(argTypes)) _
-				And (DataValue_same(List_car(argTypes), IntegerType)) _
+			If (List_length(argTypes) = 1) Then
+				If DataValue_same(List_car(argTypes), IntegerType) _
 				Then : Exit Do : End If
 			End If
 			ctors = List_cdr(ctors)
@@ -407,6 +415,34 @@ Function TypeParam(Optional i As Integer)
 		out = _newDataValue(c, Array(i))
 	End If
 	TypeParam = out
+End Function
+
+Function TypeApp(Optional tc As Object, Optional ta As Object)
+	Static c As Object
+	Dim out
+	If isNull(c) Then
+		&apos; Look for data ctor that has argTypes = [Type, Type]
+		Dim ctors, argTypes
+		ctors = field(DataTypeCtor_dataCtors, TType)
+		Do While(True)
+			c = List_car(ctors)
+			argTypes = field(DataCtor_argTypes, c)
+			If (List_length(argTypes) = 2) Then
+				If  DataValue_same(List_car( argTypes), TDataTypeCtor) _
+				And DataValue_same(List_cadr(argTypes), TType) _
+				Then : Exit Do : End If
+			End If
+			ctors = List_cdr(ctors)
+		Loop
+	End If
+	If isMissing(tc) Then
+		out = c
+	ElseIf isMissing(ta) Then
+		croak(&quot;TypeApp/NYI: partial application&quot;)
+	Else
+		out = _newDataValue(c, Array(tc, ta))
+	End If
+	TypeApp = out
 End Function
 
 
@@ -1980,28 +2016,42 @@ Function test_bootstrapTypes()
 	assertEqual(List_nth(0, ys), 1).x
 	assertEqual(List_nth(1, ys), 2).x
 	assertEqual(List_nth(2, ys), 3).x
+
+	&apos;--- List_length
+	assertEqual(List_length(						  vNil), 	0).x
+	assertEqual(List_length(			 List_cons(0, vNil)), 	1).x
+	assertEqual(List_length(List_cons(0, List_cons(0, vNil))), 	2).x
+
+	&apos;assertEqual(isFn(Fn.length), 	True).x	&apos; from Fn object
+	&apos;assertEqual(isFn(List_length), 	True).x	&apos; from 0-arg call
+	&apos;assertEqual(arity(List_length), 1).x
 	
-	&apos;--- with List_nth, check dataCtors fields of data type ctors so far (TType later)
+	&apos;assertEqual(apply(List_length,							  vNil), 	0).x
+	&apos;assertEqual(apply(List_length,				 List_cons(0, vNil)), 	1).x
+	&apos;assertEqual(apply(List_length,	List_cons(0, List_cons(0, vNil))), 2).x
+
+	
+	&apos;--- with List_length and List_nth, 
+	&apos;    check dataCtors fields of data type ctors so far (TType later)
 	Dim dataCtors
 	dataCtors = field(DataTypeCtor_dataCtors,         tcDataTypeCtor)
+	assertEqual(List_length(dataCtors), 1).x
 	assertEqual(DataValue_same(List_nth(0, dataCtors), cDataTypeCtor),	True).x
-	assertEqual(List_isNil(List_cdr(dataCtors)), True).x
 	
 	dataCtors = field(DataTypeCtor_dataCtors,         tcDataCtor)
+	assertEqual(List_length(dataCtors), 1).x
 	assertEqual(DataValue_same(List_nth(0, dataCtors), cDataCtor), 		True).x
-	assertEqual(List_isNil(List_cdr(dataCtors)), True).x
 	
 	dataCtors = field(DataTypeCtor_dataCtors,         tcList)
+	assertEqual(List_length(dataCtors), 2).x
 	assertEqual(DataValue_same(List_nth(0, dataCtors), cNil),			True).x
 	assertEqual(DataValue_same(List_nth(1, dataCtors), cCons),			True).x
-	assertEqual(List_isNil(List_cddr(dataCtors)), True).x
 
 
 	&apos;--- fix argument order for DataTypeCtor
 	Dim argTypes, at
 	argTypes = field(DataCtor_argTypes, cDataTypeCtor)
-	&apos; there are exactly 3 arguments:
-	assertEqual(List_isNil(List_cdddr(argTypes)), True).x
+	assertEqual(List_length(argTypes), 3).x
 	
 	at = List_nth(0, argTypes)
 	assert_hasTypeCtor(ctorOf(at), tcType).x
@@ -2028,7 +2078,8 @@ Function test_bootstrapTypes()
 	assertEqual(isDataValue(cString), True).x
 	assertEqual( fieldCount(cString), 3).x
 	assertEqual(           field(DataCtor_name,     cString),  &quot;String&quot;).x
-	assertEqual(List_isNil(field(DataCtor_argTypes, cString)), True).x &apos; singleton ctor
+	argTypes = field(DataCtor_argTypes, cString)
+	assertEqual(List_length(argTypes), 0).x &apos; singleton ctor
 	assert_hasTypeCtor(cString,		tcType).x
 	assert_hasCtor(	   cString,		cDataCtor).x
 	
@@ -2042,7 +2093,8 @@ Function test_bootstrapTypes()
 	assertEqual(isDataValue(cInt), True).x
 	assertEqual( fieldCount(cInt), 3).x
 	assertEqual(           field(DataCtor_name,     cInt),  &quot;Integer&quot;).x
-	assertEqual(List_isNil(field(DataCtor_argTypes, cInt)), True).x &apos; singleton ctor
+	argTypes = field(DataCtor_argTypes, cInt)
+	assertEqual(List_length(argTypes), 0).x &apos; singleton ctor
 	assert_hasTypeCtor(cInt,		tcType).x
 	assert_hasCtor(	   cInt,		cDataCtor).x
 
@@ -2054,8 +2106,7 @@ Function test_bootstrapTypes()
 	assert_hasCtor(			cParam,  cDataCtor	).x
 	assertEqual(field(DataCtor_name,     cParam),  &quot;TypeParam&quot;).x
 	argTypes =  field(DataCtor_argTypes, cParam)
-	assertEqual(List_isNil(         argTypes), False).x
-	assertEqual(List_isNil(List_cdr(argTypes)), True).x
+	assertEqual(List_length(argTypes), 1).x
 	assertEqual(DataValue_same(List_nth(0, argTypes), vInt), True).x
 
 	&apos;--- apply TypeParam
@@ -2065,6 +2116,20 @@ Function test_bootstrapTypes()
 	assertEqual( fieldCount(vParam),	1		).x
 	assert_hasCtor(         vParam,		cParam	).x	
 
+	&apos;--- TypeApp TDataTypeCtor Type
+	Dim cApp As Variant
+	cApp = TypeApp
+	assertEqual(isDataValue(cApp), True		).x
+	assertEqual( fieldCount(cApp), 3			).x
+	assert_hasTypeCtor(     cApp,  tcType		).x
+	assert_hasCtor(			cApp,  cDataCtor	).x
+	assertEqual(field(DataCtor_name,     cApp),  &quot;TypeApp&quot;).x
+	argTypes =  field(DataCtor_argTypes, cApp)
+	assertEqual(List_length(argTypes), 2).x
+	assertEqual(DataValue_same(List_nth(1, argTypes), tcType), True).x
+	&apos; TODO: really only TDataTypeCtor? - it means only 1 type param ever!
+	assertEqual(DataValue_same(List_nth(0, argTypes), tcDataTypeCtor), True).x
+	
 End Function
 
 Function test_Type_hasType
