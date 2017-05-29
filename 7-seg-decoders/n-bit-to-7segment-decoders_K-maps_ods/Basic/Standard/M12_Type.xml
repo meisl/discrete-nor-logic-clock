@@ -1223,90 +1223,126 @@ Function test_Type_ctorOf()
 End Function
 
 Function bootstrapTypes()
-	Dim cNil
-	&apos; let&apos;s make something that is (almost) a DataCtor
-	cNil = _newDataValue(Nothing, Array( _
-		&quot;Nil&quot;, _
-		emptyArray, _
-		Nothing _
-	)
-	assertEqual(isDataValue(cNil), True).x
-	
-	&apos; There&apos;s a member .id on each DataValue which is unique to
-	&apos; the particular instance. This yields a notion of sameness:
-	assertEqual(DataValue_same(cNil, cNil), True).x
-	&apos; Even if we provide the very same values, we&apos;ll get a
-	&apos; different instance:
-	Dim x
-	x = _newDataValue(Nothing, Array( _
-		&quot;Nil&quot;, _
-		emptyArray, _
-		Nothing _
-	)
-	assertEqual(DataValue_same(x, cNil), False).x
-	&apos; To make the tests more readable we&apos;ll abbreviate that to
-	refute_same(x,    cNil).x
-	&apos; and for a positive test:
-	assert_same(x,    x).x
-	assert_same(cNil, cNil).x
-	&apos; ...which simply means that &quot;Sameness&quot; is of course
-	&apos; reflexive, ie for all x,y: if x = y then x same y.
-	&apos; It is - again of course - 
-	&apos; symmetric, ie forall x,y: x same y iff y same x.
-	assertEqual(_
-		DataValue_same(cNil, x), _
-		DataValue_same(x, cNil) _
-	).x
-	
-		
+	Dim vNil
+	&apos; The most simple DataValue is one without any fields.
+	&apos; Since we don&apos;t have data ctors yet we&apos;ll leave the
+	&apos; .ctor member empty.
+	vNil = _newDataValue(Nothing, emptyArray)
 	&apos; The function DataValue_genericToString provides a way to
 	&apos; see what&apos;s inside a DataValue:
-	Dim cNilStr As String
-	cNilStr = DataValue_genericToString(cNil)
-	assertEqual( _
-		cNilStr, _
-		&quot;{ id: &quot; &amp; cNil.id &amp; &quot;,&quot;	&amp; NL &amp; _
-		&quot;  ctor: Nothing,&quot;			&amp; NL &amp; _
-		&quot;  fields: Array(&quot;			&amp; NL &amp; _
-		&quot;    &apos;Nil&apos;,&quot;				&amp; NL &amp; _ 
-		&quot;    Array(),&quot;				&amp; NL &amp; _ 
-		&quot;    Nothing&quot;				&amp; NL &amp; _
-		&quot;  )&quot;						&amp; NL &amp; _
-		&quot;}&quot;							       _
-	).x
-
-	&apos; with that we can make a Nil value:
-	Dim vNil
-	vNil = _newDataValue(cNil, emptyArray)
-	assertEqual(isDataValue(vNil), True).x
-	&apos; It has a constructor that ctorOf accepts, and that is cFoo:
-	assert_same(ctorOf(vNil), cNil).x
-	
 	Dim vNilStr As String
 	vNilStr = DataValue_genericToString(vNil)
 	assertEqual( _
 		vNilStr, _
-	    &quot;{ id: &quot; &amp; vNil.id	&amp; &quot;,&quot;			&amp; NL &amp; _
+		&quot;{ id: &quot; &amp; vNil.id &amp; &quot;,&quot;	&amp; NL &amp; _
+		&quot;  ctor: Nothing,&quot;			&amp; NL &amp; _
+		&quot;  fields: Array()&quot;			&amp; NL &amp; _
+		&quot;}&quot;							       _
+	).x
+	&apos; We can see that there&apos;s another member: .id, which is unique
+	&apos; to the particular DataValue instance. This gives rise to a 
+	&apos; notion of sameness. The function `DataValue_same` provides a
+	&apos; means of testing for sameness:
+	assertEqual(DataValue_same(vNil, vNil), True).x
+	&apos; Even if we provide the very same values, we&apos;ll get a
+	&apos; different instance:
+	Dim x
+	x = _newDataValue(Nothing, emptyArray)
+	assertEqual(DataValue_same(x, vNil), False).x
+	&apos; To make the tests more readable we&apos;ll abbreviate that to
+	refute_same(x, vNil).x
+	&apos; and for a positive test:
+	assert_same(x,    x).x
+	assert_same(vNil, vNil).x
+	&apos; ...which simply means that &quot;sameness&quot; is of course
+	&apos; reflexive, ie for all x, y: if x = y then x same y.
+	&apos; It is - again of course - 
+	&apos; symmetric, ie forall x, y: x same y iff y same x.
+	assertEqual(_
+		DataValue_same(vNil, x), _
+		DataValue_same(x, vNil) _
+	).x
+	
+	&apos; Now we have to fill in the .ctor member of vNil, which should
+	&apos; point to vNil&apos;s data ctor.
+	&apos; A data ctor has
+	&apos;   - a name (a String)
+	&apos;   - a list of argument types (tbd)
+	&apos;   - a pointer to its datatype ctor (tbd)
+	&apos; ...and we&apos;ll consider DataValue s with a .ctor member pointing
+	&apos; to it as having been &quot;created&quot; from that data ctor.
+	&apos; We already can provide a name, and for the particular data ctor
+	&apos; of vNil - which has no fields whatsoever - we can also provide
+	&apos; the list of argument types: it&apos;s just the empty list, represented
+	&apos; by vNil.
+	&apos; If we want to represent data ctors as DataValue as well,
+	&apos; then they in turn need a .ctor member. For now we&apos;ll leave it
+	&apos; empty.
+	Dim cNil
+	cNil = _newDataValue(Nothing, Array( _
+		&quot;Nil&quot;, _
+		vNil, _
+		Nothing _
+	)
+	assertEqual(isDataValue(cNil), True).x
+	&apos; The data ctor is different from the value, even if the data ctor
+	&apos; takes no arguments:
+	refute_same(cNil, vNil).x
+	&apos; Let&apos;s make sure that cNil has an empty argument list.
+	&apos; We&apos;ll use the fn `field` and constants to index into a
+	&apos; DataValue&apos;s fields:
+	assert_same(field(DataCtor_argTypes, cNil), vNil).x
+	&apos; Fill in cNil as vNil&apos;s .ctor and see what it looks like then:
+	vNil.ctor = cNil
+	vNilStr = DataValue_genericToString(vNil)
+	assertEqual( vNilStr, _
+		&quot;{ id: &quot; &amp; vNil.id &amp; &quot;,&quot;			&amp; NL &amp; _
 		&quot;  ctor: { id: &quot; &amp; cNil.id &amp; &quot;,&quot;	&amp; NL &amp; _
 		&quot;    ctor: Nothing,&quot;				&amp; NL &amp; _
 		&quot;    fields: Array(&quot;				&amp; NL &amp; _
 		&quot;      &apos;Nil&apos;,&quot;						&amp; NL &amp; _ 
-		&quot;      Array(),&quot;					&amp; NL &amp; _ 
+		&quot;      { id: &quot; &amp; vNil.id &amp; &quot; },&quot;	&amp; NL &amp; _ 
 		&quot;      Nothing&quot;						&amp; NL &amp; _
 		&quot;    )&quot;								&amp; NL &amp; _
 		&quot;  },&quot;								&amp; NL &amp; _
 		&quot;  fields: Array()&quot;					&amp; NL &amp; _
-		&quot;}&quot;									       _
+		&quot;}&quot;										   _
 	).x
-	
-	
+	&apos; We&apos;ve just created a circular structure:
+	&apos; vNil refers to cNil via .ctor and cNil refers to vNil
+	&apos; via field argTypes. DataValue_genericToString resolves
+	&apos; the problem by showing only the .id member of previously
+	&apos; encountered DataValue s.
+	&apos; Looking at cNil (first):
+	Dim cNilStr
+	cNilStr = DataValue_genericToString(cNil)
+	assertEqual(cNilStr, _
+		&quot;{ id: &quot; &amp; cNil.id &amp; &quot;,&quot;				&amp; NL &amp; _
+		&quot;  ctor: Nothing,&quot;						&amp; NL &amp; _
+		&quot;  fields: Array(&quot;						&amp; NL &amp; _
+		&quot;    &apos;Nil&apos;,&quot;							&amp; NL &amp; _ 
+		&quot;    { id: &quot; &amp; vNil.id &amp; &quot;,&quot;			&amp; NL &amp; _ 
+		&quot;      ctor: { id: &quot; &amp; cNil.id &amp; &quot; },&quot;	&amp; NL &amp; _
+		&quot;      fields: Array()&quot;					&amp; NL &amp; _
+		&quot;    },&quot;								&amp; NL &amp; _
+		&quot;    Nothing&quot;							&amp; NL &amp; _
+		&quot;  )&quot;									&amp; NL &amp; _
+		&quot;}&quot;											   _
+	).x
+
 	&apos; access ctor fields:
 	&apos; TODO: why not .fields ?
 	Dim c
 	c = ctorOf(vNil)
-	assertEqual(           field(DataCtor_name,     c),      &quot;Nil&quot;).x
-	assert_toString_equals(field(DataCtor_argTypes, c), emptyArray).x
-	assertEqual(           field(DataCtor_typeCtor, c),    Nothing).x
+	assertEqual(field(DataCtor_name,     c), &quot;Nil&quot;).x
+	assert_same(field(DataCtor_argTypes, c), vNil).x
+	assertEqual(field(DataCtor_typeCtor, c), Nothing).x
+	
+	
+	
+	
+	
+	
 	
 	&apos; Since the ctor is itself a DataValue - what&apos;s the ctor of that ctor?
 	Dim cDataCtor As DataValue
@@ -1354,9 +1390,9 @@ Function bootstrapTypes()
 		&quot;}&quot;							           _
 	).x
 
-	&apos; Let&apos;s put this in as cFoo&apos;s .ctor:
+	&apos; Let&apos;s put this in as cNil&apos;s .ctor:
 	cNil.ctor = cDataCtor
-	&apos; Now cFoo looks like this:
+	&apos; Now cNil looks like this:
 	cNilStr = DataValue_genericToString(cNil)
 	assertEqual( _
 		cNilStr, _
@@ -1375,7 +1411,10 @@ Function bootstrapTypes()
 		&quot;  },&quot;									&amp; NL &amp; _
 		&quot;  fields: Array(&quot;						&amp; NL &amp; _
 		&quot;    &apos;Nil&apos;,&quot;							&amp; NL &amp; _
-		&quot;    Array(),&quot;							&amp; NL &amp; _
+		&quot;    { id: &quot; &amp; vNil.id &amp; &quot;,&quot;			&amp; NL &amp; _
+		&quot;      ctor: { id: &quot; &amp; cNil.id &amp; &quot; },&quot;	&amp; NL &amp; _
+		&quot;      fields: Array()&quot;					&amp; NL &amp; _
+		&quot;    },&quot;								&amp; NL &amp; _
 		&quot;    Nothing&quot;							&amp; NL &amp; _
 		&quot;  )&quot;									&amp; NL &amp; _
 		&quot;}&quot; _
