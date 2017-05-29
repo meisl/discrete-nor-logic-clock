@@ -16,15 +16,6 @@ Type DataType
 	typeCtor As TypeCtor
 End Type
 
-Type DataCtor
-	tag		 As String
-	str		 As String	&apos; debugger shows that in inspector
-	_name	 As String	&apos; see TypeCtor._name
-	typeCtor As TypeCtor
-	argTypes As Array
-	arity    As Integer
-End Type
-
 
 
 Const DataCtor_name     = 0
@@ -42,6 +33,7 @@ Type DataValue
 	ctor	 As DataCtor
 	fields   As Array
 End Type
+
 
 Sub Main
 	[test_Type======================================]
@@ -128,6 +120,10 @@ End Function
 
 Function field(idx As Integer, v As DataValue)
 	field = v.fields(idx)
+End Function
+
+Function fieldCount(v As DataValue)
+	fieldCount = CInt(UBound(v.fields) + 1)
 End Function
 
 
@@ -232,6 +228,125 @@ Sub _setTypeCtor(dataCtor As DataValue, dataTypeCtor As DataValue)
 	&apos; TODO: check that dataTypeCtor really is a DatatypeCtor
 	dataCtor.fields(DataCtor_typeCtor) = dataTypeCtor
 End Sub
+
+
+&apos; --------------------------------------------------------------
+
+Function TType()
+	Static out As Object &apos; DON&apos;T declare it as DataValue!
+	If isNull(out) Then 
+		out = bootstrapTypes()
+	End If
+	TType = out
+End Function
+
+Function DataTypeCtor()
+	Static out As Object &apos; DON&apos;T declare as DataValue!
+	If isNull(out) Then
+		out = ctorOf(TType)
+	End If
+	DataTypeCtor = out
+End Function
+
+Function TDataTypeCtor()
+	Static out As Object &apos; DON&apos;T declare it as DataValue!
+	If isNull(out) Then 
+		out = field(DataCtor_typeCtor, DataTypeCtor)
+	End If
+	TDataTypeCtor = out
+End Function
+
+Function DataCtor()
+	Static out As Object &apos; DON&apos;T declare as DataValue!
+	If isNull(out) Then
+		out = ctorOf(DataTypeCtor)
+	End If
+	DataCtor = out
+End Function
+
+Function TDataCtor()
+	Static out As Object &apos; DON&apos;T declare as DataValue!
+	If isNull(out) Then 
+		out = field(DataCtor_typeCtor, DataCtor)
+	End If
+	TDataCtor = out
+End Function
+
+Function TList()
+	Static out As Object &apos; DON&apos;T declare it as DataValue!
+	If isNull(out) Then 
+		out = field(DataCtor_argTypes, DataCtor)	&apos; a List value
+		out = ctorOf(out)							&apos; a DataCtor value
+		out = field(DataCtor_typeCtor, out)			&apos; a DataTypeCtor value
+	End If
+	TList = out
+End Function
+
+Function List_nil() &apos; singleton data ctor; returns the singleton value
+	Static out As Object
+	If isNull(out) Then
+		&apos; The dataCtors field of TList is itself a List instance,
+		&apos;  either (cCons cCons (cCons cNil  (vNil)))
+		&apos;      or (cCons cNil  (cCons cCons (vNil)))
+		&apos; In any case: the nil *value* is down at the very bottom!
+		out = field(1, field(1, field(DataTypeCtor_dataCtors, TList)))
+	End If
+	List_nil = out
+End Function
+
+Function List_cons(Optional x As Variant, Optional xs As Variant)
+	Static c As Object
+	If isNull(c) Then
+		&apos; The dataCtors field of TList is itself a List instance,
+		&apos;  either (cCons cCons (cCons cNil  (vNil)))
+		&apos;      or (cCons cNil  (cCons cCons (vNil)))
+		&apos; In any case: the top data ctor is cons
+		c = ctorOf(field(DataTypeCtor_dataCtors, TList))
+	End If
+	Dim out As Variant
+	If isMissing(x) Then
+		out = c
+	ElseIf isMissing(xs) Then
+		croak(&quot;List_cons/NYI: partial application&quot;)
+	Else
+		&apos; TODO: require xs to be of type List a and x of type a
+		out = _newDataValue(c, Array(x, xs))
+	End If
+	List_cons = out
+End Function
+
+Function List_isNil(v As Variant)
+	Dim out As Variant
+	out = False
+	If Not(isDataValue(v)) Then
+		Goto isNil_typeError
+	End If
+	If DataValue_same(v, List_nil) Then
+		out = True
+	ElseIf Not(hasType(v, TList)) Then
+		Goto isNil_typeError
+	End If
+	List_isNil = out
+	Exit Function
+isNil_typeError:
+	croak(&quot;List_isNil: expected a List but got &quot; &amp; toString(v)
+End Function
+
+Function StringType() &apos; singleton data ctor; return the singleton value
+	Static c As Object, v As Object
+	If isNull(c) Then
+		Dim cs As Variant
+		cs = field(DataTypeCtor_dataCtors, TType)
+		
+	End If
+	StringType = v
+End Function
+
+
+
+
+
+&apos; --------------------------------------------------------------
 
 Function DataValue_toString(v As DataValue)
 	Dim seen As String
@@ -416,26 +531,39 @@ Function isDataTypeCtor(tc As DataValue)
 	isDataTypeCtor = out
 End Function
 
-Function isTypeOf(t As Object, v As DataValue)
-	Dim out
+Function hasType(v As Variant, t As Object)
+	Dim out As Variant
 	out = False
 	If Not(isDataValue(t)) Then
-		croak(&quot;isTypeOf/NYI: test against non-dataType type &quot; &amp; toString(t))
+		Goto hasType_invalidType
 	End If
-	If isDataTypeCtor(t) Then
-		Dim r As Integer
-		r = field(DataTypeCtor_arity, t)
-		If (r &lt;&gt; 0) Then
-			croak(&quot;isTypeOf/NYI: test against not-completely-applied TypeCtor &quot; &amp; toString(t))
-		End If
-		Dim c  As DataValue : c  = ctorOf(v)
-		Dim tc As DataValue : tc = field(DataCtor_typeCtor, c)
-		
-		out = field(DataTypeCtor_name, tc) = field(DataTypeCtor_name, t)
+	Dim c As Variant : c = ctorOf(v)
+	If isEmpty(c) Then
+		croak(&quot;hasType/NYI: test non-data value &quot; &amp; toString(v))
 	Else
-		croak(&quot;isTypeOf/NYI: test against type &quot; &amp; toString(t))
+		out = DataValue_same(field(DataCtor_typeCtor, c), t)
 	End If
-	isTypeOf = out
+	
+	
+	&apos;If isDataTypeCtor(t) Then
+	&apos;	Dim r As Integer
+	&apos;	r = field(DataTypeCtor_arity, t)
+	&apos;	If (r &lt;&gt; 0) Then
+	&apos;		croak(&quot;hasType/NYI: test against not-completely-applied TypeCtor &quot; &amp; toString(t))
+	&apos;	End If
+	&apos;	Dim c  As DataValue : c  = ctorOf(v)
+	&apos;	Dim tc As DataValue : tc = field(DataCtor_typeCtor, c)
+	&apos;	
+	&apos;	out = field(DataTypeCtor_name, tc) = field(DataTypeCtor_name, t)
+	&apos;Else
+	&apos;	croak(&quot;hasType/NYI: test against type &quot; &amp; toString(t))
+	&apos;End If
+	
+	
+	hasType = out
+	Exit Function
+hasType_invalidType:
+	croak(&quot;hasType: invalid type &quot; &amp; toString(t))	
 End Function
 
 Function _newDataCtor( _
@@ -761,7 +889,8 @@ Function [test_Type======================================]
 	test_Type_DataValue()
 	test_Type_ctorOf()
 	
-	bootStrap()
+	test_bootstrapTypes()
+	test_Type_hasType()
 		
 	&apos;test_Type_isDataType()
 	&apos;test_Type_TypeCtor()
@@ -990,7 +1119,7 @@ Function test_Type_ctorOf()
 	o.ctor = ctorOf		: assertThrows(ctorOf, Array(o)).x
 End Function
 
-Function bootStrap()
+Function bootstrapTypes()
 	Dim cNil
 	&apos; let&apos;s make something that is (almost) a DataCtor
 	cNil = _newDataValue(Nothing, Array( _
@@ -1566,11 +1695,230 @@ Function bootStrap()
 	assertEqual(DataValue_toString(tcDataTypeCtor), _
 		&quot;(TDataTypeCtor.DataTypeCtor &apos;TDataTypeCtor&apos; 0 [DataTypeCtor])&quot;).x
 	
+	&apos; from that we can reach everything in the object graph:
+	bootstrapTypes = tcType
+End Function	
+
+Function assert_hasCtor(v As Variant, c As Variant)
+	If Not(isDataValue(c)) Or Not(isDataValue(c)) Then
+		Goto assert_hasCtor_invalid_args
+	End If
+	If Not(DataValue_same(ctorOf(c), DataCtor)) Then
+		Goto assert_hasCtor_invalid_args
+	End If
+	assert_hasCtor = assertEqual(DataValue_same( _
+		ctorOf(v), c), True)
+	Exit Function
+assert_hasCtor_invalid_args:
+		croak(&quot;assert_hasCtor: invalid args &quot; &amp; NL &amp; toString(v) _
+			&amp; NL &amp; NL &amp; toString(c)
+End Function
+
+Function assert_hasTypeCtor(c As Variant, tc As Variant)
+	If Not(isDataValue(c)) Or Not(isDataValue(tc)) Then
+		Goto assert_hasTypeCtor_invalid_args
+	End If
+	If Not(DataValue_same(ctorOf(c),  DataCtor)) _
+	Or Not(DataValue_same(ctorOf(tc), DataTypeCtor)) Then
+		Goto assert_hasTypeCtor_invalid_args
+	End If
+	assert_hasTypeCtor = assertEqual(DataValue_same( _
+		field(DataCtor_typeCtor, c), tc), True)
+	Exit Function
+assert_hasTypeCtor_invalid_args:
+		croak(&quot;assert_hasTypeCtor: invalid args &quot; &amp; NL &amp; toString(c) _
+			&amp; NL &amp; NL &amp; toString(tc)
+End Function
+
+Function test_bootstrapTypes()
+	Dim tcType As Variant
+	tcType = TType
+	assertEqual(isDataValue(tcType), True).x
+	assertEqual(fieldCount( tcType), 3).x
+	assertEqual(field(DataTypeCtor_name,  tcType), &quot;Type&quot;).x
+	assertEqual(field(DataTypeCtor_arity, tcType), 0).x
+	&apos; field dataCtors later
+
+	Dim cDataTypeCtor As Variant
+	cDataTypeCtor = DataTypeCtor
+	assertEqual(isDataValue(cDataTypeCtor), True).x
+	assertEqual(fieldCount( cDataTypeCtor), 3).x
+	assertEqual(field(DataTypeCtor_name, cDataTypeCtor), &quot;DataTypeCtor&quot;).x
+	&apos; field argTypes later
+	assert_hasCtor(tcType, cDataTypeCtor).x
+	assertEqual(DataValue_same(cDataTypeCtor, tcType),		False).x
+
+	Dim tcDataTypeCtor As Variant
+	tcDataTypeCtor = TDataTypeCtor
+	assertEqual(isDataValue(tcDataTypeCtor), True).x
+	assertEqual(fieldCount( tcDataTypeCtor), 3).x
+	assertEqual(field(DataTypeCtor_name, tcDataTypeCtor), &quot;TDataTypeCtor&quot;).x
+	assertEqual(field(DataTypeCtor_arity, tcDataTypeCtor), 0).x
+	&apos; field dataCtors later
+	assert_hasCtor(    tcDataTypeCtor,	cDataTypeCtor).x
+	assert_hasTypeCtor(cDataTypeCtor,	tcDataTypeCtor).x
+	&apos; TODO: confirm that tcDataTypeCtor dataCtors(0) = cDataTypeCtor
+	assertEqual(DataValue_same(tcDataTypeCtor, tcType), 		False).x
+	assertEqual(DataValue_same(tcDataTypeCtor, cDataTypeCtor),	False).x
+
+	Dim cDataCtor As Variant
+	cDataCtor = DataCtor
+	assertEqual(isDataValue(cDataCtor), True).x
+	assertEqual(fieldCount( cDataCtor), 3).x
+	assertEqual(field(DataCtor_name, cDataCtor), &quot;DataCtor&quot;).x
+	&apos; field argTypes later
+	assert_hasCtor(cDataCtor, 	cDataCtor).x
+	assert_hasCtor(cDataTypeCtor,	cDataCtor).x
+	assertEqual(DataValue_same(cDataCtor, tcType), 			False).x
+	assertEqual(DataValue_same(cDataCtor, cDataTypeCtor),	False).x
+	assertEqual(DataValue_same(cDataCtor, tcDataTypeCtor),	False).x
+	
+	Dim tcDataCtor As Variant
+	tcDataCtor = TDataCtor
+	assertEqual(isDataValue(tcDataCtor), True).x
+	assertEqual(fieldCount( tcDataCtor), 3).x
+	assertEqual(field(DataTypeCtor_name,  tcDataCtor), &quot;TDataCtor&quot;).x
+	assertEqual(field(DataTypeCtor_arity, tcDataCtor), 0).x
+	&apos; field dataCtors later
+	assert_hasCtor(tcDataCtor, 		cDataTypeCtor).x
+	assert_hasCtor(cDataTypeCtor, 	cDataCtor).x
+	assert_hasTypeCtor(cDataCtor, 	tcDataCtor).x
+	&apos; TODO: confirm that tcDataCtor dataCtors(0) = cDataCtor
+	assertEqual(DataValue_same(tcDataCtor, tcType), 		False).x
+	assertEqual(DataValue_same(tcDataCtor, cDataTypeCtor),	False).x
+	assertEqual(DataValue_same(tcDataCtor, tcDataTypeCtor),	False).x
+	assertEqual(DataValue_same(tcDataCtor, cDataCtor),		False).x
+	
+	Dim tcList As Variant
+	tcList = TList
+	assertEqual(isDataValue(tcList), True).x
+	assertEqual(fieldCount(tcList), 3).x
+	assertEqual(field(DataTypeCtor_name,  tcList), &quot;List&quot;).x
+	assertEqual(field(DataTypeCtor_arity, tcList), 1).x
+	&apos; its dataCtors field is a List instance:
+	assert_hasTypeCtor(ctorOf(field(DataTypeCtor_dataCtors, tcList)), tcList).x
+	assert_hasCtor(    tcList, cDataTypeCtor).x
+	assertEqual(DataValue_same(tcList, tcType), 		False).x
+	assertEqual(DataValue_same(tcList, cDataTypeCtor),	False).x
+	assertEqual(DataValue_same(tcList, tcDataTypeCtor),	False).x
+	assertEqual(DataValue_same(tcList, cDataCtor),		False).x
+	assertEqual(DataValue_same(tcList, tcDataCtor),		False).x
+
+	&apos; dataCtors fields of the other type ctors so far:
+	assert_hasTypeCtor(ctorOf(field(DataTypeCtor_dataCtors, tcType)), 			tcList).x
+	assert_hasTypeCtor(ctorOf(field(DataTypeCtor_dataCtors, tcDataTypeCtor)), 	tcList).x
+	assert_hasTypeCtor(ctorOf(field(DataTypeCtor_dataCtors, tcDataCtor)), 		tcList).x
+
+	&apos; argTypes fields of the data ctors so far:
+	assert_hasTypeCtor(ctorOf(field(DataCtor_argTypes, cDataTypeCtor)),			tcList).x
+	assert_hasTypeCtor(ctorOf(field(DataCtor_argTypes, cDataCtor)),				tcList).x
+	
+
+
+	&apos;---- data ctors of TList
+	
+	Dim vNil As Variant, cNil As Variant
+	vNil = List_nil
+	cNil = ctorOf(vNil)
+	assertEqual(isDataValue(vNil), True).x
+	assertEqual(isDataValue(cNil), True).x
+	assertEqual(fieldCount(vNil),  0).x
+	assertEqual(fieldCount(cNil),  3).x
+	assert_hasCtor(    vNil, cNil		).x
+	assert_hasCtor(    cNil, cDataCtor	).x
+	assert_hasTypeCtor(cNil, tcList		).x
+	&apos; Let&apos;s not test the name, rather confirm that cNil is a
+	&apos; singleton data ctor: its argTypes field is the same as vNil!
+	assertEqual(DataValue_same( _
+		field(DataCtor_argTypes, cNil), vNil), True).x
+	&apos; TList&apos;s dataCtors field is non-nil:
+	Dim ListCtors
+	ListCtors = field(DataTypeCtor_dataCtors, tcList)
+	assertEqual(DataValue_same(ListCtors, vNil), False).x
+	
+	assertEqual(DataValue_same(vNil, tcType), 			False).x
+	assertEqual(DataValue_same(vNil, cDataTypeCtor),	False).x
+	assertEqual(DataValue_same(vNil, tcDataTypeCtor),	False).x
+	assertEqual(DataValue_same(vNil, cDataCtor),		False).x
+	assertEqual(DataValue_same(vNil, tcDataCtor),		False).x
+	assertEqual(DataValue_same(vNil, tcList),			False).x
+	assertEqual(DataValue_same(vNil, cNil),				False).x
+	assertEqual(DataValue_same(cNil, tcType), 			False).x
+	assertEqual(DataValue_same(cNil, cDataTypeCtor),	False).x
+	assertEqual(DataValue_same(cNil, tcDataTypeCtor),	False).x
+	assertEqual(DataValue_same(cNil, cDataCtor),		False).x
+	assertEqual(DataValue_same(cNil, tcDataCtor),		False).x
+	assertEqual(DataValue_same(cNil, tcList),			False).x
+	
+	Dim cCons As Variant
+	cCons = List_cons
+	assertEqual(isDataValue(cCons), True).x
+	assert_hasCtor(    cCons, cDataCtor	).x
+	assert_hasTypeCtor(cCons, tcList	).x
+	&apos; Let&apos;s not test the name, rather confirm that it has 
+	&apos; a non-nil argTypes field and is itself the data ctor of that!
+	assertEqual(DataValue_same(field(DataCtor_argTypes, cCons), vNil), False).x
+	assert_hasCtor(field(DataCtor_argTypes, cCons), cCons).x
+	&apos; TList&apos;s dataCtors field is a cons value:
+	assert_hasCtor(ListCtors, cCons).x
+
+	assertEqual(DataValue_same(cCons, tcType), 			False).x
+	assertEqual(DataValue_same(cCons, cDataTypeCtor),	False).x
+	assertEqual(DataValue_same(cCons, tcDataTypeCtor),	False).x
+	assertEqual(DataValue_same(cCons, cDataCtor),		False).x
+	assertEqual(DataValue_same(cCons, tcDataCtor),		False).x
+	assertEqual(DataValue_same(cCons, tcList),			False).x
+	assertEqual(DataValue_same(cCons, vNil),			False).x
+	assertEqual(DataValue_same(cCons, cNil),			False).x
+	
+	&apos;--- apply List_cons, test List_isNil
+	Dim xs As Variant, ys As Variant
+	xs = vNil
+	assertEqual(List_isNil(xs), True).x
+	
+	xs = List_cons(vNil, vNil)
+	assertEqual(isDataValue(xs), True).x
+	assert_hasCtor(xs, cCons).x
+	assertEqual(List_isNil(xs), False).x
+	ys = List_cons(vNil, ys)
+	assertEqual(isDataValue(ys), True).x
+	assert_hasCtor(ys, cCons).x
+	assertEqual(List_isNil(ys), False).x
 	
 	
+	&apos;---- data ctors of TType
+	Dim cString As Variant
+	cString = StringType
+	assertEqual(isDataValue(cString), True).x
+	assertEqual(field(DataCtor_name, cString), &quot;String&quot;).x
+	assert_hasCtor(	   cString,		cDataCtor).x
+	assert_hasTypeCtor(cString,		tcType).x
+	
+	assertEqual(DataValue_same( _
+		field(DataCtor_typeCtor, cDataCtor), _
+		tcDataCtor), _
+	True).x
 	
 	
+End Function
+
+Function test_Type_hasType
+	assertEqual(hasType(TDataTypeCtor,	TDataTypeCtor), True).x
+	assertEqual(hasType(TType, 			TDataTypeCtor), True).x
+	assertEqual(hasType(DataTypeCtor,	TDataTypeCtor), False).x
+	assertEqual(hasType(DataTypeCtor,	TDataCtor), 	True).x
+	assertEqual(hasType(TDataCtor,		TDataTypeCtor), True).x
+	assertEqual(hasType(DataCtor,		TDataTypeCtor), False).x
+	assertEqual(hasType(DataCtor,		TDataCtor), 	True).x
+
+	assertEqual(hasType(TDataCtor,		DataCtor), True).x
 	
+	assertEqual(hasType(), True).x
+	assertEqual(hasType(), True).x
+
+End Function
+
+Function asdf
 	&apos; But before we go on to make one, let&apos;s make things a bit more 
 	&apos; interesting. Why not give him a brother:
 	Dim cBar As DataValue
