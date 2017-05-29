@@ -1244,11 +1244,21 @@ Function bootstrapTypes()
 		Nothing _
 	)
 	assertEqual(DataValue_same(x, cNil), False).x
-	&apos; &quot;Sameness&quot; is of course symmetric, ie x same y iff y same x:
-	assertEqual(DataValue_same(cNil, x), False).x
-	&apos; ...and it is of course reflexive, ie forall x: x same x
-	assertEqual(DataValue_same(x, x), True).x
+	&apos; To make the tests more readable we&apos;ll abbreviate that to
+	refute_same(x,    cNil).x
+	&apos; and for a positive test:
+	assert_same(x,    x).x
+	assert_same(cNil, cNil).x
+	&apos; ...which simply means that &quot;Sameness&quot; is of course
+	&apos; reflexive, ie for all x,y: if x = y then x same y.
+	&apos; It is - again of course - 
+	&apos; symmetric, ie forall x,y: x same y iff y same x.
+	assertEqual(_
+		DataValue_same(cNil, x), _
+		DataValue_same(x, cNil) _
+	).x
 	
+		
 	&apos; The function DataValue_genericToString provides a way to
 	&apos; see what&apos;s inside a DataValue:
 	Dim cNilStr As String
@@ -1270,7 +1280,7 @@ Function bootstrapTypes()
 	vNil = _newDataValue(cNil, emptyArray)
 	assertEqual(isDataValue(vNil), True).x
 	&apos; It has a constructor that ctorOf accepts, and that is cFoo:
-	assertEqual(DataValue_same(ctorOf(vNil), cNil), True).x
+	assert_same(ctorOf(vNil), cNil).x
 	
 	Dim vNilStr As String
 	vNilStr = DataValue_genericToString(vNil)
@@ -1806,10 +1816,22 @@ Function test_same(x As Variant, y As Variant, exp As Boolean)
 	If Not(isDataValue(x)) Or Not(isDataValue(y)) Then
 		Goto test_same_invalid_args
 	End If
-	test_same = assertEqual(DataValue_same(x, y), exp)
+	Dim out, lvl As Integer, msg As String
+	testLevel = testLevel + 1
+	out = assertEqual(DataValue_same(x, y), exp)
+	testLevel = testLevel - 1
+	If out.isFail Then
+		msg = &quot;expected .id &quot; &amp; x.id _
+			&amp; IIf(exp, &quot;&quot;, &quot;NOT&quot;) _
+			&amp; &quot; to be same as .id &quot; &amp; y.id &amp; &quot;:&quot; _
+			&amp; NL &amp; &quot;.id &quot; &amp; x.id &amp; &quot;: &quot; &amp; DataValue_toString(x) _
+			&amp; NL _
+			&amp; NL &amp; &quot;.id &quot; &amp; y.id &amp; &quot;: &quot; &amp; DataValue_toString(y)
+		out = mkFail(x, y, msg)
+	End If
+	test_same = out
 	Exit Function
 test_same_invalid_args:
-	Dim msg As String
 	msg = IIf(exp, &quot;assert&quot;, &quot;refute&quot;) _
 		&amp; &quot;_same: invalid args &quot; &amp; NL &amp; toString(x) _
 		&amp; NL &amp; NL &amp; toString(y)
