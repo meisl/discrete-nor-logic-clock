@@ -20,7 +20,7 @@ Const DataTypeCtor_dataCtors = 2
 
 
 Sub Main
-	[test_Type======================================]
+	[test_Type======================================]()
 End Sub
 
 

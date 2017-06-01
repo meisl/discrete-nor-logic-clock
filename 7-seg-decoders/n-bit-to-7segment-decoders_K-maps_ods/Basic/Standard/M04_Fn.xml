@@ -397,7 +397,7 @@ Function apply1(ByVal fn As Variant, ByVal arg As Variant)
 End Function
 
 Function applyLast(ByVal fn As Object, arg As Variant)
-	Dim result As Variant
+	Dim out As Variant
 	Dim reverseArgs As Object
 	Dim baseArity As Integer
 	Dim args As Variant
@@ -417,101 +417,101 @@ Function applyLast(ByVal fn As Object, arg As Variant)
 applyLast_of_one:
 	a0 = arg
 	Select Case name
-		Case &quot;ctorOf&quot;:		result = ctorOf(	a0)
+		Case &quot;ctorOf&quot;:				out = ctorOf(	a0)
 		
-		Case &quot;isEmpty&quot;:		result = isEmpty(	a0)
-		Case &quot;isString&quot;:	result = isString(	a0)
+		Case &quot;isEmpty&quot;:				out = isEmpty(	a0)
+		Case &quot;isString&quot;:			out = isString(	a0)
 
-		Case &quot;id&quot;: 			result = a0
-		Case &quot;sndArg&quot;:		result = sndArg(	a0)
-		Case &quot;asc&quot;:			result = Asc(		a0)
-		Case &quot;chr&quot;:			result = Chr(		a0)
-		Case &quot;ucase&quot;:		result = UCase(		a0)
-		Case &quot;lcase&quot;:		result = LCase(		a0)
-		Case &quot;toString&quot;:	result = toString(	a0)
-		Case &quot;readHex&quot;:		result = readHex(	a0)
-		Case &quot;isList&quot;:		result = isList(	a0)
-		Case &quot;isNil&quot;:		result = isNil(		a0)
-		Case &quot;length&quot;:		result = length(	a0)
-		Case &quot;car&quot;:			result = car(		a0)
-		Case &quot;cdr&quot;:			result = cdr(		a0)
-		Case &quot;cadr&quot;:		result = cadr(		a0)
-		Case &quot;caddr&quot;:		result = caddr(		a0)
-		Case &quot;flatten&quot;:		result = flatten(	a0)
-		Case &quot;reverse&quot;: 	result = reverse(	a0)
-		Case &quot;toArray&quot;: 	result = toArray(	a0)
-		Case &quot;pStr&quot;: 		result = pStr(		a0)
-		Case &quot;pReturn&quot;:		result = pReturn(	a0)
-		Case &quot;pMany&quot;:		result = pMany(		a0)
-		Case &quot;pMany1&quot;:		result = pMany1(	a0)
-		Case &quot;pZeroOrOne&quot;:	result = pZeroOrOne(a0)
-		Case &quot;mkTypeVar&quot;:	result = mkTypeVar(	a0)
-		Case &quot;TFn_toString&quot;:		result = TFn_toString(		a0)
-		Case &quot;TList_toString&quot;:		result = TList_toString(	a0)
-		Case &quot;TParser_toString&quot;:	result = TParser_toString(	a0)
-		Case &quot;TASN_toString&quot;:		result = TASN_toString(		a0)
-		Case &quot;mkDtTerminal&quot;:		result = mkDtTerminal(		a0)
-		Case &quot;isPattern&quot;:			result = isPattern(	a0)
-		Case &quot;TPattern_toString&quot;:	result = TPattern_toString(	a0)
-		Case &quot;isExpr&quot;:				result = isExpr(			a0)
+		Case &quot;id&quot;: 					out = a0
+		Case &quot;sndArg&quot;:				out = sndArg(	a0)
+		Case &quot;asc&quot;:					out = Asc(		a0)
+		Case &quot;chr&quot;:					out = Chr(		a0)
+		Case &quot;ucase&quot;:				out = UCase(		a0)
+		Case &quot;lcase&quot;:				out = LCase(		a0)
+		Case &quot;toString&quot;:			out = toString(	a0)
+		Case &quot;readHex&quot;:				out = readHex(	a0)
+		Case &quot;isList&quot;:				out = isList(	a0)
+		Case &quot;isNil&quot;:				out = isNil(		a0)
+		Case &quot;length&quot;:				out = length(	a0)
+		Case &quot;car&quot;:					out = car(		a0)
+		Case &quot;cdr&quot;:					out = cdr(		a0)
+		Case &quot;cadr&quot;:				out = cadr(		a0)
+		Case &quot;caddr&quot;:				out = caddr(		a0)
+		Case &quot;flatten&quot;:				out = flatten(	a0)
+		Case &quot;reverse&quot;: 			out = reverse(	a0)
+		Case &quot;toArray&quot;: 			out = toArray(	a0)
+		Case &quot;pStr&quot;: 				out = pStr(		a0)
+		Case &quot;pReturn&quot;:				out = pReturn(	a0)
+		Case &quot;pMany&quot;:				out = pMany(		a0)
+		Case &quot;pMany1&quot;:				out = pMany1(	a0)
+		Case &quot;pZeroOrOne&quot;:			out = pZeroOrOne(a0)
+		Case &quot;mkTypeVar&quot;:			out = mkTypeVar(	a0)
+		Case &quot;TFn_toString&quot;:		out = TFn_toString(		a0)
+		Case &quot;TList_toString&quot;:		out = TList_toString(	a0)
+		Case &quot;TParser_toString&quot;:	out = TParser_toString(	a0)
+		Case &quot;TASN_toString&quot;:		out = TASN_toString(		a0)
+		Case &quot;mkDtTerminal&quot;:		out = mkDtTerminal(		a0)
+		Case &quot;isPattern&quot;:			out = isPattern(	a0)
+		Case &quot;TPattern_toString&quot;:	out = TPattern_toString(	a0)
+		Case &quot;isExpr&quot;:				out = isExpr(			a0)
 		Case Else
-			Goto applyLast_doTheCall
+			Goto applyLast_unknownF
 	End Select
-	applyLast = result
+	applyLast = out
 	Exit Function
 applyLast_of_two:
 	a0 = car(reverseArgs) &apos;fn.args(0)
 	a1 = arg
 	Select Case name
-		Case &quot;TList_equ&quot;:	result = TList_equ(		a0, a1)
-		Case &quot;fstArg&quot;:		result = a0
-		Case &quot;add&quot;:			result = CLng(a0 + a1)
-		Case &quot;mul&quot;:			result = CLng(a0 * a1)
-		Case &quot;concat&quot;:		result = a0 &amp; a1
-		Case &quot;equ&quot;:			result = equ(			a0, a1)
-		Case &quot;neq&quot;:			result = Not(equ(		a0, a1))
-		Case &quot;applyToList&quot;:	result = applyToList(	a0, a1)
-		Case &quot;cons&quot;:		result = cons(			a0, a1)
-		Case &quot;map&quot;:			result = map(			a0, a1)
-		Case &quot;filter&quot;:		result = filter(		a0, a1)
-		Case &quot;skipWhile&quot;:	result = skipWhile(		a0, a1)
-		Case &quot;skipUntil&quot;:	result = skipUntil(		a0, a1)
-		Case &quot;foldl1&quot;:		result = foldl1(		a0, a1)
-&apos;		Case &quot;foldr1&quot;:		result = foldr1(		a0, a1)
-		Case &quot;adjoin&quot;:		result = adjoin(		a0, a1)
-		Case &quot;mkParser&quot;:	result = mkParser(		a0, a1)
-		Case &quot;pBind&quot;:		result = pBind(			a0, a1)
-		Case &quot;pChoice&quot;:		result = pChoice(		a0, a1)
-		Case &quot;pZeroOrOne2&quot;:	result = pZeroOrOne2(	a0, a1)
-		Case &quot;maybeMakeArrowType&quot;: result = maybeMakeArrowType(a0, a1)
-		Case &quot;mkTypeCtor&quot;:	result = mkTypeCtor(	a0, a1)
-		Case &quot;mkTupleType&quot;:	result = mkTupleType(	a0, a1)
-		Case &quot;hasType&quot;:		result = hasType(		a0, a1)
-		Case &quot;TASN_dot&quot;:	result = TASN_dot(		a0, a1)
-		Case &quot;mkDtCClass&quot;:	result = mkDtCClass(	a0, a1)
-		Case &quot;mkDtNonterminal&quot;:	result = mkDtNonterminal(	a0, a1)
-		Case &quot;mkDtMult&quot;:		result = mkDtMult(	a0, a1)
+		Case &quot;TList_equ&quot;:			out = TList_equ(		a0, a1)
+		Case &quot;fstArg&quot;:				out = a0
+		Case &quot;add&quot;:					out = CLng(a0 + a1)
+		Case &quot;mul&quot;:					out = CLng(a0 * a1)
+		Case &quot;concat&quot;:				out = a0 &amp; a1
+		Case &quot;equ&quot;:					out = equ(			a0, a1)
+		Case &quot;neq&quot;:					out = Not(equ(		a0, a1))
+		Case &quot;applyToList&quot;:			out = applyToList(	a0, a1)
+		Case &quot;cons&quot;:				out = cons(			a0, a1)
+		Case &quot;map&quot;:					out = map(			a0, a1)
+		Case &quot;filter&quot;:				out = filter(		a0, a1)
+		Case &quot;skipWhile&quot;:			out = skipWhile(		a0, a1)
+		Case &quot;skipUntil&quot;:			out = skipUntil(		a0, a1)
+		Case &quot;foldl1&quot;:				out = foldl1(		a0, a1)
+&apos;		Case &quot;foldr1&quot;:				out = foldr1(		a0, a1)
+		Case &quot;adjoin&quot;:				out = adjoin(		a0, a1)
+		Case &quot;mkParser&quot;:			out = mkParser(		a0, a1)
+		Case &quot;pBind&quot;:				out = pBind(			a0, a1)
+		Case &quot;pChoice&quot;:				out = pChoice(		a0, a1)
+		Case &quot;pZeroOrOne2&quot;:			out = pZeroOrOne2(	a0, a1)
+		Case &quot;maybeMakeArrowType&quot;:	out = maybeMakeArrowType(a0, a1)
+		Case &quot;mkTypeCtor&quot;:			out = mkTypeCtor(	a0, a1)
+		Case &quot;mkTupleType&quot;:			out = mkTupleType(	a0, a1)
+		Case &quot;hasType&quot;:				out = hasType(		a0, a1)
+		Case &quot;TASN_dot&quot;:			out = TASN_dot(		a0, a1)
+		Case &quot;mkDtCClass&quot;:			out = mkDtCClass(	a0, a1)
+		Case &quot;mkDtNonterminal&quot;:		out = mkDtNonterminal(	a0, a1)
+		Case &quot;mkDtMult&quot;:			out = mkDtMult(	a0, a1)
 		Case Else
-			Goto applyLast_doTheCall
+			Goto applyLast_unknownF
 	End Select
-	applyLast = result
+	applyLast = out
 	Exit Function
 applyLast_of_three:
 	a0 = cadr(reverseArgs) &apos;fn.args(0)
 	a1 = car(reverseArgs) &apos;fn.args(1)
 	a2 = arg
 	Select Case name
-		Case &quot;swap&quot;:		result = apply(a0, a2, a1)
-		Case &quot;compose&quot;:		result = _compose(a0, a1, a2)	&apos;	apply(a0, apply(a1, a2))	&apos;
-		Case &quot;inRange&quot;:		result = CBool( (a0 &lt;= a2) And (a2 &lt;= a1) )
-		Case &quot;foldl&quot;:		result = foldl(		a0, a1, a2)
-		Case &quot;foldr&quot;:		result = foldr(		a0, a1, a2)
-		Case &quot;mkASN&quot;:		result = mkASN(		a0, a1, a2)
-		Case &quot;matches&quot;:		result = matches(	a0, a1, a2)
+		Case &quot;swap&quot;:				out = apply(a0, a2, a1)
+		Case &quot;compose&quot;:				out = _compose(a0, a1, a2)	&apos;	apply(a0, apply(a1, a2))	&apos;
+		Case &quot;inRange&quot;:				out = CBool( (a0 &lt;= a2) And (a2 &lt;= a1) )
+		Case &quot;foldl&quot;:				out = foldl(		a0, a1, a2)
+		Case &quot;foldr&quot;:				out = foldr(		a0, a1, a2)
+		Case &quot;mkASN&quot;:				out = mkASN(		a0, a1, a2)
+		Case &quot;matches&quot;:				out = matches(	a0, a1, a2)
 		Case Else
-			Goto applyLast_doTheCall
+			Goto applyLast_unknownF
 	End Select
-	applyLast = result
+	applyLast = out
 	Exit Function
 applyLast_of_four:
 	a0 = caddr(reverseArgs) &apos;fn.args(0)
@@ -521,44 +521,19 @@ applyLast_of_four:
 	Select Case name
 		Case &quot;ite&quot;
 			If applyLast(a0, a3) Then
-				result = apply1(a1, a3)
+				out = apply1(a1, a3)
 			Else
-				result = apply1(a2, a3)
+				out = apply1(a2, a3)
 			End if
 		Case Else
-			Goto applyLast_doTheCall
+			Goto applyLast_unknownF
 	End Select
-	applyLast = result
+	applyLast = out
 	Exit Function
 applyLast_of_fiveOrMore:
-	croak(&quot;NYI: applyLast_fiveOrMore&quot;)
-applyLast_doTheCall:
-	reverseArgs = cons(arg, reverseArgs)
-	result = applyBuiltinRev(fn, reverseArgs)
-	applyLast = result
-End Function
-
-Function applyBuiltinRev(fn As Object, ByVal reverseArgs As Object)
-	Dim result As Variant
-	Dim r As Integer, n As Integer
-	r = arity(fn)
-	n = length(reverseArgs)
-	If (r &lt;&gt; n) Then
-		croak(&quot;applyBuiltinRev: arity = &quot; &amp; r &amp; &quot; &lt;&gt; #args = &quot; &amp; n)
-	End If
-	&apos; Do NOT call or apply &quot;reverse&quot;!
-	Dim a(0 To n - 1)
-	Dim i As Integer
-	For i = n - 1 To 0 Step -1
-		a(i) = car(reverseArgs)
-		reverseArgs = cdr(reverseArgs)
-	Next i
-	Select Case getFnName(fn)
-	&apos;	Case &quot;TList_equ&quot;:			result = TList_equ(			a(0), a(1)			)
-		Case Else
-			croak(&quot;applyBuiltinRev: unknown function &apos;&quot; &amp; getFnName(fn) &amp; &quot;&apos;&quot;)
-	End Select	
-	applyBuiltinRev = result
+	croak(&quot;applyLast/NYI: five or more args&quot;)
+applyLast_unknownF:
+	croak(&quot;applyLast: unknown fn &apos;&quot; &amp; name &amp; &quot;&apos;&quot;)
 End Function
 
 Function applyToList(Optional ByVal f As Variant, Optional ByVal args As Object)

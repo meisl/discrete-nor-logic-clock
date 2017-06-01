@@ -4,7 +4,7 @@
 Option Explicit
 
 Sub Main
-	[test_PrsGrammar======================================]
+	[test_PrsGrammar======================================]()
 End Sub
 
 Function derivationTree_prsGrammar( _

@@ -1587,10 +1587,6 @@ Function test_Parser(Optional what)
 	failure = toString(parseFailure)
 	
 	Dim result As Variant
-	Dim ticksPerSec As Long
-	ticksPerSec = GetSystemTicks()
-	Wait(100) &apos; wait a hundred milliseconds
-	ticksPerSec = 10 * (GetSystemTicks() - ticksPerSec)
 
 	Dim tm As Double, aCount As Integer, aPerSec As Double
 	aCount = assertionCount
@@ -2878,7 +2874,7 @@ Function test_Parser_TypeExpr()
 	assert_parses(p, &quot;((a,b),c)&quot;, &quot;(Tuple2 [&apos;(Tuple2 [&apos;&apos;a&apos;, &apos;&apos;b&apos;])&apos;, &apos;&apos;c&apos;])&quot;, 10).x
 	 
 	Dim fns As Object, f As Object, fName As String, typStr As String
-	fns = fnObjs
+	fns = Fn._instances
 	While Not(isNil(fns))
 		f = car(fns)
 		typStr = getFnTypeStr(f)

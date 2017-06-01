@@ -95,7 +95,7 @@ isEnv_start:
 	isEnv = out
 End Function
 
-Function [test_Env======================================]
+Function [test_Env======================================]()
 	test_Env_empty()
 	test_Env_extend()
 	test_Env_toString()

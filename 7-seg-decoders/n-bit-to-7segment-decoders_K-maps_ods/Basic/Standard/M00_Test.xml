@@ -21,11 +21,24 @@ Type TTest_Dummy
 End Type
 
 Public testLevel As Integer
-Public assertionCount As Integer
+Public assertionCount As Long
+
 
 Sub Main
-	test_Test()
+	[test_Test ===========]()
+	[test_All ============]()
 End Sub
+
+
+Function ticksPerSec()
+	Dim out As Long
+	If out = 0 Then
+		out = GetSystemTicks()
+		Wait(100) &apos; wait a hundred milliseconds
+		out = 10 * (GetSystemTicks() - out)
+	End If
+	ticksPerSec = out
+End Function
 
 Function _argsStr(fName As String, args As Array)
 On Local Error Goto JustSomething
@@ -313,7 +326,7 @@ Function i_will_throw0()
 	i_will_throw0 = foo.provoke.an.error
 End Function
 
-Function test_Test()
+Function [test_Test ===========]()
 	test_assertEqual()
 	test_assertThrows()
 	test_testStat()
@@ -481,5 +494,28 @@ Function test_testStat()
 	assertEqual(testStat(&quot;time&quot;,  &quot;foobar 5,5 987&quot;), 5.5).x
 	assertEqual(testStat(&quot;count&quot;, &quot;foobar 5,5 987&quot;), 987).x
 End Function
+
+
+Function [test_All ============]()
+	Dim tm As Double
+	tm = GetSystemTicks()
+	
+	test_Common()
+	test_Array()
+	[test_List ===============]()
+	[test_Fn ===============]()
+	test_Parser()
+	test_AST()
+	test_PrsLogic()
+	[test_PrsGrammar======================================]()
+	[test_Pattern======================================]()
+	[test_Env======================================]()
+	[test_Expr======================================]()
+	[test_Type======================================]()
+	
+	tm = (GetSystemTicks() - tm) / ticksPerSec
+	show(&quot;time for all tests: &quot;, tm)
+End Function
+
 
 </script:module>

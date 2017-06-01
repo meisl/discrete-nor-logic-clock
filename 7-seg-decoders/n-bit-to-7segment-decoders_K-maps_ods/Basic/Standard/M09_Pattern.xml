@@ -17,7 +17,7 @@ End Type
 
 
 Sub Main
-	[test_Pattern======================================]
+	[test_Pattern======================================]()
 End Sub
 
 
@@ -181,6 +181,7 @@ _matches_dispatch:
 		Case &quot;Val&quot;
 			u = p.a0
 _matches_Val_equalityTest:
+			&apos;On Local Error Goto _matches_Val_equalityTest_threw
 			If equ(x, u) Then
 				out = e
 			Else
@@ -513,10 +514,17 @@ Function test_Pattern_matches_Val()
 		
 	p = patVal(Nothing)
 	assert_matches(p, e, Nothing).x
-	refute_matches(p, e, Array( _
-		Empty, _
-		nil, List(nil), List(1, 2, 3) _
-	)).x
+	
+	&apos; TODO: decide what match should do if it wouldn&apos;t type-check
+	&apos;refute_matches(p, e, Empty			).x
+	&apos;refute_matches(p, e, nil			).x
+	&apos;refute_matches(p, e, List(nil)		).x
+	&apos;refute_matches(p, e, List(1, 2, 3)	).x
+	&apos;refute_matches(p, e, Array( _
+	&apos;	Empty, _
+	&apos;	nil, List(nil), List(1, 2, 3) _
+	&apos;)).x
+	
 	f = matches(p, e)
 	assertThrows(f, Array(      True)).x
 	assertThrows(f, Array(     False)).x
@@ -708,19 +716,7 @@ Function test_Pattern_matches_ASN()
 	&apos;show(v)
 	&apos;show(w)
 	assert_toString_equals(w, mkASN(&quot;Foo&quot;, &quot;bar&quot;, nil)).x
-	
-	p = xpApp( _
-			xpApp( _
-				patDat(cons), _
-				patVar(&quot;x&quot;) _
-			), _
-			patVar(&quot;xs&quot;) _
-		)
-	v = List(1, 2, 3)	&apos;	mkDtTerminal(&quot;asdf&quot;) &apos; 
-	e = envEmpty
-	act = matches(p, e, v)
-	show(act)
-	
+		
 	&apos;ASN &quot;Con&quot;  () [x]        -&gt; x
 	&apos;ASN &quot;Atom&quot; () [x]        -&gt; x
 	
