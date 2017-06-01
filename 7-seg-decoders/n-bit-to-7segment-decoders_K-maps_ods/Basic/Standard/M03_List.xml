@@ -3,126 +3,110 @@
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M03_List" script:language="StarBasic">REM  *****  BASIC  *****
 Option Explicit
 
-Const TList_tyname = &quot;TList&quot;
-Type TList
-	tyname As String
-	ctor As Object
-	head As Variant
-	tail As TList
-	len As Integer
-End Type
 
 Sub Main
-	&apos;show(Env_toString(TList))
-	test_List()
+	[test_List ===============]()
 End Sub
 
-Function TList()
-	Static out As Object : If isNull(out) Then
-		Dim tv As Variant, t As Variant
-		tv = mkTypeVar(&quot;a&quot;)
-		t = mkTypeCtor(&quot;List&quot;, List(tv))
-		out = envEmpty
-		out = extend(out, cons, mkArrowType(tv, t))
-		out = extend(out, nil, t)
-		out = extend(envEmpty, &quot;DataCtors&quot;, out)
-		&apos;out = extend(out, &quot;TypeArgs&quot;, &quot;a&quot;)
-		out = extend(out, &quot;TypeCtor&quot;, t)
-		End If
-	TList = out
-End Function
 
 &apos; --- constructors ---
 
-Function _newList(head As Variant, tail As TList) As TList
-	Dim out As New TList
-	out.tyname = TList_tyname
-	out.head = head
-	out.tail = tail
-	_newList = out
-End Function
-
-Function nil() As TList
-	Static out As Object
-	If isNull(out) Then
-		out = _newList(Empty, Nothing)
-		out.ctor = out
-		out.len = 0
-	End If
-	nil = out
+Function nil()
+	nil = List_nil
 End Function
 
 Function cons(Optional x, Optional xs)
-	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.cons : End If
-	Dim out As Variant
-	If isMissing(x) Then :		out = oFn
-	ElseIf isMissing(xs) Then : out = apply1(oFn, x)
-	ElseIf isList(xs) Then
-		out = _newList(x, xs)
-		out.ctor = oFn
-		out.len = xs.len + 1
+	Dim out As Variant : Static oFn As Object
+	If isMissing(xs) Then
+		If isNull(oFn) Then : oFn = Fn.cons : End If
+		out = _apply(oFn, x, xs)
 	Else
-		croak(&quot;cons: invalid tail - expected a List but got a &quot; &amp; typeOf(xs) &amp; &quot;:&quot; &amp; NL &amp; toString(xs))
+		If isList(xs) Then
+			out = List_cons(x, xs)
+		Else
+			croak(&quot;cons: invalid tail - expected a List but got a &quot; &amp; typeOf(xs) &amp; &quot;:&quot; &amp; NL &amp; toString(xs))
+		End If
 	End If
 	cons = out
 End Function
 
+&apos; --- ctor test ---
+
+Function isNil(Optional xs)
+	If isMissing(xs) Then : isNil = Fn.isNil : Else
+		isNil = List_isNil(xs)
+	End If
+End Function
+
 &apos; --- destructors ---
 
-Function car(Optional xs As TList) As Variant
+Function car(Optional xs)
 	If isMissing(xs) Then : car = Fn.car : Exit Function : End If
 	If isNil(xs) Then
 		croak(&quot;car: nil&quot;)
 	Else
-		car = xs.head
+		car = List_car(xs)
 	End If
 End Function
 
-Function cdr(Optional xs As TList) As TList
+Function cdr(Optional xs)
 	If isMissing(xs) Then : cdr = Fn.cdr : Exit Function : End If
 	If isNil(xs) Then
 		croak(&quot;cdr: nil&quot;)
 	Else
-		cdr = xs.tail
+		cdr = List_cdr(xs)
 	End If
 End Function
 
-Function length(Optional xs As TList)
+Function length(Optional xs)
 	If isMissing(xs) Then : length = Fn.length : Else
-		length = xs.len
+		length = List_length(xs)
 	End If
 End Function
 
 &apos; --- type test ---
 
 Function isList(Optional x As Variant)
-	If isMissing(x) Then
-		isList = Fn.isList
-	Else
-		isList = (typeOf(x) = typeOf(nil))
-	End If
+	isList = hasType(x, TList)
 End Function
 
-&apos; --- ctor test ---
-
-Function isNil(Optional xs As TList)
-	If isMissing(xs) Then : isNil = Fn.isNil : Else
-		isNil = (xs.len = 0)
-	End If
-End Function
 
 &apos; --- toString ---
 
-Function TList_toString(xs As TList)
-&apos;	concat &quot;[&quot; (concat (foldl1 (\acc.(concat acc) ° (concat &quot;, &quot;))) &quot;[&quot; (map toString xs)) &quot;]&quot;
-	Dim result As String
-	result = &quot;[&quot; &amp; Join(toArray(map(Fn.toString, xs)), &quot;, &quot;) &amp; &quot;]&quot;
-	TList_toString = result
+Function TList_toString(ByVal xs)
+	&apos;concat &quot;[&quot; (concat (foldl1 (\acc.(concat acc) ° (concat &quot;, &quot;))) &quot;[&quot; (map toString xs)) &quot;]&quot;
+	&apos;out = &quot;[&quot; &amp; Join(toArray(map(Fn.toString, xs)), &quot;, &quot;) &amp; &quot;]&quot;
+	
+	Dim out As String
+	If isNil(xs) Then
+		out = &quot;[]&quot;
+	Else
+		Dim x
+		x = car(xs)
+		If isList(x) Then
+			out = TList_toString(x)
+		Else
+			out = toString(x)
+		End If
+		xs = cdr(xs)
+		Do Until(isNil(xs))
+			x = car(xs)
+			xs = cdr(xs)
+			If isList(x) Then
+				out = out &amp; &quot;, &quot; &amp; TList_toString(x)
+			Else
+				out = out &amp; &quot;, &quot; &amp; toString(x)
+			End If
+		Loop
+		out = &quot;[&quot; &amp; out &amp; &quot;]&quot;
+	End If
+	
+	TList_toString = out
 End Function
 
 &apos; --- equality ---
 
-Function TList_equ(xs As TList, ys As TList) As Boolean
+Function TList_equ(xs, ys) As Boolean
 	Dim out As Boolean
 	out = False
 	Dim n As Integer
@@ -151,11 +135,11 @@ End Function
 
 &apos; --- fns on List ---
 
-Function cadr(xs As TList)
+Function cadr(xs)
 	cadr = car(cdr(xs))
 End Function
 
-Function caddr(xs As TList)
+Function caddr(xs)
 	caddr = cadr(cdr(xs))
 End Function
 
@@ -259,7 +243,11 @@ Function skipUntil( _
 	skipUntil = out
 End Function
 
-Function foldl(Optional f As Object, Optional acc, Optional ByVal xs As TList)
+Function foldl( _
+	Optional f As Object, _
+	Optional acc, _
+	Optional ByVal xs _
+)
 	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.foldl : End If
 	If isMissing(xs) Then
 		If isMissing(acc) Then
@@ -286,7 +274,7 @@ Function foldl(Optional f As Object, Optional acc, Optional ByVal xs As TList)
 	End If
 End Function
 
-Function foldl1(Optional f As Object, Optional xs As TList)
+Function foldl1(Optional f As Object, Optional xs)
 	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.foldl1 : End If
 	If isMissing(f) Then
 		foldl1 = oFn
@@ -300,7 +288,11 @@ Function foldl1(Optional f As Object, Optional xs As TList)
 	End If
 End Function
 
-Function foldr(Optional f As Object, Optional acc As Variant, Optional xs As TList)
+Function foldr( _
+	Optional f As Object, _
+	Optional acc As Variant, _
+	Optional xs _
+)
 	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.foldr : End If
 	If isMissing(xs) Then
 		If isMissing(acc) Then
@@ -326,7 +318,7 @@ Function foldr(Optional f As Object, Optional acc As Variant, Optional xs As TLi
 End Function
 
 &apos; Cannot name this function &quot;append&quot;, seems to be a BASIC keyword(?)
-Function adjoin(Optional xs As TList, Optional ys As TList)
+Function adjoin(Optional xs, Optional ys)
 	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.adjoin : End If
 	If isMissing(ys) Then 
 		If isMissing(xs) Then
@@ -335,12 +327,17 @@ Function adjoin(Optional xs As TList, Optional ys As TList)
 			adjoin = apply(oFn, xs)
 		End If
 	Else
-		adjoin = foldr(cons, ys, xs)
+		If isList(ys) Then
+			adjoin = foldr(cons, ys, xs)
+		Else
+			croak(&quot;adjoin: expected List as 2nd arg - got &quot; &amp; typeOf(ys) _
+				&amp; NL &amp; toString(ys))
+		End If
 	End If
 End Function
 
 &apos; Normally this is called &quot;concat&quot; but we already have that for Strings
-Function flatten(Optional xs As TList)
+Function flatten(Optional xs)
 	If isMissing(xs) Then
 		flatten = foldl(adjoin, nil)
 	Else
@@ -348,7 +345,7 @@ Function flatten(Optional xs As TList)
 	End If
 End Function
 
-Function reverse(Optional ByVal xs As TList)
+Function reverse(Optional ByVal xs)
 	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.reverse : End If
 	Dim out As Variant
 	If isMissing(xs) Then : out = oFn
@@ -370,11 +367,11 @@ Function reverse(Optional ByVal xs As TList)
 	reverse = out
 End Function
 
-Function toArray(ByVal xs As TList)
+Function toArray(ByVal xs)
 	Dim n As Integer
 	n = length(xs) - 1
 	If n = -1 Then
-		toArray = Array()
+		toArray = emptyArray
 	Else
 		Dim out(0 To n)
 		Dim i As Integer
@@ -386,52 +383,66 @@ Function toArray(ByVal xs As TList)
 	End If
 End Function
 
-Function List(Optional a0, Optional a1, Optional a2, Optional a3, Optional a4, Optional a5, Optional a6, Optional a7, Optional a8, Optional a9, Optional a10)
+Function List( _
+	Optional a0, _
+	Optional a1, _
+	Optional a2, _
+	Optional a3, _
+	Optional a4, _
+	Optional a5, _
+	Optional a6, _
+	Optional a7, _
+	Optional a8, _
+	Optional a9, _
+	Optional a10 _
+)
 	If Not(IsMissing(a10)) Then
 		croak(&quot;List(...): cannot handle more than 10 args&quot;)
 	End If
-	Dim result As TList
+	Dim out
 	If isMissing(a0) Then
-		result = nil
+		out = nil
 	Else
 		&apos; tail-call:
-		result = cons(a0, List(a1, a2, a3, a4, a5, a6, a7, a8, a9))
+		out = cons(a0, List(a1, a2, a3, a4, a5, a6, a7, a8, a9))
 	End If
-	List = result
+	List = out
 End Function
 
 Function toList(a As Array)
-	Dim result As TList
-	Set result = nil
+	Dim out As Variant
+	Set out = nil
 	Dim i As Integer, k As Integer
 	Select Case getDim(a)
 		Case 1
 			For i = UBound(a) To LBound(a) Step -1
-				result = cons(a(i), result)
+				out = cons(a(i), out)
 			Next i
 		Case 2
 			For i = UBound(a, 1) To LBound(a, 1) Step -1
-				Dim inner As TList
-				Set inner = nil
+				Dim inner
+				inner = nil
 				For k = UBound(a, 2) To LBound(a, 2) Step -1
 					inner = cons(a(i, k), inner)
 				Next k
-				result = cons(inner, result)
+				out = cons(inner, out)
 			Next i
 		Case Else
-			croak(&quot;cannot handle &quot; &amp; getDim(a) &amp; &quot;-dimensional arrays&quot;)
+			croak(&quot;toList: cannot handle &quot; &amp; getDim(a) &amp; &quot;-dimensional arrays&quot;)
 	End Select
-	toList = result
+	toList = out
 End Function
 				
 &apos;= tests ============================================================
 
-Function test_List()
+Function [test_List ===============]()
 	test_List_isList()
 	test_List_isNil_and_cons()
 	test_List_length()
 	test_List_fnApp()
-	test_List_typeOfAndToString()
+	test_List_typeOf()
+	test_List_TList_toString()
+	test_List_polymorphic_toString()
 	test_List_List()
 	test_List_car()
 	test_List_cdr()
@@ -520,35 +531,60 @@ Function test_List_fnApp()
 
 End Function
 
-Function test_List_typeOfAndToString()
-	assertEqual(typeOf(nil), &quot;Object/TList&quot;).x
-	assertEqual(toString(nil), &quot;[]&quot;).x
+Function test_List_typeOf()
+	assertEqual(typeOf(nil), &quot;Data/List&quot;).x
 	
-	Dim lst As TList
-	Set lst = cons(5, nil)
-	assertEqual(typeOf(lst), &quot;Object/TList&quot;).x
-	assertEqual(toString(lst), &quot;[5]&quot;).x
+	Dim lst
+	lst = cons(5, nil)
+	assertEqual(typeOf(lst), &quot;Data/List&quot;).x
+End Function
 
-	Dim a As Variant
-	a = Array(7)
-	assertEqual(Join(a, &quot;, &quot;), &quot;7&quot;)
+Function test_List_TList_toString()
+	Dim a
+	a = nil
+	assertEqual(TList_toString(a), &quot;[]&quot;).x
+	
+	a = cons(5, nil)
+	assertEqual(TList_toString(a), &quot;[5]&quot;).x
 
-	a = Array(7, 5)
-	assertEqual(Join(a, &quot;, &quot;), &quot;7, 5&quot;)
+	a = cons(7, a)
+	assertEqual(TList_toString(a), &quot;[7, 5]&quot;).x
+	a = cons(&quot;a&quot;, a)
+	assertEqual(TList_toString(a), &quot;[&apos;a&apos;, 7, 5]&quot;).x
+	a = cons(&quot;xxx&quot;, nil)
+	assertEqual(TList_toString(a), &quot;[&apos;xxx&apos;]&quot;).x
 
-	Set lst = cons(7, lst)
-	assertEqual(toString(lst), &quot;[7, 5]&quot;).x
-	Set lst = cons(&quot;a&quot;, lst)
-	assertEqual(toString(lst), &quot;[&apos;a&apos;, 7, 5]&quot;).x
-	Set lst = cons(&quot;xxx&quot;, nil)
-	assertEqual(toString(lst), &quot;[&apos;xxx&apos;]&quot;).x
+	a = cons(nil, nil)
+	assertEqual(TList_toString(a), &quot;[[]]&quot;).x
+	a = cons(&quot;b&quot;, a)
+	assertEqual(TList_toString(a), &quot;[&apos;b&apos;, []]&quot;).x
+	a = cons(cons(&quot;a&quot;, nil), a)
+	assertEqual(TList_toString(a), &quot;[[&apos;a&apos;], &apos;b&apos;, []]&quot;).x
+	a = cons(a, nil)
+	assertEqual(TList_toString(a), &quot;[[[&apos;a&apos;], &apos;b&apos;, []]]&quot;).x
+End Function
 
-	Set lst = cons(nil, nil)
-	assertEqual(toString(lst), &quot;[[]]&quot;).x
-	Set lst = cons(&quot;b&quot;, lst)
-	assertEqual(toString(lst), &quot;[&apos;b&apos;, []]&quot;).x
-	Set lst = cons(cons(&quot;a&quot;, nil), lst)
-	assertEqual(toString(lst), &quot;[[&apos;a&apos;], &apos;b&apos;, []]&quot;).x
+Function test_List_polymorphic_toString()
+	Dim a
+	a = nil
+	assertEqual(toString(a), &quot;[]&quot;).x
+	
+	a = cons(5, nil)
+	assertEqual(toString(a), &quot;[5]&quot;).x
+
+	a = cons(7, a)
+	assertEqual(toString(a), &quot;[7, 5]&quot;).x
+	a = cons(&quot;a&quot;, a)
+	assertEqual(toString(a), &quot;[&apos;a&apos;, 7, 5]&quot;).x
+	a = cons(&quot;xxx&quot;, nil)
+	assertEqual(toString(a), &quot;[&apos;xxx&apos;]&quot;).x
+
+	a = cons(nil, nil)
+	assertEqual(toString(a), &quot;[[]]&quot;).x
+	a = cons(&quot;b&quot;, a)
+	assertEqual(toString(a), &quot;[&apos;b&apos;, []]&quot;).x
+	a = cons(cons(&quot;a&quot;, nil), a)
+	assertEqual(toString(a), &quot;[[&apos;a&apos;], &apos;b&apos;, []]&quot;).x
 End Function
 
 Function test_List_foo(Optional a0, Optional a1)
@@ -568,7 +604,8 @@ Function test_List_List()
 	assertEqual(toString(List(0, 1, 2, 3, 4, 5, 6, 7, 8)), &quot;[0, 1, 2, 3, 4, 5, 6, 7, 8]&quot;).x
 	assertEqual(toString(List(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)), &quot;[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]&quot;).x
 
-	&apos;&apos; assertThrows requires the function to be recognized by module &quot;List&quot;
+	&apos;&apos; assertThrows requires the function to be
+	&apos;&apos; recognized by module &quot;List&quot;
 	&apos;assertThrows(&quot;List&quot;, Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)).x
 	
 	assertEqual(toString(test_List_foo(5)), &quot;[5]&quot;).x
@@ -776,13 +813,17 @@ End Function
 
 Function test_List_adjoin()
 	assertEqual(toString(adjoin(nil, nil)), &quot;[]&quot;).x
-	Dim lst As TList
+	
+	assertThrows(adjoin, Array(1, nil)).x
+	assertThrows(adjoin, Array(nil, 1)).x
+	
+	Dim lst
 	Set lst = cons(1, nil)
 	assertEqual(toString(adjoin(lst, nil)), &quot;[1]&quot;).x
 	assertEqual(toString(adjoin(nil, lst)), &quot;[1]&quot;).x
 
 	assertEqual(toString(adjoin(lst, lst)), &quot;[1, 1]&quot;).x
-	Dim lst2 As TList
+	Dim lst2
 	Set lst2 = cons(2, nil)
 	assertEqual(toString(adjoin(lst, lst2)), &quot;[1, 2]&quot;).x
 	assertEqual(toString(adjoin(lst2, lst)), &quot;[2, 1]&quot;).x
@@ -796,14 +837,14 @@ End Function
 
 Function test_List_flatten()
 	assertEqual(toString(flatten(nil)), &quot;[]&quot;).x
-	Dim lst As TList
+	Dim lst
 	Set lst = cons(1, nil)
 	assertThrows(&quot;flatten&quot;, Array(lst)).x
 	Set lst = cons(lst, nil)	&apos; [[1]]
 	assertEqual(toString(flatten(lst)), &quot;[1]&quot;).x
 	Set lst = cons(nil, lst)	&apos; [[], [1]]
 	assertEqual(toString(flatten(lst)), &quot;[1]&quot;).x
-	Dim lst2 As TList
+	Dim lst2
 	Set lst2 = cons(&quot;a&quot;, cons(&quot;b&quot;, nil))
 	Set lst = cons(lst2, lst)	&apos; [[&apos;a&apos;, &apos;b&apos;], [], [1]]
 	assertEqual(toString(flatten(lst)), &quot;[&apos;a&apos;, &apos;b&apos;, 1]&quot;).x
@@ -814,7 +855,7 @@ End Function
 
 Function test_List_reverse()
 	assertEqual(toString(reverse(nil)), toString(nil)).x
-	Dim lst As TList
+	Dim lst
 	Set lst = cons(1, nil)
 	assertEqual(toString(reverse(lst)), toString(lst)).x
 	Set lst = cons(2, lst)
@@ -832,8 +873,9 @@ Function test_List_equ()
 	assertEqual(equ(nil, Empty), False).x	&apos; Empty is comparable to anything
 	assertEqual(equ(Empty, nil), False).x
 
-	assertEqual(equ(nil,		Nothing),		False).x	&apos; TList is an Object type,
-	assertEqual(equ(Nothing,	nil),			False).x	&apos; ... so it&apos;s comparable to Nothing
+	&apos; we consider data types NOT to be comparable with plain Object:
+	assertThrows(equ, Array(nil, Nothing)).x
+	assertThrows(equ, Array(Nothing, nil)).x
 
 	assertEqual(equ(nil,		nil),			True).x
 	
@@ -844,14 +886,20 @@ Function test_List_equ()
 	assertEqual(equ(List(2), 	List(1)),		False).x
 	assertEqual(equ(List(1), 	List(2)),		False).x
 	
-&apos;	assertEqual(equ(List(&quot;1&quot;), 	List(1)),		False).x
+	&apos; ?? &quot;equ: incompatible types String and Integer&quot;
+	&apos;assertThrows(equ, Array(List(&quot;1&quot;), 	List(1))).x
+	assertEqual(equ(List(&quot;1&quot;), List(1)), False).x
+	
+	&apos; ?? &quot;equ: incompatible types Integer and String&quot;
+	&apos;assertThrows(equ, Array(List(1, 2), List(1, &quot;2&quot;))).x
+	assertEqual(equ(List(1, 2), List(1, &quot;2&quot;)), False).x
+	
 	assertEqual(equ(List(1, 2), List(1)),		False).x
 	assertEqual(equ(List(1), 	List(1, 2)),	False).x
 	assertEqual(equ(List(1, 2), List(1, 2)),	True).x
 	assertEqual(equ(List(2, 2), List(1, 2)),	False).x
 	assertEqual(equ(List(2, 1), List(1, 2)),	False).x
 
-	assertEqual(equ(List(1, 2), List(1, &quot;2&quot;)),	False).x
 
 End Function
 

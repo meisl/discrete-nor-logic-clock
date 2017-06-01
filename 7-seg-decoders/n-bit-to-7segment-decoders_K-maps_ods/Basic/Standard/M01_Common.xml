@@ -229,9 +229,13 @@ Function equ(Optional a As Variant, Optional b As Variant)
 				Case Else
 					If isObject(a) Then	&apos;they are instances of the same custom type (with non-empty.tyname)
 						&apos; ATTENTION: do NOT access .tyname directly!
-						Dim fName As String
-						fName = _tyname(a) &amp; &quot;_equ&quot;
-						result = apply(fName, a, b)
+						Dim tyName As String
+						If isDataValue(a) Then
+							tyName = &quot;T&quot; &amp; typeCtorName(ctorOf(a))
+						Else
+							tyName = _tyname(a)
+						End If
+						result = apply(tyName &amp; &quot;_equ&quot;, a, b)
 					ElseIf isArray(a) Then
 						croak(&quot;equ: NYI - comparing arrays&quot;)
 					Else
@@ -268,22 +272,34 @@ Function toString(ByVal v As Variant) As String
 				result = tp &amp; &quot;(...)&quot;
 			End If
 		Case Else
-			If IsObject(v) Then	&apos; Object with a .tyname field
-				Dim tyName As String, toStrFnName As String, toStrFn As Variant
-				&apos; ATTENTION: do NOT access .tyname directly!
-				tyName = _tyName(v)
-				If (tyname = &quot;&quot;) Then
-					result = &quot;Object(tyname=&apos;&apos;)&quot;
-				Else
-					toStrFnName = tyName &amp; &quot;_toString&quot;
-					&apos;We&apos;ve got an Object with .tyName, so we insist on its _toString to exist
-					&apos;Note: We test for existence separately because apply/croak call toString again...
+			If IsObject(v) Then
+				Dim toStrFnName As String, toStrFn As Variant
+				If isDataValue(v) Then
+					toStrFnName = &quot;T&quot; &amp; typeCtorName(ctorOf(v)) _
+								&amp; &quot;_toString&quot;
 					toStrFn = lookupFn(toStrFnName)
 					If isEmpty(toStrFn) Then
-						&apos;croak(&quot;toString: unknown fn &apos;&quot; &amp; toStrFnName &amp; &quot;&apos;&quot;)
-						result = tyName &amp; &quot;(...)&quot;
+						result = DataValue_toString(v)
 					Else
 						result = apply(toStrFn, v)
+					End If
+				Else &apos; Object with a .tyname field
+					Dim tyName As String
+					&apos; ATTENTION: do NOT access .tyname directly!
+					tyName = _tyName(v)
+					If (tyname = &quot;&quot;) Then
+						result = &quot;Object(tyname=&apos;&apos;)&quot;
+					Else
+						toStrFnName = tyName &amp; &quot;_toString&quot;
+						&apos;We&apos;ve got an Object with .tyName, so we insist on its _toString to exist
+						&apos;Note: We test for existence separately because apply/croak call toString again...
+						toStrFn = lookupFn(toStrFnName)
+						If isEmpty(toStrFn) Then
+							&apos;croak(&quot;toString: unknown fn &apos;&quot; &amp; toStrFnName &amp; &quot;&apos;&quot;)
+							result = tyName &amp; &quot;(...)&quot;
+						Else
+							result = apply(toStrFn, v)
+						End If
 					End If
 				End If
 			Else

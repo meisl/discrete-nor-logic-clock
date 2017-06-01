@@ -14,6 +14,8 @@ Type TFn
 End Type
 
 Type TFnObjs
+	_instances	As Object
+	
 	ctorOf		As Object
 	
 	isEmpty		As Object
@@ -40,26 +42,30 @@ Type TFnObjs
 	
 	TFn_toString	As Object
 	applyToList		As Object
+	existsF			As Object
+	arityF			As Object
 
-	isList		As Object
-	isNil		As Object
-	cons		As Object
-	length		As Object
-	car			As Object
-	cdr			As Object
-	cadr		As Object
-	caddr		As Object
-	map			As Object
-	filter		As Object
-	skipWhile	As Object
-	skipUntil	As Object
-	foldl		As Object
-	foldr		As Object
-	foldl1		As Object
-&apos;	foldr1		As Object
-	adjoin		As Object
-	flatten 	As Object
-	reverse 	As Object
+	TList_toString	As Object
+	TList_equ		As Object
+	isList			As Object
+	isNil			As Object
+	cons			As Object
+	length			As Object
+	car				As Object
+	cdr				As Object
+	cadr			As Object
+	caddr			As Object
+	map				As Object
+	filter			As Object
+	skipWhile		As Object
+	skipUntil		As Object
+	foldl			As Object
+	foldr			As Object
+	foldl1			As Object
+	foldr1			As Object
+	adjoin			As Object
+	flatten 		As Object
+	reverse 		As Object
 	
 	TParser_toString	As Object
 	mkParser 			As Object
@@ -95,107 +101,123 @@ End Type
 
 
 Sub Main
-	test_Fn()
+	[test_Fn ===============]()
 End Sub
 
 
-Function Fn
-	Static result As Object
-	If isNull(result) Then
-		Set result = New TFnObjs
-		result.ctorOf	= lookupFn(&quot;ctorOf&quot;)
-		
-		result.isEmpty	= lookupFn(&quot;isEmpty&quot;)
-		result.isString	= lookupFn(&quot;isString&quot;)
-
-		result.id      	= lookupFn(&quot;id&quot;)
-		result.fstArg  	= lookupFn(&quot;fstArg&quot;)
-		result.sndArg  	= lookupFn(&quot;sndArg&quot;)
-		result.swap    	= lookupFn(&quot;swap&quot;)
-		result.compose 	= lookupFn(&quot;compose&quot;)
-		result.ite 		= lookupFn(&quot;ite&quot;)
-		result.asc 		= lookupFn(&quot;asc&quot;)
-		result.chr 		= lookupFn(&quot;chr&quot;)
-		result.ucase	= lookupFn(&quot;ucase&quot;)
-		result.lcase	= lookupFn(&quot;lcase&quot;)
-		result.add 		= lookupFn(&quot;add&quot;)
-		result.mul 		= lookupFn(&quot;mul&quot;)
-		result.toString = lookupFn(&quot;toString&quot;)
-		result.concat	= lookupFn(&quot;concat&quot;)
-		result.readHex	= lookupFn(&quot;readHex&quot;)
-		result.equ		= lookupFn(&quot;equ&quot;)
-		result.neq		= lookupFn(&quot;neq&quot;)
-		result.inRange	= lookupFn(&quot;inRange&quot;)
-		
-		result.TFn_toString = lookupFn(&quot;TFn_toString&quot;)
-		result.applyToList 	= lookupFn(&quot;applyToList&quot;)
-
-		result.isList	= lookupFn(&quot;isList&quot;)
-		result.isNil	= lookupFn(&quot;isNil&quot;)
-		result.cons		= lookupFn(&quot;cons&quot;)
-		result.length	= lookupFn(&quot;length&quot;)
-		result.car 		= lookupFn(&quot;car&quot;)
-		result.cdr 		= lookupFn(&quot;cdr&quot;)
-		result.cadr 	= lookupFn(&quot;cadr&quot;)
-		result.caddr 	= lookupFn(&quot;caddr&quot;)
-		result.map		= lookupFn(&quot;map&quot;)
-		result.filter	= lookupFn(&quot;filter&quot;)
-		result.skipWhile = lookupFn(&quot;skipWhile&quot;)
-		result.skipUntil = lookupFn(&quot;skipUntil&quot;)
-		result.foldl	= lookupFn(&quot;foldl&quot;)
-		result.foldr	= lookupFn(&quot;foldr&quot;)
-		result.foldl1	= lookupFn(&quot;foldl1&quot;)
-&apos;		result.foldr1	= lookupFn(&quot;foldr1&quot;)
-		result.adjoin	= lookupFn(&quot;adjoin&quot;)
-		result.flatten	= lookupFn(&quot;flatten&quot;)
-		result.reverse	= lookupFn(&quot;reverse&quot;)
-
-		result.TParser_toString = lookupFn(&quot;TParser_toString&quot;)
-		result.mkParser	= lookupFn(&quot;mkParser&quot;)
-		result.pReturn	= lookupFn(&quot;pReturn&quot;)
-		result.pStr		= lookupFn(&quot;pStr&quot;)
-		result.pBind	= lookupFn(&quot;pBind&quot;)
-		result.pChoice	= lookupFn(&quot;pChoice&quot;)
-		result.pMany		= lookupFn(&quot;pMany&quot;)
-		result.pMany1		= lookupFn(&quot;pMany1&quot;)
-		result.pZeroOrOne	= lookupFn(&quot;pZeroOrOne&quot;)
-		result.pZeroOrOne2	= lookupFn(&quot;pZeroOrOne2&quot;)
-		result.mkTypeVar		  = lookupFn(&quot;mkTypeVar&quot;)
-		result.maybeMakeArrowType = lookupFn(&quot;maybeMakeArrowType&quot;)
-		result.mkTypeCtor		  = lookupFn(&quot;mkTypeCtor&quot;)
-		result.mkTupleType		  = lookupFn(&quot;mkTupleType&quot;)
-
-		result.hasType			= lookupFn(&quot;hasType&quot;)
-
-		result.TASN_dot 		= lookupFn(&quot;TASN_dot&quot;)
-		result.TASN_toString 	= lookupFn(&quot;TASN_toString&quot;)
-		result.mkASN			= lookupFn(&quot;mkASN&quot;)
-		result.mkDtTerminal		= lookupFn(&quot;mkDtTerminal&quot;)
-		result.mkDtCClass		= lookupFn(&quot;mkDtCClass&quot;)
-		result.mkDtNonterminal  = lookupFn(&quot;mkDtNonterminal&quot;)
-		result.mkDtMult  		= lookupFn(&quot;mkDtMult&quot;)
-		
-		result.isPattern			= lookupFn(&quot;isPattern&quot;)
-		result.TPattern_toString	= lookupFn(&quot;TPattern_toString&quot;)
-		result.matches				= lookupFn(&quot;matches&quot;)
-		
-		result.isExpr			= lookupFn(&quot;isExpr&quot;)
-	End If
-	Fn = result
-End Function
-
-Function newFn(name As String, arity As Integer, Optional typ)
-	Dim result As New TFn
-	result.tyname = TFn_tyname
-	result.which = name
-	result.arity = arity
+Function _newFn(name As String, arity As Integer, Optional typ)
+	Dim out As New TFn
+	out.tyname = TFn_tyname
+	out.which = name
+	out.arity = arity
 	If Not(isMissing(typ)) Then
-		result.str = name &amp; &quot; :: &quot; &amp; typ
+		out.str = name &amp; &quot; :: &quot; &amp; typ
 	Else
-		result.str = name
+		out.str = name
 	End If
-	newFn = result
+	_newFn = out
 End Function
+
+Function mkFn(ByRef fs As Object, name As String, arity As Integer, Optional typ)
+	Dim out
+	out = _newFn(name, arity, typ)
+	fs = cons(out, fs)
+	mkFn = out
+End Function
+
+Function Fn
+	Static out As Object
+	If isNull(out) Then
+		Dim fs As Object : fs = nil
+		out = New TFnObjs
+				
+		out.ctorOf		= mkFn(fs, &quot;ctorOf&quot;,		1, &quot;Any -&gt; Maybe TDataCtor&quot;)
+		
+		out.isEmpty		= mkFn(fs, &quot;isEmpty&quot;,		1, &quot;Any -&gt; Bool&quot;)
+		out.isString	= mkFn(fs, &quot;isString&quot;,		1, &quot;Any -&gt; Bool&quot;)
+		out.isExpr		= mkFn(fs, &quot;isExpr&quot;,		1, &quot;Any -&gt; Bool&quot;)	
+		
+		out.toString	= mkFn(fs, &quot;toString&quot;,		1, &quot;Any -&gt; Str&quot;)
+		out.id			= mkFn(fs, &quot;id&quot;,			1, &quot;a -&gt; a&quot;)
+		out.fstArg		= mkFn(fs, &quot;fstArg&quot;,		2, &quot;a -&gt; b -&gt; a&quot;)
+		out.sndArg		= mkFn(fs, &quot;sndArg&quot;,		1, &quot;a -&gt; b -&gt; b&quot;)
+		out.swap		= mkFn(fs, &quot;swap&quot;,			3, &quot;(b -&gt; a -&gt; c) -&gt; a -&gt; b -&gt; c&quot;)
+		out.compose		= mkFn(fs, &quot;compose&quot;,		3, &quot;(b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c&quot;)
+		out.ite			= mkFn(fs, &quot;ite&quot;,			4, &quot;(a -&gt; Bool) -&gt; (a -&gt; b) -&gt; (a -&gt; b) -&gt; a -&gt; b&quot;)
+		out.add			= mkFn(fs, &quot;add&quot;,			2, &quot;Long -&gt; Long -&gt; Long&quot;)
+		out.mul			= mkFn(fs, &quot;mul&quot;,			2, &quot;Long -&gt; Long -&gt; Long&quot;)
+		out.inRange		= mkFn(fs, &quot;inRange&quot;,		3, &quot;Long -&gt; Long -&gt; Long -&gt; Bool&quot;)
+		out.equ			= mkFn(fs, &quot;equ&quot;,			2, &quot;a -&gt; a -&gt; Bool&quot;)
+		out.neq			= mkFn(fs, &quot;neq&quot;,			2, &quot;a -&gt; a -&gt; Bool&quot;)
+		out.concat		= mkFn(fs, &quot;concat&quot;,		2, &quot;Str -&gt; Str -&gt; Str&quot;)
+		out.asc			= mkFn(fs, &quot;asc&quot;,			1, &quot;Char -&gt; Int&quot;)
+		out.chr			= mkFn(fs, &quot;chr&quot;,			1, &quot;Int -&gt; Char&quot;)
+		out.ucase		= mkFn(fs, &quot;ucase&quot;,			1, &quot;Str -&gt; Str&quot;)
+		out.lcase		= mkFn(fs, &quot;lcase&quot;,			1, &quot;Str -&gt; Str&quot;)
+		out.readHex		= mkFn(fs, &quot;readHex&quot;,		1, &quot;Str -&gt; Long&quot;)
+		
+		out.TFn_toString = mkFn(fs, &quot;TFn_toString&quot;,	1, &quot;(a -&gt; b) -&gt; Str&quot;)
+		out.applyToList	= mkFn(fs, &quot;applyToList&quot;,	2)
+		out.existsF		= mkFn(fs, &quot;existsF&quot;,		1)
+		out.arityF		= mkFn(fs, &quot;arityF&quot;, 		1)
+		
+		out.TList_toString	= mkFn(fs, &quot;TList_toString&quot;,	1)
+		out.TList_equ		= mkFn(fs, &quot;TList_equ&quot;,			2)
+		out.isList			= mkFn(fs, &quot;isList&quot;,			1, &quot;Any -&gt; Bool&quot;)
+		out.isNil			= mkFn(fs, &quot;isNil&quot;,				1, &quot;[a] -&gt; Bool&quot;)
+		out.cons			= mkFn(fs, &quot;cons&quot;,				2, &quot;a -&gt; [a] -&gt; [a]&quot;)
+		out.length			= mkFn(fs, &quot;length&quot;,			1)
+		out.car				= mkFn(fs, &quot;car&quot;,				1)
+		out.cdr				= mkFn(fs, &quot;cdr&quot;,				1)
+		out.cadr			= mkFn(fs, &quot;cadr&quot;,				1)
+		out.caddr			= mkFn(fs, &quot;caddr&quot;,				1)
+		out.map				= mkFn(fs, &quot;map&quot;,				2, &quot;(a -&gt; b) -&gt; [a] -&gt; [b]&quot;)
+		out.filter			= mkFn(fs, &quot;filter&quot;,			2, &quot;(a -&gt; Bool) -&gt; [a] -&gt; [a]&quot;)
+		out.skipWhile		= mkFn(fs, &quot;skipWhile&quot;,			2, &quot;(a -&gt; Bool) -&gt; [a] -&gt; [a]&quot;)
+		out.skipUntil		= mkFn(fs, &quot;skipUntil&quot;,			2, &quot;(a -&gt; Bool) -&gt; [a] -&gt; [a]&quot;)
+		out.foldl			= mkFn(fs, &quot;foldl&quot;,				3)
+		out.foldr			= mkFn(fs, &quot;foldr&quot;,				3)
+		out.foldl1			= mkFn(fs, &quot;foldl1&quot;,			2)
+		out.foldr1			= mkFn(fs, &quot;foldr1&quot;,			2)
+		out.adjoin			= mkFn(fs, &quot;adjoin&quot;,			2)
+		out.flatten			= mkFn(fs, &quot;flatten&quot;,			1, &quot;List List a -&gt; List a&quot;)
+		out.reverse			= mkFn(fs, &quot;reverse&quot;,			1, &quot;List a -&gt; List a&quot;)
+		
+		out.TParser_toString = mkFn(fs, &quot;TParser_toString&quot;,	1, &quot;Parser a -&gt; Str&quot;)
+		out.mkParser		= mkFn(fs, &quot;mkParser&quot;,			2, &quot;Str -&gt; Any -&gt; Parser a&quot;)
+		out.pReturn			= mkFn(fs, &quot;pReturn&quot;,			1, &quot;a -&gt; Parser a&quot;)
+		out.pStr			= mkFn(fs, &quot;pStr&quot;,				1, &quot;Str -&gt; Parser Str&quot;)
+		out.pBind			= mkFn(fs, &quot;pBind&quot;,				2, &quot;Parser a -&gt; (a -&gt; Parser b) -&gt; Parser b&quot;)
+		out.pChoice			= mkFn(fs, &quot;pChoice&quot;,			2, &quot;Parser a -&gt; Parser a -&gt; Parser a&quot;)
+		out.pMany			= mkFn(fs, &quot;pMany&quot;,				1, &quot;Parser a -&gt; Parser [a]&quot;)
+		out.pMany1			= mkFn(fs, &quot;pMany1&quot;,				1, &quot;Parser a -&gt; Parser [a]&quot;)
+		out.pZeroOrOne		= mkFn(fs, &quot;pZeroOrOne&quot;,			1, &quot;Parser a -&gt; Parser (Maybe a)&quot;)
+		out.pZeroOrOne2		= mkFn(fs, &quot;pZeroOrOne2&quot;,		2, &quot;Parser a -&gt; a -&gt; Parser a&quot;)
+		out.mkTypeVar		= mkFn(fs, &quot;mkTypeVar&quot;,			1, &quot;Char -&gt; Str&quot;)
+		out.maybeMakeArrowType = mkFn(fs, &quot;maybeMakeArrowType&quot;,	2, &quot;Typ -&gt; Maybe Typ -&gt; Typ&quot;)
+		out.mkTypeCtor		= mkFn(fs, &quot;mkTypeCtor&quot;,			2, &quot;Str -&gt; [Typ] -&gt; Typ&quot;)
+		out.mkTupleType		= mkFn(fs, &quot;mkTupleType&quot;,		2, &quot;Typ -&gt; [Typ] -&gt; Typ&quot;)
+		
+		out.hasType			= mkFn(fs, &quot;hasType&quot;,			2, &quot;Any -&gt; Typ -&gt; Bool&quot;)
+		
+		out.TASN_dot		= mkFn(fs, &quot;TASN_dot&quot;,			2, &quot;Str -&gt; ASN -&gt; Any&quot;)
+		out.TASN_toString	= mkFn(fs, &quot;TASN_toString&quot;,		1, &quot;ASN -&gt; Str&quot;)
+		out.mkASN			= mkFn(fs, &quot;mkASN&quot;,				3, &quot;Any -&gt; a -&gt; [b] -&gt; ASN&quot;)
+		out.mkDtTerminal	= mkFn(fs, &quot;mkDtTerminal&quot;,		1, &quot;Str -&gt; ASN&quot;)
+		out.mkDtCClass		= mkFn(fs, &quot;mkDtCClass&quot;,			2, &quot;Str -&gt; Str -&gt; ASN&quot;)
+		out.mkDtNonterminal	= mkFn(fs, &quot;mkDtNonterminal&quot;,	2, &quot;Str -&gt; [ASN] -&gt; ASN&quot;)
+		out.mkDtMult		= mkFn(fs, &quot;mkDtMult&quot;,			2, &quot;Str -&gt; [ASN] -&gt; ASN&quot;)
+		
+		out.isPattern		= mkFn(fs, &quot;isPattern&quot;,			1, &quot;Any -&gt; Bool&quot;)
+		out.TPattern_toString = mkFn(fs, &quot;TPattern_toString&quot;,	1, &quot;Pattern a -&gt; Str&quot;)
+		out.matches			= mkFn(fs, &quot;matches&quot;,			3, &quot;Pattern a -&gt; Maybe Env -&gt; a -&gt; Maybe Env&quot;)
+		
+		
+		out._instances = fs
+	End If
+	Fn = out
+End Function
+
 
 Function mkPartialApp(fn As Object, arg As Variant)
 	Dim result As New TFn
@@ -286,109 +308,19 @@ Function TFn_toString(ByVal f)
 	TFn_toString = result
 End Function
 
-Function fnObjs()
-	Static result As Object
-	If IsNull(result) Then
-		result = toList(Array(_
-			newFn(&quot;ctorOf&quot;,			1, &quot;Any -&gt; Maybe DataCtor&quot;), _
-			_
-			newFn(&quot;isEmpty&quot;,		1, &quot;Any -&gt; Bool&quot;), _
-			newFn(&quot;isString&quot;,		1, &quot;Any -&gt; Bool&quot;), _
-			_
-			newFn(&quot;toString&quot;,		1, &quot;Any -&gt; Str&quot;), _
-			newFn(&quot;id&quot;,				1, &quot;a -&gt; a&quot;), _
-			newFn(&quot;fstArg&quot;,			2, &quot;a -&gt; b -&gt; a&quot;), _
-			newFn(&quot;sndArg&quot;,			1, &quot;a -&gt; b -&gt; b&quot;), _
-			newFn(&quot;swap&quot;,			3, &quot;(b -&gt; a -&gt; c) -&gt; a -&gt; b -&gt; c&quot;), _
-			newFn(&quot;compose&quot;,		3, &quot;(b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c&quot;), _
-			newFn(&quot;ite&quot;,			4, &quot;(a -&gt; Bool) -&gt; (a -&gt; b) -&gt; (a -&gt; b) -&gt; a -&gt; b&quot;), _
-			newFn(&quot;add&quot;,			2, &quot;Long -&gt; Long -&gt; Long&quot;), _
-			newFn(&quot;mul&quot;,			2, &quot;Long -&gt; Long -&gt; Long&quot;), _
-			newFn(&quot;inRange&quot;,		3, &quot;Long -&gt; Long -&gt; Long -&gt; Bool&quot;), _
-			newFn(&quot;equ&quot;,			2, &quot;a -&gt; a -&gt; Bool&quot;), _
-			newFn(&quot;neq&quot;,			2, &quot;a -&gt; a -&gt; Bool&quot;), _
-			newFn(&quot;concat&quot;,			2, &quot;Str -&gt; Str -&gt; Str&quot;), _
-			newFn(&quot;asc&quot;,			1, &quot;Char -&gt; Int&quot;), _
-			newFn(&quot;chr&quot;,			1, &quot;Int -&gt; Char&quot;), _
-			newFn(&quot;ucase&quot;,			1, &quot;Str -&gt; Str&quot;), _
-			newFn(&quot;lcase&quot;,			1, &quot;Str -&gt; Str&quot;), _
-			newFn(&quot;readHex&quot;,		1, &quot;Str -&gt; Long&quot;), _
-			_
-			newFn(&quot;TFn_toString&quot;,	1, &quot;(a -&gt; b) -&gt; Str&quot;), _
-			newFn(&quot;applyToList&quot;,	2), _
-			newFn(&quot;existsF&quot;,		1), _
-			newFn(&quot;arityF&quot;, 		1), _
-			_
-			newFn(&quot;TList_toString&quot;,	1), _
-			newFn(&quot;TList_equ&quot;,		2), _
-			newFn(&quot;isList&quot;,			1, &quot;Any -&gt; Bool&quot;), _
-			newFn(&quot;isNil&quot;,			1, &quot;[a] -&gt; Bool&quot;), _
-			newFn(&quot;cons&quot;,			2, &quot;a -&gt; [a] -&gt; [a]&quot;), _
-			newFn(&quot;length&quot;,			1), _
-			newFn(&quot;car&quot;,			1), _
-			newFn(&quot;cdr&quot;,			1), _
-			newFn(&quot;cadr&quot;,			1), _
-			newFn(&quot;caddr&quot;,			1), _
-			newFn(&quot;map&quot;,			2, &quot;(a -&gt; b) -&gt; [a] -&gt; [b]&quot;), _
-			newFn(&quot;filter&quot;,			2, &quot;(a -&gt; Bool) -&gt; [a] -&gt; [a]&quot;), _
-			newFn(&quot;skipWhile&quot;,		2, &quot;(a -&gt; Bool) -&gt; [a] -&gt; [a]&quot;), _
-			newFn(&quot;skipUntil&quot;,		2, &quot;(a -&gt; Bool) -&gt; [a] -&gt; [a]&quot;), _
-			newFn(&quot;foldl&quot;,			3), _
-			newFn(&quot;foldr&quot;,			3), _
-			newFn(&quot;foldl1&quot;,			2), _
-			newFn(&quot;foldr1&quot;,			2), _
-			newFn(&quot;adjoin&quot;,			2), _
-			newFn(&quot;flatten&quot;,		1, &quot;List List a -&gt; List a&quot;), _
-			newFn(&quot;reverse&quot;,		1, &quot;List a -&gt; List a&quot;), _
-			_
-			newFn(&quot;TParser_toString&quot;,	1, &quot;Parser a -&gt; Str&quot;), _
-			newFn(&quot;mkParser&quot;,			2, &quot;Str -&gt; Any -&gt; Parser a&quot;), _
-			newFn(&quot;pReturn&quot;,			1, &quot;a -&gt; Parser a&quot;), _
-			newFn(&quot;pStr&quot;,				1, &quot;Str -&gt; Parser Str&quot;), _
-			newFn(&quot;pBind&quot;,				2, &quot;Parser a -&gt; (a -&gt; Parser b) -&gt; Parser b&quot;), _
-			newFn(&quot;pChoice&quot;,			2, &quot;Parser a -&gt; Parser a -&gt; Parser a&quot;), _
-			newFn(&quot;pMany&quot;,				1, &quot;Parser a -&gt; Parser [a]&quot;), _
-			newFn(&quot;pMany1&quot;,				1, &quot;Parser a -&gt; Parser [a]&quot;), _
-			newFn(&quot;pZeroOrOne&quot;,			1, &quot;Parser a -&gt; Parser (Maybe a)&quot;), _
-			newFn(&quot;pZeroOrOne2&quot;,		2, &quot;Parser a -&gt; a -&gt; Parser a&quot;), _
-			newFn(&quot;mkTypeVar&quot;,			1, &quot;Char -&gt; Str&quot;), _
-			newFn(&quot;maybeMakeArrowType&quot;,	2, &quot;Typ -&gt; Maybe Typ -&gt; Typ&quot;), _
-			newFn(&quot;mkTypeCtor&quot;,			2, &quot;Str -&gt; [Typ] -&gt; Typ&quot;), _
-			newFn(&quot;mkTupleType&quot;,		2, &quot;Typ -&gt; [Typ] -&gt; Typ&quot;), _
-			_
-			newFn(&quot;hasType&quot;,			2, &quot;Any -&gt; Typ -&gt; Bool&quot;), _
-			_
-			newFn(&quot;TASN_dot&quot;,			2, &quot;Str -&gt; ASN -&gt; Any&quot;), _
-			newFn(&quot;TASN_toString&quot;,		1, &quot;ASN -&gt; Str&quot;), _
-			newFn(&quot;mkASN&quot;,				3, &quot;Any -&gt; a -&gt; [b] -&gt; ASN&quot;), _
-			newFn(&quot;mkDtTerminal&quot;,		1, &quot;Str -&gt; ASN&quot;), _
-			newFn(&quot;mkDtCClass&quot;,			2, &quot;Str -&gt; Str -&gt; ASN&quot;), _
-			newFn(&quot;mkDtNonterminal&quot;,	2, &quot;Str -&gt; [ASN] -&gt; ASN&quot;), _
-			newFn(&quot;mkDtMult&quot;,			2, &quot;Str -&gt; [ASN] -&gt; ASN&quot;), _
-			_
-			newFn(&quot;isPattern&quot;,			1, &quot;Any -&gt; Bool&quot;), _
-			newFn(&quot;TPattern_toString&quot;,	1, &quot;Pattern a -&gt; Str&quot;), _
-			newFn(&quot;matches&quot;,			3, &quot;Pattern a -&gt; Maybe Env -&gt; a -&gt; Maybe Env&quot;), _
-			_
-			newFn(&quot;isExpr&quot;,				1, &quot;Any -&gt; Bool&quot;) _
-	))
-	End If
-	fnObjs = result
-End Function
-
 Function lookupFn(name As String) As Variant
-	Dim result As Variant
-	Dim fs As Object
-	fs = fnObjs
-	While Not(isNil(fs))
-		If (getFnName(car(fs)) = name) Then
-			result = car(fs)
-			fs = nil
-		Else
-			fs = cdr(fs)
+	Dim out As Variant
+	Dim fs As Object, f As Object
+	fs = Fn._instances
+	Do Until(isNil(fs))
+		f = car(fs)
+		If (getFnName(f) = name) Then
+			out = f
+			Exit Do
 		End If
-	Wend
-	lookupFn = result
+		fs = cdr(fs)
+	Loop
+	lookupFn = out
 End Function
 
 Function existsF(fName As String) As Boolean
@@ -712,7 +644,7 @@ End Function
 
 &apos;= tests ============================================================
 
-Function test_Fn()
+Function [test_Fn ===============]()
 	Dim i As Integer
 		
 	Dim fId As Variant

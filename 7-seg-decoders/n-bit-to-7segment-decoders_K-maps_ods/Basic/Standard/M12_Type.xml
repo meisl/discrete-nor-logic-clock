@@ -2,21 +2,13 @@
 <!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M12_Type" script:language="StarBasic">REM  *****  BASIC  *****
 Option Explicit
-
-
-Type TypeCtor
-	_name	  As String	 &apos; cannot use just &quot;name&quot;, that&apos;s a BASIC directive
-	arity	  As Integer &apos; the nr of typeArgs
-	dataCtors As DataCtor Array
-End Type
-
-Type DataType
+		
+Type DataValue
 	str		 As String	&apos; debugger shows that in inspector
-	typeArgs As Array
-	typeCtor As TypeCtor
+	id		 As Long
+	ctor	 As DataValue
+	fields   As Array
 End Type
-
-
 
 Const DataCtor_name     = 0
 Const DataCtor_argTypes = 1
@@ -25,14 +17,6 @@ Const DataCtor_typeCtor = 2
 Const DataTypeCtor_name  	 = 0
 Const DataTypeCtor_arity 	 = 1
 Const DataTypeCtor_dataCtors = 2
-
-		
-Type DataValue
-	str		 As String	&apos; debugger shows that in inspector
-	id		 As Long
-	ctor	 As DataValue
-	fields   As Array
-End Type
 
 
 Sub Main
@@ -241,10 +225,20 @@ Function TType()
 End Function
 
 &apos; String -&gt; Integer -&gt; (TypeApp List TDataCtor) -&gt; TDataTypeCtor
-Function DataTypeCtor()
-	Static out As Object &apos; DON&apos;T declare as DataValue!
-	If isNull(out) Then
-		out = ctorOf(TType)
+Function DataTypeCtor( _
+	Optional _name As String, _
+	Optional arity As Integer, _
+	Optional dataCtors As Object _
+)
+	Static c As Object : If isNull(c) Then : c = ctorOf(TType) : End If
+	Dim out As Variant
+	If isMissing(_name) Then
+		out = c
+	&apos;ElseIf isMissing(arity) Then
+	ElseIf isMissing(dataCtors) Then
+		croak(&quot;DataTypeCtor/NYI: partial application&quot;)
+	Else
+		out = _newDataValue(c, Array(_name, arity, dataCtors))
 	End If
 	DataTypeCtor = out
 End Function
@@ -639,12 +633,17 @@ Function isDataTypeCtor(tc As DataValue)
 End Function
 
 Function hasType(Optional v As Variant, Optional t As Object)
-	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.hasType : End If
+	Static oFn As Object
 	Dim out As Variant
-	If isMissing(v) Then
-		out = oFn
-	ElseIf isMissing(t) Then
-		out = apply1(oFn, v)
+	If isMissing(t) Then
+		If isNull(oFn) Then : 
+			oFn = Fn.hasType
+		End If
+		If isMissing(v) Then
+			out = oFn
+		Else
+			out = apply1(oFn, v)
+		End If
 	Else
 		out = False
 		Dim ct As Variant, cv As Variant
@@ -922,8 +921,15 @@ End Function
 Function typeOf(x As Variant)
 	Dim out As String
 	out = TypeName(x)
-	If out = &quot;Object&quot; Then
-		out = _typeOf(x) &apos; DONT access fields in here!
+	If out = &quot;Object&quot; Then &apos; DONT dot-access fields in here!
+		Dim c
+		c = ctorOf(x)
+		If isEmpty(c) Then &apos; x is not a DataValue
+			out = _typeOf(x)
+		Else &apos; x is a DataValue
+			out = &quot;Data/&quot; &amp; _
+				field(DataTypeCtor_name, field(DataCtor_typeCtor, c))
+		End If
 	ElseIf IsArray(x) Then
 		out = &quot;Array&quot;
 	End If
@@ -944,9 +950,11 @@ Function _tyname(o As Object)
 End Function
 
 Function ctorOf(Optional x As Variant)
-	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.ctorOf : End If
+	Static oFn As Object
 	Dim out As Variant
-	If isMissing(x) Then : out = oFn
+	If isMissing(x) Then 
+		If isNull(oFn) Then : oFn = Fn.ctorOf : End If
+		out = oFn
 	Else
 		out = Empty
 		If isObject(x) Then
@@ -973,6 +981,16 @@ Function ctorName(v As DataValue)
 	Dim out
 	out = v.ctor.fields(DataCtor_name)
 	ctorName = out
+End Function
+
+Function typeCtorOf(c)
+	&apos;require(hasType, c, TDataCtor)
+	typeCtorOf = c.fields(DataCtor_typeCtor)
+End Function
+
+Function typeCtorName(c)
+	&apos;require(hasType, c, TDataCtor)
+	typeCtorName = field(DataTypeCtor_name, typeCtorOf(c))
 End Function
 
 
@@ -1011,6 +1029,8 @@ Function [test_Type======================================]
 	&apos;test_Type_DataCtor()
 End Function
 
+&apos; some dummy (BASIC) Type s used in tests
+&apos; ---------------------------------------
 
 Type TTest_NoTyname
 End Type
@@ -1027,6 +1047,75 @@ Type TTest_Ctor
 	ctor As Variant
 End Type
 
+&apos; test helpers
+&apos; --------------------------------------------------
+
+
+Function test_same(x As Variant, y As Variant, exp As Boolean)
+	If Not(isDataValue(x)) Or Not(isDataValue(y)) Then
+		Goto test_same_invalid_args
+	End If
+	Dim out, lvl As Integer, msg As String
+	testLevel = testLevel + 1
+	out = assertEqual(DataValue_same(x, y), exp)
+	testLevel = testLevel - 1
+	If out.isFail Then
+		msg = &quot;expected .id &quot; &amp; x.id _
+			&amp; IIf(exp, &quot;&quot;, &quot;NOT&quot;) _
+			&amp; &quot; to be same as .id &quot; &amp; y.id &amp; &quot;:&quot; _
+			&amp; NL &amp; &quot;.id &quot; &amp; x.id &amp; &quot;: &quot; &amp; DataValue_toString(x) _
+			&amp; NL _
+			&amp; NL &amp; &quot;.id &quot; &amp; y.id &amp; &quot;: &quot; &amp; DataValue_toString(y)
+		out = mkFail(x, y, msg)
+	End If
+	test_same = out
+	Exit Function
+test_same_invalid_args:
+	msg = IIf(exp, &quot;assert&quot;, &quot;refute&quot;) _
+		&amp; &quot;_same: invalid args &quot; &amp; NL &amp; toString(x) _
+		&amp; NL &amp; NL &amp; toString(y)
+	croak(msg)
+End Function
+
+Function assert_same(act As Variant, exp As Variant)
+	assert_same = test_same(act, exp, True)
+End Function
+
+Function refute_same(act As Variant, exp As Variant)
+	refute_same = test_same(act, exp, False)
+End Function
+
+Function assert_hasCtor(v As Variant, c As Variant)
+	If Not(isDataValue(c)) Or Not(isDataValue(c)) Then
+		Goto assert_hasCtor_invalid_args
+	End If
+	If assert_same(ctorOf(c), DataCtor).isFail Then
+		Goto assert_hasCtor_invalid_args
+	End If
+	assert_hasCtor = assert_same(ctorOf(v), c)
+	Exit Function
+assert_hasCtor_invalid_args:
+	croak(&quot;assert_hasCtor: invalid args &quot; &amp; NL &amp; toString(v) _
+		&amp; NL &amp; NL &amp; toString(c)
+End Function
+
+Function assert_hasTypeCtor(c As Variant, tc As Variant)
+	If Not(isDataValue(c)) Or Not(isDataValue(tc)) Then
+		Goto assert_hasTypeCtor_invalid_args
+	End If
+	If assert_same(ctorOf(c),  DataCtor    ).isFail _
+	Or assert_same(ctorOf(tc), DataTypeCtor).isFail Then
+		Goto assert_hasTypeCtor_invalid_args
+	End If
+	assert_hasTypeCtor = assert_same(field(DataCtor_typeCtor, c), tc)
+	Exit Function
+assert_hasTypeCtor_invalid_args:
+		croak(&quot;assert_hasTypeCtor: invalid args &quot; &amp; NL &amp; toString(c) _
+			&amp; NL &amp; NL &amp; toString(tc)
+End Function
+
+&apos; actual tests
+&apos; ----------------------------------------------------
 
 Function test_Type_typeOf()
 	assertEqual(typeOf(0), &quot;Integer&quot;).x
@@ -1050,6 +1139,27 @@ Function test_Type_typeOf()
 	Dim t2 As New TTest_TyName
 	t2.tyname = &quot;foobar&quot;
 	assertEqual(typeOf(t2), &quot;Object/foobar&quot;).x
+	
+	Dim a
+	a = DataCtor
+	assertEqual(typeOf(a), &quot;Data/TDataCtor&quot;).x
+	a = TDataCtor
+	assertEqual(typeOf(a), &quot;Data/TDataTypeCtor&quot;).x
+	a = TDataTypeCtor
+	assertEqual(typeOf(a), &quot;Data/TDataTypeCtor&quot;).x
+	a = DataTypeCtor
+	assertEqual(typeOf(a), &quot;Data/TDataCtor&quot;).x
+	
+	a = TList
+	assertEqual(typeOf(a), &quot;Data/TDataTypeCtor&quot;).x
+	
+	a = List_nil	&apos; returns the singleton *value*
+	assertEqual(typeOf(a), &quot;Data/List&quot;).x
+	a = List_cons
+	assertEqual(typeOf(a), &quot;Data/TDataCtor&quot;).x
+	a = List_cons(List_nil, List_nil)
+	assertEqual(typeOf(a), &quot;Data/List&quot;).x
+	
 End Function
 
 
@@ -1864,68 +1974,6 @@ Function bootstrapTypes()
 	bootstrapTypes = tcType
 End Function	
 
-Function test_same(x As Variant, y As Variant, exp As Boolean)
-	If Not(isDataValue(x)) Or Not(isDataValue(y)) Then
-		Goto test_same_invalid_args
-	End If
-	Dim out, lvl As Integer, msg As String
-	testLevel = testLevel + 1
-	out = assertEqual(DataValue_same(x, y), exp)
-	testLevel = testLevel - 1
-	If out.isFail Then
-		msg = &quot;expected .id &quot; &amp; x.id _
-			&amp; IIf(exp, &quot;&quot;, &quot;NOT&quot;) _
-			&amp; &quot; to be same as .id &quot; &amp; y.id &amp; &quot;:&quot; _
-			&amp; NL &amp; &quot;.id &quot; &amp; x.id &amp; &quot;: &quot; &amp; DataValue_toString(x) _
-			&amp; NL _
-			&amp; NL &amp; &quot;.id &quot; &amp; y.id &amp; &quot;: &quot; &amp; DataValue_toString(y)
-		out = mkFail(x, y, msg)
-	End If
-	test_same = out
-	Exit Function
-test_same_invalid_args:
-	msg = IIf(exp, &quot;assert&quot;, &quot;refute&quot;) _
-		&amp; &quot;_same: invalid args &quot; &amp; NL &amp; toString(x) _
-		&amp; NL &amp; NL &amp; toString(y)
-	croak(msg)
-End Function
-
-Function assert_same(act As Variant, exp As Variant)
-	assert_same = test_same(act, exp, True)
-End Function
-
-Function refute_same(act As Variant, exp As Variant)
-	refute_same = test_same(act, exp, False)
-End Function
-
-Function assert_hasCtor(v As Variant, c As Variant)
-	If Not(isDataValue(c)) Or Not(isDataValue(c)) Then
-		Goto assert_hasCtor_invalid_args
-	End If
-	If assert_same(ctorOf(c), DataCtor).isFail Then
-		Goto assert_hasCtor_invalid_args
-	End If
-	assert_hasCtor = assert_same(ctorOf(v), c)
-	Exit Function
-assert_hasCtor_invalid_args:
-	croak(&quot;assert_hasCtor: invalid args &quot; &amp; NL &amp; toString(v) _
-		&amp; NL &amp; NL &amp; toString(c)
-End Function
-
-Function assert_hasTypeCtor(c As Variant, tc As Variant)
-	If Not(isDataValue(c)) Or Not(isDataValue(tc)) Then
-		Goto assert_hasTypeCtor_invalid_args
-	End If
-	If assert_same(ctorOf(c),  DataCtor    ).isFail _
-	Or assert_same(ctorOf(tc), DataTypeCtor).isFail Then
-		Goto assert_hasTypeCtor_invalid_args
-	End If
-	assert_hasTypeCtor = assert_same(field(DataCtor_typeCtor, c), tc)
-	Exit Function
-assert_hasTypeCtor_invalid_args:
-		croak(&quot;assert_hasTypeCtor: invalid args &quot; &amp; NL &amp; toString(c) _
-			&amp; NL &amp; NL &amp; toString(tc)
-End Function
 
 Function test_bootstrapTypes()
 	Dim tcType As Variant
@@ -2244,6 +2292,11 @@ Function test_bootstrapTypes()
 
 	assert_same(field(0,	vApp),	tcList).x
 	assert_same(field(1,	vApp),	vInt).x
+	
+	
+	&apos;--- apply data ctor DataTypeCtor
+	Dim tcUnit
+
 End Function
 
 Function test_Type_hasType
@@ -2350,21 +2403,21 @@ Function asdf
 	x = _mkValueFrom_lax(cFoo, Array())
 	y = _mkValueFrom_lax(cBar, Array())
 	z = _mkValueFrom_lax(cFoo, Array())
-	&apos; the function isTypeOf takes a type and a value, and tests
+	&apos; the function istypeOf takes a type and a value, and tests
 	&apos; whether the value has the given type:
-	assertEqual(isTypeOf(tcFooOrBar, x), True).x
-	assertEqual(isTypeOf(tcFooOrBar, y), True).x
-	assertEqual(isTypeOf(tcFooOrBar, z), True).x
+	assertEqual(istypeOf(tcFooOrBar, x), True).x
+	assertEqual(istypeOf(tcFooOrBar, y), True).x
+	assertEqual(istypeOf(tcFooOrBar, z), True).x
 	&apos; But of course, FooOrBar itself is NOT a FooOrBar
-	assertEqual(isTypeOf(tcFooOrBar, tcFooOrBar), False).x
+	assertEqual(istypeOf(tcFooOrBar, tcFooOrBar), False).x
 	&apos; Rather it is a TDataTypeCtor
-	assertEqual(isTypeOf(tcDataTypeCtor, tcFooOrBar), True).x
+	assertEqual(istypeOf(tcDataTypeCtor, tcFooOrBar), True).x
 	&apos; Similarly, neither cFoo nor cBar are FooBar s:
-	assertEqual(isTypeOf(tcFooOrBar, cFoo), False).x
-	assertEqual(isTypeOf(tcFooOrBar, cBar), False).x
+	assertEqual(istypeOf(tcFooOrBar, cFoo), False).x
+	assertEqual(istypeOf(tcFooOrBar, cBar), False).x
 	&apos; They&apos;re data constructors:
-	assertEqual(isTypeOf(tcDataCtor, cFoo), True).x
-	assertEqual(isTypeOf(tcDataCtor, cBar), True).x
+	assertEqual(istypeOf(tcDataCtor, cFoo), True).x
+	assertEqual(istypeOf(tcDataCtor, cBar), True).x
 	
 	&apos; We can also dispatch on the values&apos; ctors (names).
 	&apos; Since extracting the ctor&apos;s name will be common, we&apos;ll
@@ -2391,50 +2444,7 @@ End Function
 
 
 &apos; ##############################################
-Function test_Type_DataValue_old()	
-	Dim tc, dt
-	Dim c1, c2
-	Dim v1, v2
-	
-	tc = _newTypeCtor(&quot;TC_Unit&quot;, 0, Array( _
-		&quot;_Unit&quot;, Array() _
-	))
-	dt = applyTC(tc, Array())
-	c1 = tc.dataCtors(0)
-	assertEqual(c1.arity, 0).x
-	
-	v1 = applyDC(c1)
-	assertEqual(DataCtor_equ(v1.ctor, c1), True).x
-	assertEqual(UBound(v1.fields), UBound(Array())).x
-	v1 = applyDC(c1, Array())
 
-	show(v1.ctor.str, c1.str)
-	assertEqual(DataType_equ(v1.dataType, dt), True).x
-End Function
-
-
-
-Function test_Type_isDataType()
-	&apos; positive tests below in test_TypeCtor
-	&apos; main thing to prove is that it doesn&apos;t throw
-	assertEqual(isDataType(Nothing),            False).x
-	assertEqual(isDataType(Empty),              False).x
-	assertEqual(isDataType(True),               False).x
-	assertEqual(isDataType(False),              False).x
-	assertEqual(isDataType(&quot;&quot;),                 False).x
-	assertEqual(isDataType(&quot;a&quot;),                False).x
-	assertEqual(isDataType(&quot;foobar&quot;),           False).x
-	assertEqual(isDataType(0),                  False).x
-	assertEqual(isDataType(1),                  False).x
-	assertEqual(isDataType(3.14),               False).x
-	assertEqual(isDataType(Array()),            False).x
-	assertEqual(isDataType(Array(42)),          False).x
-	assertEqual(isDataType(Array(42)),          False).x
-	
-	Dim o As Object
-	o = New TTest_Foo
-	assertEqual(isDataType(o), False).x
-End Function
 
 Function test_Type_TypeCtor()
 	Dim tc0, tc1
