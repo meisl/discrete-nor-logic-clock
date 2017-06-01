@@ -557,7 +557,6 @@ Function test_toString()
 	Dim t2 As New TTest_TyName
 	assertEqual(toString(t2), &quot;Object(tyname=&apos;&apos;)&quot;).x
 	t2.tyname = &quot;foobar&quot;
-	&apos;assertThrows(&quot;toString&quot;, Array(t2)).x
 	assertEqual(toString(t2), &quot;foobar(...)&quot;).x
 End Function
 
@@ -668,7 +667,7 @@ Function test_mul()
 End Function
 
 Function assert_compose_equals(f As Object, g As Object, x As Object)
-	assert_compose_equals = assertEqual(toString(compose(f, g)), toString(x))
+	assert_compose_equals = assert_toString_equals(compose(f, g), x)
 End Function
 
 Function assert_compApp_equals( _
@@ -703,27 +702,27 @@ Function test_compose()
 	
 	assertEqual(compose(id, id, &quot;asdf&quot;), &quot;asdf&quot;).x
 
-	assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;, id, 42)).x
-	assertThrows(&quot;compose&quot;, Array(Nothing, 		  id, 42)).x
-	assertThrows(&quot;compose&quot;, Array(Empty, 		  id, 42)).x
-	assertThrows(&quot;compose&quot;, Array(4711, 		  id, 42)).x
+	assertThrows(Fn.compose, Array(&quot;i-dont-exist&quot;, id, 42)).x
+	assertThrows(Fn.compose, Array(Nothing, 		  id, 42)).x
+	assertThrows(Fn.compose, Array(Empty, 		  id, 42)).x
+	assertThrows(Fn.compose, Array(4711, 		  id, 42)).x
 	
 	&apos;&apos;assertThrows doesn&apos;t really work with partial app
 	&apos;&apos;that is because it uses applyToList, which doesn&apos;t do
 	&apos;&apos;an actual call until more args come in
-	&apos;assertThrows(&quot;compose&quot;, Array(Nothing, Fn.id)).x	
-	&apos;assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;)).x
+	&apos;assertThrows(Fn.compose, Array(Nothing, Fn.id)).x	
+	&apos;assertThrows(Fn.compose, Array(&quot;i-dont-exist&quot;)).x
 
-	assertThrows(&quot;compose&quot;, Array(id, &quot;i-dont-exist&quot;, 42)).x
-	assertThrows(&quot;compose&quot;, Array(id, Nothing, 		  42)).x
-	assertThrows(&quot;compose&quot;, Array(id, Empty, 		  42)).x
-	assertThrows(&quot;compose&quot;, Array(id, 4711, 		  42)).x
+	assertThrows(Fn.compose, Array(id, &quot;i-dont-exist&quot;, 42)).x
+	assertThrows(Fn.compose, Array(id, Nothing, 		  42)).x
+	assertThrows(Fn.compose, Array(id, Empty, 		  42)).x
+	assertThrows(Fn.compose, Array(id, 4711, 		  42)).x
 	&apos;&apos;assertThrows doesn&apos;t really work with partial app
-	&apos;assertThrows(&quot;compose&quot;, Array(id, &quot;i-dont-exist&quot;)).x
+	&apos;assertThrows(Fn.compose, Array(id, &quot;i-dont-exist&quot;)).x
 
-	assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;, &quot;i-dont-exist-either&quot;, 42)).x
+	assertThrows(Fn.compose, Array(&quot;i-dont-exist&quot;, &quot;i-dont-exist-either&quot;, 42)).x
 	&apos;&apos;assertThrows doesn&apos;t really work with partial app
-	&apos;assertThrows(&quot;compose&quot;, Array(&quot;i-dont-exist&quot;, &quot;i-dont-exist-either&quot;)).x
+	&apos;assertThrows(Fn.compose, Array(&quot;i-dont-exist&quot;, &quot;i-dont-exist-either&quot;)).x
 
 	test_compose_left_id()   &apos; not passing when delaying until 3rd arg
 	test_compose_right_id()  &apos; not passing when delaying until 3rd arg
@@ -872,7 +871,10 @@ Function test_inRange()
 End Function
 
 Function test_equ()
-	assertThrows(&quot;equ&quot;, Array(0, &quot;one&quot;)).x
+	assertEqual(arity(Fn.equ),	2).x
+	assertEqual(arity(equ),		2).x
+	
+	assertThrows(Fn.equ, Array(0, &quot;one&quot;)).x
 	
 	assertEqual(equ(0, 0), True).x
 	assertEqual(equ(0, 1), False).x
@@ -971,11 +973,11 @@ Function test_equ()
 	
 	&apos;---------------
 	
-	assertThrows(&quot;equ&quot;, Array(vUninitTyName, oUninitTyName)).x	&apos; cannot compare uninitialized instances of type Object/
+	assertThrows(Fn.equ, Array(vUninitTyName, oUninitTyName)).x	&apos; cannot compare uninitialized instances of type Object/
 
-	assertThrows(&quot;equ&quot;, Array(vUninitTyName, oInitTyName)).x	&apos; missing fn &quot;foobar_equ&quot;
+	assertThrows(Fn.equ, Array(vUninitTyName, oInitTyName)).x	&apos; missing fn &quot;foobar_equ&quot;
 	
-	assertThrows(&quot;equ&quot;, Array(Array(), Array())).x	&apos; NYI
+	assertThrows(Fn.equ, Array(Array(), Array())).x	&apos; NYI
 	
 	assertEqual(equ(Nothing,		oNothing), 		True ).x
 	assertEqual(equ(oNothing,		Nothing), 		True ).x
@@ -984,14 +986,15 @@ Function test_equ()
 	assertEqual(equ(Nothing,		oInitTyName),	False).x
 	assertEqual(equ(oInitTyName,	Nothing),		False).x
 
-	assertThrows(&quot;equ&quot;, Array(vUninitNoTyName, oUninitNoTyName)).x	&apos; cannot compare values of underspecified type Object
-	assertThrows(&quot;equ&quot;, Array(oUninitNoTyName, vUninitNoTyName)).x	&apos; cannot compare values of underspecified type Object
+	assertThrows(Fn.equ, Array(vUninitNoTyName, oUninitNoTyName)).x	&apos; cannot compare values of underspecified type Object
+	assertThrows(Fn.equ, Array(oUninitNoTyName, vUninitNoTyName)).x	&apos; cannot compare values of underspecified type Object
 
-	assertThrows(&quot;equ&quot;, Array(nil, oUninitNoTyName)).x	&apos; incompatible types Object/TList and Object
+	assertThrows(Fn.equ, Array(nil, oUninitNoTyName)).x	&apos; incompatible types Object/TList and Object
 End Function
 
 Function test_readHex()
-	assertEqual(arityF(&quot;readHex&quot;), 1).x
+	assertEqual(arity(Fn.readHex), 1).x
+	&apos;assertEqual(arity(readHex), 1).x
 	
 	assertEqual(readHex( &quot;0&quot;),    0).x
 	assertEqual(readHex( &quot;1&quot;),    1).x
@@ -1033,15 +1036,15 @@ Function test_readHex()
 &apos;	assertEqual(readHex( &quot;CAFEBABE&quot;), 3405691582).x
 &apos;	assertEqual(readHex( &quot;deadbeef&quot;), 3735928559).x
 
-	assertThrows(&quot;readHex&quot;, Array(3)).x
-	assertThrows(&quot;readHex&quot;, Array(&quot;&quot;)).x
-	assertThrows(&quot;readHex&quot;, Array(&quot; &quot;)).x
-	assertThrows(&quot;readHex&quot;, Array(&quot;g&quot;)).x
-	assertThrows(&quot;readHex&quot;, Array(&quot;G&quot;)).x
-	assertThrows(&quot;readHex&quot;, Array(&quot;z&quot;)).x
-	assertThrows(&quot;readHex&quot;, Array(&quot;Z&quot;)).x
+	assertThrows(Fn.readHex, Array(3)).x
+	assertThrows(Fn.readHex, Array(&quot;&quot;)).x
+	assertThrows(Fn.readHex, Array(&quot; &quot;)).x
+	assertThrows(Fn.readHex, Array(&quot;g&quot;)).x
+	assertThrows(Fn.readHex, Array(&quot;G&quot;)).x
+	assertThrows(Fn.readHex, Array(&quot;z&quot;)).x
+	assertThrows(Fn.readHex, Array(&quot;Z&quot;)).x
 
-	assertThrows(&quot;readHex&quot;, Array(&quot;014Z&quot;)).x
+	assertThrows(Fn.readHex, Array(&quot;014Z&quot;)).x
 End Function
 
 </script:module>

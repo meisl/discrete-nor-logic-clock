@@ -42,9 +42,7 @@ Type TFnObjs
 	
 	TFn_toString	As Object
 	applyToList		As Object
-	existsF			As Object
-	arityF			As Object
-
+	
 	TList_toString	As Object
 	TList_equ		As Object
 	isList			As Object
@@ -158,8 +156,6 @@ Function Fn
 		
 		out.TFn_toString = mkFn(fs, &quot;TFn_toString&quot;,	1, &quot;(a -&gt; b) -&gt; Str&quot;)
 		out.applyToList	= mkFn(fs, &quot;applyToList&quot;,	2)
-		out.existsF		= mkFn(fs, &quot;existsF&quot;,		1)
-		out.arityF		= mkFn(fs, &quot;arityF&quot;, 		1)
 		
 		out.TList_toString	= mkFn(fs, &quot;TList_toString&quot;,	1)
 		out.TList_equ		= mkFn(fs, &quot;TList_equ&quot;,			2)
@@ -323,18 +319,6 @@ Function lookupFn(name As String) As Variant
 	lookupFn = out
 End Function
 
-Function existsF(fName As String) As Boolean
-	existsF = Not(isEmpty(lookupFn(fName)))
-End Function
-
-Function arityF(fName As String) As Integer
-	If Not(existsF(fName)) Then
-		arityF = -1
-	Else
-		arityF = arity(lookupFn(fName))
-	End If
-End Function
-
 Function arity(fn As Object) As Integer
 	arity = fn.arity
 End Function
@@ -479,6 +463,7 @@ applyLast_of_two:
 	a0 = car(reverseArgs) &apos;fn.args(0)
 	a1 = arg
 	Select Case name
+		Case &quot;TList_equ&quot;:	result = TList_equ(		a0, a1)
 		Case &quot;fstArg&quot;:		result = a0
 		Case &quot;add&quot;:			result = CLng(a0 + a1)
 		Case &quot;mul&quot;:			result = CLng(a0 * a1)
@@ -569,9 +554,7 @@ Function applyBuiltinRev(fn As Object, ByVal reverseArgs As Object)
 		reverseArgs = cdr(reverseArgs)
 	Next i
 	Select Case getFnName(fn)
-		Case &quot;arityF&quot;:				result = arityF(			a(0)				)
-		Case &quot;existsF&quot;:				result = existsF(			a(0)				)
-		Case &quot;TList_equ&quot;:			result = TList_equ(			a(0), a(1)			)
+	&apos;	Case &quot;TList_equ&quot;:			result = TList_equ(			a(0), a(1)			)
 		Case Else
 			croak(&quot;applyBuiltinRev: unknown function &apos;&quot; &amp; getFnName(fn) &amp; &quot;&apos;&quot;)
 	End Select	
@@ -808,14 +791,9 @@ Function [test_Fn ===============]()
 	assertEqual(apply(fReadHex,  &quot;f&quot;),  readHex(&quot;f&quot;)).x
 
 
-	assertEqual(arityF(&quot;arityF&quot;), 1).x
-	assertEqual(arityF(&quot;applyToList&quot;), 2).x
+	assertEqual(arity(Fn.applyToList), 2).x
 
-	assertEqual(apply(&quot;arityF&quot;,  &quot;foo&quot;),            -1).x
-	assertEqual(apply(&quot;arityF&quot;,  &quot;arityF&quot;),          1).x
-	assertEqual(apply(&quot;arityF&quot;,  &quot;applyToList&quot;),     2).x
-
-	assertEqual(apply(&quot;toString&quot;, &quot;abcd&quot;), &quot;&apos;abcd&apos;&quot;).x
+	assertEqual(apply(Fn.toString, &quot;abcd&quot;), &quot;&apos;abcd&apos;&quot;).x
 End Function
 
 </script:module>
