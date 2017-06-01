@@ -30,7 +30,7 @@ Const DataTypeCtor_dataCtors = 2
 Type DataValue
 	str		 As String	&apos; debugger shows that in inspector
 	id		 As Long
-	ctor	 As DataCtor
+	ctor	 As DataValue
 	fields   As Array
 End Type
 
@@ -240,6 +240,7 @@ Function TType()
 	TType = out
 End Function
 
+&apos; String -&gt; Integer -&gt; (TypeApp List TDataCtor) -&gt; TDataTypeCtor
 Function DataTypeCtor()
 	Static out As Object &apos; DON&apos;T declare as DataValue!
 	If isNull(out) Then
@@ -256,6 +257,8 @@ Function TDataTypeCtor()
 	TDataTypeCtor = out
 End Function
 
+&apos; :: Str -&gt; (List TType) -&gt; TDataTypeCtor -&gt; TDataCtor
+&apos;  = DataCtor &quot;DataCtor&quot; [Str (TypeApp List TType) TDataTypeCtor] TDataCtor
 Function DataCtor()
 	Static out As Object &apos; DON&apos;T declare as DataValue!
 	If isNull(out) Then
@@ -272,6 +275,7 @@ Function TDataCtor()
 	TDataCtor = out
 End Function
 
+&apos; DataTypeCtor &quot;List&quot; 1 [Nil, Cons]
 Function TList()
 	Static out As Object &apos; DON&apos;T declare it as DataValue!
 	If isNull(out) Then 
@@ -374,22 +378,22 @@ Function List_length(ByVal xs As Variant)
 End Function
 
 
-Function StringType() &apos; singleton data ctor; return the singleton value
+Function TString() &apos; singleton data ctor; returns the singleton value
 	Static out As Object
 	If isNull(out) Then
 		&apos; order of argTypes of DataTypeCtor is fixed:
 		out = List_nth(0, field(DataCtor_argTypes, DataTypeCtor))
 	End If
-	StringType = out
+	TString = out
 End Function
 
-Function IntegerType() &apos; singleton data ctor; return the singleton value
+Function TInteger() &apos; singleton data ctor; returns the singleton value
 	Static out As Object
 	If isNull(out) Then
 		&apos; order of argTypes of DataTypeCtor is fixed:
 		out = List_nth(1, field(DataCtor_argTypes, DataTypeCtor))
 	End If
-	IntegerType = out
+	TInteger = out
 End Function
 
 Function TypeParam(Optional i As Integer)
@@ -403,7 +407,7 @@ Function TypeParam(Optional i As Integer)
 			c = List_car(ctors)
 			argTypes = field(DataCtor_argTypes, c)
 			If (List_length(argTypes) = 1) Then
-				If DataValue_same(List_car(argTypes), IntegerType) _
+				If DataValue_same(List_car(argTypes), TInteger) _
 				Then : Exit Do : End If
 			End If
 			ctors = List_cdr(ctors)
@@ -634,39 +638,46 @@ Function isDataTypeCtor(tc As DataValue)
 	isDataTypeCtor = out
 End Function
 
-Function hasType(v As Variant, t As Object)
+Function hasType(Optional v As Variant, Optional t As Object)
+	Static oFn As Object : If isNull(oFn) Then : oFn = Fn.hasType : End If
 	Dim out As Variant
-	out = False
-	If Not(isDataValue(t)) Then
-		Goto hasType_invalidType
-	End If
-	Dim c As Variant : c = ctorOf(v)
-	If isEmpty(c) Then
-		croak(&quot;hasType/NYI: test non-data value &quot; &amp; toString(v))
+	If isMissing(v) Then
+		out = oFn
+	ElseIf isMissing(t) Then
+		out = apply1(oFn, v)
 	Else
-		out = DataValue_same(field(DataCtor_typeCtor, c), t)
-	End If
-	
-	
-	&apos;If isDataTypeCtor(t) Then
-	&apos;	Dim r As Integer
-	&apos;	r = field(DataTypeCtor_arity, t)
-	&apos;	If (r &lt;&gt; 0) Then
-	&apos;		croak(&quot;hasType/NYI: test against not-completely-applied TypeCtor &quot; &amp; toString(t))
-	&apos;	End If
-	&apos;	Dim c  As DataValue : c  = ctorOf(v)
-	&apos;	Dim tc As DataValue : tc = field(DataCtor_typeCtor, c)
-	&apos;	
-	&apos;	out = field(DataTypeCtor_name, tc) = field(DataTypeCtor_name, t)
-	&apos;Else
-	&apos;	croak(&quot;hasType/NYI: test against type &quot; &amp; toString(t))
-	&apos;End If
-	
-	
+		out = False
+		Dim ct As Variant, cv As Variant
+		ct = ctorOf(t)
+		If isEmpty(ct) Then
+			Goto hasType_invalidType
+		ElseIf DataValue_same(ct, DataTypeCtor) Then
+			cv = ctorOf(v)
+			If Not(isEmpty(cv)) Then
+				out = DataValue_same(field(DataCtor_typeCtor, cv), t)
+			End If
+		Else &apos; t is not a DataTypeCtor
+			If DataValue_same(field(DataCtor_typeCtor, ct), TType) Then
+				&apos; Note: TString and TInteger return the singleton
+				&apos;       *value*, not the data ctor!
+				If DataValue_same(t, TString) Then
+					out = isString(v)
+				ElseIf DataValue_same(t, TInteger) Then
+					out = isInteger(v)
+				Else
+					croak(&quot;hasType/NYI: test against &quot; _
+						&amp; DataValue_toString(t))
+				End If
+			Else &apos; t is not a TType data ctor either
+				Goto hasType_invalidType
+			End If
+		End If
+	End If	
+		
 	hasType = out
 	Exit Function
 hasType_invalidType:
-	croak(&quot;hasType: invalid type &quot; &amp; toString(t))	
+	croak(&quot;hasType: not a type: &quot; &amp; toString(t))	
 End Function
 
 Function _newDataCtor( _
@@ -1828,7 +1839,8 @@ Function bootstrapTypes()
 		&quot;(TDataCtor.DataCtor &apos;DataCtor&apos; [String, (TypeApp List Type), TDataTypeCtor] TDataCtor)&quot;).x
 	
 	
-	tcDataCtor.fields(DataTypeCtor_dataCtors) = _newDataValue(cCons, Array(cDataCtor , vNil))
+	tcDataCtor.fields(DataTypeCtor_dataCtors) = _newDataValue( _
+		cCons, Array(cDataCtor , vNil))
 	assertEqual(DataValue_toString(tcDataCtor), _
 		&quot;(TDataTypeCtor.DataTypeCtor &apos;TDataCtor&apos; 0 [DataCtor])&quot;).x
 
@@ -1843,7 +1855,8 @@ Function bootstrapTypes()
 		&quot;(TDataCtor.DataCtor &apos;DataTypeCtor&apos; [String, Integer, (TypeApp List TDataCtor)] TDataTypeCtor)&quot;).x
 	
 	
-	tcDataTypeCtor.fields(DataTypeCtor_dataCtors) = _newDataValue(cCons, Array(cDataTypeCtor , vNil))
+	tcDataTypeCtor.fields(DataTypeCtor_dataCtors) = _newDataValue( _
+		cCons, Array(cDataTypeCtor , vNil))
 	assertEqual(DataValue_toString(tcDataTypeCtor), _
 		&quot;(TDataTypeCtor.DataTypeCtor &apos;TDataTypeCtor&apos; 0 [DataTypeCtor])&quot;).x
 	
@@ -2158,11 +2171,11 @@ Function test_bootstrapTypes()
 	
 	&apos;--- TType data ctor: String
 	Dim vString As Variant, cString As Variant &apos; singleton data ctor, returns the singleton value
-	vString = StringType
+	vString = TString
 	assertEqual(isDataValue(vString), True).x
 	assertEqual( fieldCount(vString), 0).x	&apos; singleton value
-	&apos; StringType returns the same instance again
-	assert_same(StringType, vString).x
+	&apos; TString returns the same instance again
+	assert_same(TString, vString).x
 	cString = ctorOf(vString)
 	assertEqual(isDataValue(cString), True).x
 	assertEqual( fieldCount(cString), 3).x
@@ -2174,11 +2187,11 @@ Function test_bootstrapTypes()
 	
 	&apos;--- TType data ctor: Integer
 	Dim vInt As Variant, cInt As Variant &apos; singleton data ctor, returns the singleton value
-	vInt = IntegerType
+	vInt = TInteger
 	assertEqual(isDataValue(vInt), True).x
 	assertEqual( fieldCount(vInt), 0).x	&apos; singleton value
-	&apos; IntegerType returns the same instance again
-	assert_same(IntegerType, vInt).x
+	&apos; TInteger returns the same instance again
+	assert_same(TInteger, vInt).x
 	cInt = ctorOf(vInt)
 	assertEqual(isDataValue(cInt), True).x
 	assertEqual( fieldCount(cInt), 3).x
@@ -2231,22 +2244,83 @@ Function test_bootstrapTypes()
 
 	assert_same(field(0,	vApp),	tcList).x
 	assert_same(field(1,	vApp),	vInt).x
-
-	
 End Function
 
 Function test_Type_hasType
+	assertEqual(hasType(DataTypeCtor,	TDataCtor), 	True).x
+	assertEqual(hasType(DataCtor,		TDataCtor), 	True).x
+	assertEqual(hasType(TDataCtor,		TDataTypeCtor), True).x
 	assertEqual(hasType(TDataTypeCtor,	TDataTypeCtor), True).x
 	assertEqual(hasType(TType, 			TDataTypeCtor), True).x
-	assertEqual(hasType(DataTypeCtor,	TDataTypeCtor), False).x
-	assertEqual(hasType(DataTypeCtor,	TDataCtor), 	True).x
-	assertEqual(hasType(TDataCtor,		TDataTypeCtor), True).x
-	assertEqual(hasType(DataCtor,		TDataTypeCtor), False).x
-	assertEqual(hasType(DataCtor,		TDataCtor), 	True).x
-
-	&apos;assertThrows(hasType(TDataCtor,		DataCtor)).x
+	assertEqual(hasType(TList, 			TDataTypeCtor), True).x
 	
-	&apos;assertEqual(hasType(), True).x
+	assertEqual(hasType(DataCtor,		TDataTypeCtor), False).x
+	assertEqual(hasType(DataTypeCtor,	TDataTypeCtor), False).x
+
+	assertThrows(hasType, Array(TDataCtor, DataCtor)).x
+	
+	assertEqual(hasType(             List_nil,			TList), True).x
+	assertEqual(hasType(List_cons(1, List_nil),			TList), True).x
+		
+	assertEqual(hasType(TString,						TType), True).x
+	assertEqual(hasType(TInteger,						TType), True).x
+	assertEqual(hasType(TypeParam(0),					TType), True).x
+	assertEqual(hasType(TypeApp(TList, TypeParam(0)),	TType), True).x
+	
+	&apos; NYI
+	&apos;assertEqual(hasType(3, TypeParam(0)), True).x
+	&apos; NYI
+	&apos;assertEqual(hasType(3, TypeApp(TList TString)), True).x
+	
+	assertEqual(hasType(&quot;&quot;,				TString),	 True).x
+	assertEqual(hasType(&quot;a&quot;,			TString),	 True).x
+	assertEqual(hasType(&quot;foobar&quot;,		TString),	 True).x
+	assertEqual(hasType(Nothing,		TString),	False).x
+	assertEqual(hasType(Empty,			TString),	False).x
+	assertEqual(hasType(True,			TString),	False).x
+	assertEqual(hasType(False,			TString),	False).x
+	assertEqual(hasType(0,				TString),	False).x
+	assertEqual(hasType(1,				TString),	False).x
+	assertEqual(hasType(3.14,			TString),	False).x
+	assertEqual(hasType(Array(),		TString),	False).x
+	assertEqual(hasType(Array(42),		TString),	False).x
+	assertEqual(hasType(Array(42),		TString),	False).x
+	assertEqual(hasType(List,			TString),	False).x
+	assertEqual(hasType(List_nil,		TString),	False).x
+	assertEqual(hasType(List_cons,		TString),	False).x
+
+	assertEqual(hasType(&quot;&quot;,				TInteger),	False).x
+	assertEqual(hasType(&quot;a&quot;,			TInteger),	False).x
+	assertEqual(hasType(&quot;foobar&quot;,		TInteger),	False).x
+	assertEqual(hasType(Nothing,		TInteger),	False).x
+	assertEqual(hasType(Empty,			TInteger),	False).x
+	assertEqual(hasType(True,			TInteger),	False).x
+	assertEqual(hasType(False,			TInteger),	False).x
+	assertEqual(hasType( 0,				TInteger),	 True).x
+	assertEqual(hasType( 1,				TInteger),	 True).x
+	assertEqual(hasType(-1,				TInteger),	 True).x
+	assertEqual(hasType( 32766,			TInteger),	 True).x &apos;0x7FFE
+	assertEqual(hasType( 32767,			TInteger),	 True).x &apos;0x7FFF
+	assertEqual(hasType( 32768,			TInteger),	False).x &apos;0x8000 (!)
+	assertEqual(hasType( 65534,			TInteger),	False).x &apos;0xFFFE
+	assertEqual(hasType( 65535,			TInteger),	False).x &apos;0xFFFF
+	assertEqual(hasType( 65536,			TInteger),	False).x &apos;0x80000
+	assertEqual(hasType(-32766,			TInteger),	 True).x &apos;0x8002
+	assertEqual(hasType(-32767,			TInteger),	 True).x &apos;0x8001
+	assertEqual(hasType(-32768,			TInteger),	 True).x &apos;0x8000
+	assertEqual(hasType(-32769,			TInteger),	False).x &apos;0x17FFF (!)
+	assertEqual(hasType(-65534,			TInteger),	False).x &apos;0xFFFE
+	assertEqual(hasType(-65535,			TInteger),	False).x &apos;0xFFFF
+	assertEqual(hasType(-65536,			TInteger),	False).x &apos;0x80000
+	assertEqual(hasType(3.14,			TInteger),	False).x
+	assertEqual(hasType(Array(),		TInteger),	False).x
+	assertEqual(hasType(Array(42),		TInteger),	False).x
+	assertEqual(hasType(Array(42),		TInteger),	False).x
+	assertEqual(hasType(List,			TInteger),	False).x
+	assertEqual(hasType(List_nil,		TInteger),	False).x
+	assertEqual(hasType(List_cons,		TInteger),	False).x
+
+
 	&apos;assertEqual(hasType(), True).x
 
 End Function
