@@ -3099,7 +3099,7 @@ Function test_Parser_seq()
 	assert_parses(p, &quot;AB&quot;,	asc(&quot;A&quot;), 2).x
 	assert_parses(p, &quot;BA&quot;,	asc(&quot;B&quot;), 2).x
 	
-	f = &quot;concat&quot;
+	f = Fn.concat
 	p = pSeq(Array(pItem, pItem), f)
 	refute_parses(p, &quot;&quot;).x
 	refute_parses(p, &quot;A&quot;).x

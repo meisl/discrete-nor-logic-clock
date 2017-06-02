@@ -113,12 +113,15 @@ Function TList_equ(xs, ys) As Boolean
 	n = length(xs)
 	
 	If n = length(ys) Then
+	Dim x, y
 TList_equ_compare_elems:
 		If n = 0 Then
 			out = True
 		Else
 			On Local Error Goto TList_equ_end &apos; if cars are incomparable
-			If equ(car(xs), car(ys)) Then
+			x = car(xs)
+			y = car(ys)
+			If equ(x, y) Then
 				&apos; tail-call:
 				&apos;out = TList_equ(cdr(xs), cdr(ys))
 				xs = cdr(xs)

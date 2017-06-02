@@ -31,7 +31,7 @@ Function getBounds(a As Array)
 End Function
 
 Function getSizes(a As Array)
-	getSizes = map(&quot;caddr&quot;, getBounds(a))
+	getSizes = map(Fn.caddr, getBounds(a))
 End Function
 
 Function getDim(a As Array)

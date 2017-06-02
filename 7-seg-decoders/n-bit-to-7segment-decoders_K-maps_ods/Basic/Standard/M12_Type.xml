@@ -4,11 +4,31 @@
 Option Explicit
 		
 Type DataValue
-	str		 As String	&apos; debugger shows that in inspector
-	id		 As Long
-	ctor	 As DataValue
-	fields   As Array
+	str		As String	&apos; debugger shows that in inspector
+	id		As Long
+	ctor	As DataValue
+	fields	As Array
+	x		As Variant
 End Type
+
+Type Tp
+	TDataTypeCtor	As DataValue
+	DataTypeCtor	As Datavalue
+	
+	TDataCtor		As DataValue
+	DataCtor		As Datavalue
+	
+	List			As DataValue
+	List_Nil		As DataValue
+	List_Cons		As DataValue
+
+	TType			As DataValue
+	TType_Param		As DataValue
+	TType_App		As DataValue
+	TType_Str		As DataValue
+	TType_Int		As DataValue
+End Type
+
 
 Const DataCtor_name     = 0
 Const DataCtor_argTypes = 1
@@ -36,6 +56,70 @@ Function _newDataValue(ctor As DataValue, ByRef args As Array)
 		_validate(out)
 	End If
 	_newDataValue = out
+End Function
+
+Function Tp() &apos; bootstrap TType and data types
+	Static out As Object
+	If isNull(out) Then
+		out = New Tp
+		
+		Dim vNil, tcList, cNil
+		vNil = _newDataValue(Nothing, emptyArray)
+		tcList = _newDataValue(Nothing, Array(&quot;List&quot;, 1, vNil))
+		out.List = tcList
+		
+		cNil = _newDataValue(Nothing, Array(&quot;Nil&quot;, vNil, tcList))
+		cNil.x = vNil
+		vNil.ctor = cNil
+		out.List_nil = cNil
+		
+		
+		Dim tcDataCtor, cDataCtor
+		tcDataCtor = _newDataValue(Nothing, Array( _
+			&quot;TDataCtor&quot;, 0, vNil _
+		)
+		out.TDataCtor = tcDataCtor
+		
+		cDataCtor = _newDataValue(Nothing, Array( _
+			&quot;DataCtor&quot;, vNil, tcDataCtor _
+		))
+		cNil.ctor = cDataCtor
+		out.DataCtor = cDataCtor
+		
+		
+		Dim tcDataTypeCtor, cDataTypeCtor
+		tcDataTypeCtor = _newDataValue(Nothing, Array( _
+			&quot;TDataTypeCtor&quot;, 0, vNil _
+		))
+		out.TDataTypeCtor = tcDataTypeCtor
+		
+		cDataTypeCtor = _newDataValue(cDataCtor, Array( _
+			&quot;DataCtor&quot;, vNil, tcDataTypeCtor _
+		))
+		tcDataTypeCtor.ctor = cDataTypeCtor
+		tcDataCtor.ctor 	= cDataTypeCtor
+		tcList.ctor			= cDataTypeCtor
+		out.DataTypeCtor = cDataTypeCtor
+		
+		
+		out.TDataTypeCtor.str	= &quot;TDataTypeCtor&quot;
+		out.DataTypeCtor.str	= &quot;DataTypeCtor :: Str -&gt; Int -&gt; TDataTypeCtor&quot;
+		
+		out.TDataCtor.str		= &quot;TDataCtor&quot;
+		out.DataCtor.str		= &quot;DataCtor :: Str -&gt; (List Type) -&gt; TDataTypeCtor -&gt; TDataCtor&quot;
+
+		out.List.str			= &quot;List&quot;
+		out.List_Nil.str		= &quot;Nil :: List a0&quot;	&apos; singleton data ctor
+		out.List_Nil.x.str		= &quot;[]&quot;	&apos; singleton value
+		out.List_Cons.str		= &quot;Cons :: a0 -&gt; (List a0) -&gt; (List a0)&quot;
+
+		&apos;out.TType.str			= &quot;Type&quot;
+		&apos;out.TType_Param.str		= &quot;Param :: Int -&gt; Type&quot;
+		&apos;out.TType_App.str		= &quot;App :: Type -&gt; Type -&gt; Type&quot;
+		&apos;out.TType_Str.str		= &quot;Str :: Type&quot;
+		&apos;out.TType_Int.str		= &quot;Int :: Type&quot;
+	End If
+	Tp = out
 End Function
 
 
@@ -219,7 +303,8 @@ End Sub
 Function TType()
 	Static out As Object &apos; DON&apos;T declare it as DataValue!
 	If isNull(out) Then 
-		out = bootstrapTypes()
+		out = bootstrapTypes()	&apos;	Tp.TType	&apos;	
+		out.str = field(DataTypeCtor_name, out)
 	End If
 	TType = out
 End Function
@@ -230,7 +315,10 @@ Function DataTypeCtor( _
 	Optional arity As Integer, _
 	Optional dataCtors As Object _
 )
-	Static c As Object : If isNull(c) Then : c = ctorOf(TType) : End If
+	Static c As Object : If isNull(c) Then
+		c = ctorOf(TType)
+		c.str = typeCtorName(c) &amp; &quot;.&quot; &amp; field(DataCtor_name, c)
+	End If
 	Dim out As Variant
 	If isMissing(_name) Then
 		out = c
@@ -247,6 +335,7 @@ Function TDataTypeCtor()
 	Static out As Object &apos; DON&apos;T declare it as DataValue!
 	If isNull(out) Then 
 		out = field(DataCtor_typeCtor, DataTypeCtor)
+		out.str = field(DataTypeCtor_name, out)
 	End If
 	TDataTypeCtor = out
 End Function
@@ -254,17 +343,19 @@ End Function
 &apos; :: Str -&gt; (List TType) -&gt; TDataTypeCtor -&gt; TDataCtor
 &apos;  = DataCtor &quot;DataCtor&quot; [Str (TypeApp List TType) TDataTypeCtor] TDataCtor
 Function DataCtor()
-	Static out As Object &apos; DON&apos;T declare as DataValue!
-	If isNull(out) Then
-		out = ctorOf(DataTypeCtor)
+	Static c As Object &apos; DON&apos;T declare as DataValue!
+	If isNull(c) Then
+		c = ctorOf(DataTypeCtor)
+		c.str = typeCtorName(c) &amp; &quot;.&quot; &amp; field(DataCtor_name, c)
 	End If
-	DataCtor = out
+	DataCtor = c
 End Function
 
 Function TDataCtor()
 	Static out As Object &apos; DON&apos;T declare as DataValue!
 	If isNull(out) Then 
 		out = field(DataCtor_typeCtor, DataCtor)
+		out.str = field(DataTypeCtor_name, out)
 	End If
 	TDataCtor = out
 End Function
@@ -276,6 +367,7 @@ Function TList()
 		out = field(DataCtor_argTypes, DataCtor)	&apos; a List value
 		out = ctorOf(out)							&apos; a DataCtor value
 		out = field(DataCtor_typeCtor, out)			&apos; a DataTypeCtor value
+		out.str = field(DataTypeCtor_name, out)
 	End If
 	TList = out
 End Function
@@ -288,6 +380,10 @@ Function List_nil() &apos; singleton data ctor; returns the singleton value
 		&apos;      or (cCons cNil  (cCons cCons (vNil)))
 		&apos; In any case: the nil *value* is down at the very bottom!
 		out = field(1, field(1, field(DataTypeCtor_dataCtors, TList)))
+		out.str = &quot;[]&quot;
+		Dim c : c = ctorOf(out)
+		c.x = out
+		c.str = typeCtorName(c) &amp; &quot;.&quot; &amp; field(DataCtor_name, c)
 	End If
 	List_nil = out
 End Function
@@ -300,6 +396,7 @@ Function List_cons(Optional x As Variant, Optional xs As Variant)
 		&apos;      or (cCons cNil  (cCons cCons (vNil)))
 		&apos; In any case: the top data ctor is cons
 		c = ctorOf(field(DataTypeCtor_dataCtors, TList))
+		c.str = typeCtorName(c) &amp; &quot;.&quot; &amp; field(DataCtor_name, c)
 	End If
 	Dim out As Variant
 	If isMissing(x) Then
@@ -377,6 +474,10 @@ Function TString() &apos; singleton data ctor; returns the singleton value
 	If isNull(out) Then
 		&apos; order of argTypes of DataTypeCtor is fixed:
 		out = List_nth(0, field(DataCtor_argTypes, DataTypeCtor))
+		out.str = &quot;Str&quot;
+		Dim c : c = ctorOf(out)
+		c.x = out
+		c.str = typeCtorName(c) &amp; &quot;.&quot; &amp; field(DataCtor_name, c)
 	End If
 	TString = out
 End Function
@@ -386,6 +487,10 @@ Function TInteger() &apos; singleton data ctor; returns the singleton value
 	If isNull(out) Then
 		&apos; order of argTypes of DataTypeCtor is fixed:
 		out = List_nth(1, field(DataCtor_argTypes, DataTypeCtor))
+		out.str = &quot;Int&quot;
+		Dim c : c = ctorOf(out)
+		c.x = out
+		c.str = typeCtorName(c) &amp; &quot;.&quot; &amp; field(DataCtor_name, c)
 	End If
 	TInteger = out
 End Function
@@ -406,11 +511,13 @@ Function TypeParam(Optional i As Integer)
 			End If
 			ctors = List_cdr(ctors)
 		Loop
+		c.str = typeCtorName(c) &amp; &quot;.&quot; &amp; field(DataCtor_name, c)
 	End If
 	If isMissing(i) Then
 		out = c
 	Else
 		out = _newDataValue(c, Array(i))
+		out.str = &quot;a&quot; &amp; i
 	End If
 	TypeParam = out
 End Function
@@ -432,6 +539,7 @@ Function TypeApp(Optional tc As Object, Optional ta As Object)
 			End If
 			ctors = List_cdr(ctors)
 		Loop
+		c.str = typeCtorName(c) &amp; &quot;.&quot; &amp; field(DataCtor_name, c)
 	End If
 	If isMissing(tc) Then
 		out = c
@@ -439,12 +547,190 @@ Function TypeApp(Optional tc As Object, Optional ta As Object)
 		croak(&quot;TypeApp/NYI: partial application&quot;)
 	Else
 		out = _newDataValue(c, Array(tc, ta))
+		If (tc.str &lt;&gt; &quot;&quot;) And (ta.str &lt;&gt; &quot;&quot;) Then
+			If InStr(tc.str, &quot; &quot;) &lt;= 0 Then
+				out.str = tc.str
+			Else
+				out.str = &quot;(&quot; &amp; tc.str &amp; &quot;)&quot;
+			End If
+			If InStr(ta.str, &quot; &quot;) &lt;= 0 Then
+				out.str = out.str &amp; &quot; &quot; &amp; ta.str
+			Else
+				out.str = out.str &amp; &quot; (&quot; &amp; ta.str &amp; &quot;)&quot;
+			End If
+		End If
 	End If
 	TypeApp = out
 End Function
 
+&apos; --------------------------------------------------------------
 
 
+&apos;Function isSubtypeOf(s As Object, t As Object)
+&apos;	Dim out
+&apos;	out = DataValue_same(s, t)
+&apos;	If Not(out) Then
+&apos;		If DataValue_same(t, TType) Then
+&apos;			out = CBool(DataValue_same(s, TDataTypeCtor) _
+&apos;					Or DataValue_same(s, TString) _
+&apos;					Or DataValue_same(s, TInteger) _
+&apos;			)
+&apos;		End If
+&apos;	End If
+&apos;	isSubtypeOf = out
+&apos;End Function
+
+Function hasType(Optional v As Variant, Optional t As Object)
+	Static oFn As Object
+	Dim out As Variant
+	If isMissing(t) Then
+		If isNull(oFn) Then : 
+			oFn = Fn.hasType
+		End If
+		If isMissing(v) Then
+			out = oFn
+		Else
+			out = apply1(oFn, v)
+		End If
+	Else
+		out = False
+		Dim ct As Variant, cv As Variant
+		ct = ctorOf(t)
+		If isEmpty(ct) Then
+			Goto hasType_invalidType
+		ElseIf DataValue_same(ct, DataTypeCtor) Then
+			cv = ctorOf(v)
+			If Not(isEmpty(cv)) Then
+				Dim tc As Object
+				tc = field(DataCtor_typeCtor, cv)
+				&apos;out = isSubtypeOf(tc, t)
+				out = DataValue_same(tc, t)
+			End If
+		Else &apos; t is not a DataTypeCtor
+			If DataValue_same(field(DataCtor_typeCtor, ct), TType) Then
+				&apos; Note: TString and TInteger return the singleton
+				&apos;       *value*, not the data ctor!
+				If DataValue_same(t, TString) Then
+					out = isString(v)
+				ElseIf DataValue_same(t, TInteger) Then
+					out = isInteger(v)
+				Else
+					croak(&quot;hasType/NYI: test against &quot; _
+						&amp; DataValue_toString(t))
+				End If
+			Else &apos; t is not a TType data ctor either
+				Goto hasType_invalidType
+			End If
+		End If
+	End If	
+		
+	hasType = out
+	Exit Function
+hasType_invalidType:
+	croak(&quot;hasType: not a type: &quot; &amp; toString(t))	
+End Function
+
+&apos;Function requireType(t As Object, v As Variant)
+&apos;	Dim out
+&apos;	If hasType(v, t) Then
+&apos;		out = mkPass
+&apos;	Else
+&apos;		out = mkFail(v, t, &quot;need &quot; &amp; DataValue_toString(t) &amp; &quot; - got&quot; &amp; NL &amp; toString(v))
+&apos;	End If
+&apos;	requireType = out
+&apos;End Function
+
+Function applyDC(c, _
+	Optional a0, _
+	Optional a1, _
+	Optional a2, _
+	Optional a3, _
+	Optional a4 _
+)
+	If Not(hasType(c, TDataCtor)) Then
+		croak(&quot;applyDC: not a data ctor: &quot; &amp; NL &amp; toString(c))
+	End If
+	Dim out As Object
+	Dim cName As String : cName = field(DataCtor_name, c)
+	Dim ats As Object	: ats = field(DataCtor_argTypes, c)
+	Dim r As Integer	: r = List_length(ats)
+	Dim n As Integer, i As Integer
+	Dim a As Variant, t As Object
+	
+	If     isMissing(a0) Then :	n = 0
+	ElseIf isMissing(a1) Then
+		n = 1 : If r &lt; n Then : Goto applyDC_too_many_args : End If
+		&apos;a = a0 : i = 0 : t = List_nth(i, ats)
+		&apos;If Not(hasType(a, t)) Then : Goto applyDC_typeError : End If
+	ElseIf isMissing(a2) Then
+		n = 2 : If r &lt; n Then : Goto applyDC_too_many_args : End If
+		&apos;a = a0 : i = 0 : t = List_nth(i, ats)
+		&apos;If Not(hasType(a, t)) Then : Goto applyDC_typeError : End If
+		&apos;a = a1 : i = 1 : t = List_nth(i, ats)
+		&apos;If Not(hasType(a, t)) Then : Goto applyDC_typeError : End If
+	ElseIf isMissing(a3) Then
+		n = 3 : If r &lt; n Then : Goto applyDC_too_many_args : End If
+	ElseIf isMissing(a4) Then
+		n = 4 : If r &lt; n Then : Goto applyDC_too_many_args : End If
+	Else
+		croak(&quot;applyDC &quot; &amp; cName &amp; &quot;: &quot; _
+			&amp; &quot; only up to 4 args supported - got 5&quot; _
+		)
+	End If
+	
+	If n &lt; r Then
+		Dim typeStr As String
+		For i = n To r - 1
+			t = List_nth(i, ats)
+			&apos;If (t.str &lt;&gt; &quot;&quot;) Then
+			&apos;	typeStr = typeStr &amp; t.str &amp; &quot; -&gt; &quot;
+			&apos;Else
+				typeStr = typeStr &amp; _DataValue_toString_Type(t, &quot;&quot;) &amp; &quot; -&gt; &quot;
+			&apos;End If
+		Next i
+		typeStr = typeStr &amp; typeCtorName(c)
+		Dim oFn As Object
+		oFn = _newFn(&quot;applyDC&quot;, r + 1, typeStr)
+		Select Case n
+			Case 0:	out = apply(oFn, c)
+			Case 1:	out = apply(oFn, c, a0)
+			Case 2:	out = apply(oFn, c, a0, a1)
+			Case 3:	out = apply(oFn, c, a0, a1, a2)
+			Case 4:	out = apply(oFn, c, a0, a1, a2, a3)
+		End Select
+	ElseIf n = r Then
+		If n = 0 Then
+			out = c.x
+			If isEmpty(out) Then
+				croak(&quot;applyDC &quot; &amp; cName &amp; &quot;: singleton ctor &quot; _
+					&amp; &quot; empty with .x&quot; _
+				)
+			End If
+		Else
+			Dim fields
+			Select Case n
+				Case 1:	fields = Array(a0)
+				Case 2:	fields = Array(a0, a1)
+				Case 3:	fields = Array(a0, a1, a2)
+				Case 4:	fields = Array(a0, a1, a2, a3)
+			End Select
+			out = _newDataValue(c, fields)
+		End If
+	Else
+applyDC_too_many_args:
+		croak(&quot;applyDC &quot; &amp; cName &amp; &quot;: &quot; _
+			&amp; &quot; cannot apply &quot; &amp; r &amp; &quot;-arg ctor to &quot; &amp; n &amp; &quot; args&quot; _
+		)
+	End If
+	applyDC = out
+	Exit Function
+applyDC_typeError:
+		croak(&quot;applyDC &quot; &amp; cName &amp; &quot;: type error: expected &quot; _
+			&amp; _DataValue_toString_Type(t) _
+			&amp; NL &amp; &quot;but got&quot; _
+			&amp; NL &amp; toString(a) _
+		)
+End Function
 
 
 &apos; --------------------------------------------------------------
@@ -632,109 +918,29 @@ Function isDataTypeCtor(tc As DataValue)
 	isDataTypeCtor = out
 End Function
 
-Function hasType(Optional v As Variant, Optional t As Object)
-	Static oFn As Object
-	Dim out As Variant
-	If isMissing(t) Then
-		If isNull(oFn) Then : 
-			oFn = Fn.hasType
-		End If
-		If isMissing(v) Then
-			out = oFn
-		Else
-			out = apply1(oFn, v)
-		End If
-	Else
-		out = False
-		Dim ct As Variant, cv As Variant
-		ct = ctorOf(t)
-		If isEmpty(ct) Then
-			Goto hasType_invalidType
-		ElseIf DataValue_same(ct, DataTypeCtor) Then
-			cv = ctorOf(v)
-			If Not(isEmpty(cv)) Then
-				out = DataValue_same(field(DataCtor_typeCtor, cv), t)
-			End If
-		Else &apos; t is not a DataTypeCtor
-			If DataValue_same(field(DataCtor_typeCtor, ct), TType) Then
-				&apos; Note: TString and TInteger return the singleton
-				&apos;       *value*, not the data ctor!
-				If DataValue_same(t, TString) Then
-					out = isString(v)
-				ElseIf DataValue_same(t, TInteger) Then
-					out = isInteger(v)
-				Else
-					croak(&quot;hasType/NYI: test against &quot; _
-						&amp; DataValue_toString(t))
-				End If
-			Else &apos; t is not a TType data ctor either
-				Goto hasType_invalidType
-			End If
-		End If
-	End If	
-		
-	hasType = out
-	Exit Function
-hasType_invalidType:
-	croak(&quot;hasType: not a type: &quot; &amp; toString(t))	
-End Function
 
-Function _newDataCtor( _
-	typeCtor As TypeCtor, _
+Function mkDataCtor( _
+	typeCtor As Object, _
 	name 	 As String, _
 	argTypes As Array _
 )
-	Dim out As New DataCtor
-	out.tag = &quot;DataCtor&quot;
-	out._name = name
-	out.typeCtor = typeCtor
-	Dim lo As Integer : lo = LBound(argTypes)
-	Dim hi As Integer : hi = UBound(argTypes)
-	Dim n  As Integer : n = hi - lo + 1
-	out.arity = n
-
-	Dim typeStr As String, i As Integer
-	typeStr = &quot;&quot;
-	If n = 0 Then
-		out.argTypes = Array()
-	Else
-		Dim ats(0 To n - 1)
-		Dim t As Variant
-		Dim k As Integer : k = 0
-		For i = lo To hi
-			t = argTypes(i)
-			If isInteger(t) Then
-				If (t &lt; 0) Or (t &gt;= typeCtor.arity) Then
-					croak(&quot;_newDataCtor &quot; &amp; name &amp; &quot;: &quot; _
-						&amp; &quot;invalid type var index &quot; &amp; t _
-						&amp; &quot; - expected [0..&quot; &amp; (typeCtor.arity - 1) &amp; &quot;]&quot;_
-					)
-				End If
-				typeStr = typeStr &amp; &quot;a&quot; &amp; t &amp; &quot; -&gt; &quot;
-			ElseIf isType(t) Then
-				If isArrowType(t) Then
-					typeStr = typeStr &amp; &quot;(&quot; &amp; t.str &amp; &quot;)&quot;
-				Else
-					typeStr = typeStr &amp; t.str
-				End If
-				typeStr = typeStr &amp; &quot; -&gt; &quot;
-			Else
-				croak(&quot;_newDataCtor &quot; &amp; name &amp; &quot;: &quot; _
-					&amp; &quot;invalid type arg &quot; &amp; toString(t) _
-				)
-			End If
-			ats(k) = t
-			k = k + 1
-		Next i
+	If Not(hasType(typeCtor, TDataTypeCtor)) Then
+		croak(&quot;mkDataCtor: type error - expected TDataTypeCtor&quot;)
 	End If
-	
-	typeStr = typeStr &amp; typeCtor._name
-	For i = 0 To typeCtor.arity - 1
-		typeStr = typeStr &amp; &quot; a&quot; &amp; i
-	Next i
-
-	out.str = typeCtor._name &amp; &quot;.&quot; &amp; name &amp; &quot; :: &quot; &amp; typeStr
-	_newDataCtor = out
+	Static dc As Object
+	If isNull(dc) Then : dc = DataCtor : End If
+	Dim n As Integer  : n = UBound(argTypes) + 1
+	Dim ats As Object : ats = toList(argTypes)
+	Dim out
+	out = _newDataValue(dc, Array(name, ats, typeCtor))
+	typeCtor.fields(DataTypeCtor_dataCtors, typeCtor) _
+		= List_cons(out, typeCtor.fields(DataTypeCtor_dataCtors, typeCtor))
+	If n = 0 Then &apos; singleton data ctor
+		out.x = _newDataValue(out, emptyArray)
+		out.x.str = name
+	End If
+	out.str = field(DataTypeCtor_name, typeCtor) &amp; &quot;.&quot; &amp; name
+	mkDataCtor = out
 End Function
 
 Function _newTypeCtor( _
@@ -870,6 +1076,7 @@ End Function
 Function DataCtor_equ(a As DataCtor, b As DataCtor)
 	Dim out
 	out = False
+	Dim aStr
 	If a._name = b._name Then
 		out = TypeCtor_equ(a.typeCtor, b.typeCtor)
 	End If
@@ -896,26 +1103,7 @@ End Function
 
 
 
-Function applyDC(c As DataCtor, _
-	Optional a0, _
-	Optional a1, _
-	Optional a2, _
-	Optional a3, _
-	Optional a4 _
-)
-	Dim out As Object
-	If     isMissing(a0) Then :	out = _newDataValue(c, emptyArray)
-	ElseIf isMissing(a1) Then :	out = _newDataValue(c, Array(a0))
-	ElseIf isMissing(a2) Then :	out = _newDataValue(c, Array(a0, a1))
-	ElseIf isMissing(a3) Then :	out = _newDataValue(c, Array(a0, a1, a2))
-	ElseIf isMissing(a4) Then :	out = _newDataValue(c, Array(a0, a1, a2, a3))
-	Else
-		croak(&quot;applyDC &quot; &amp; ctor.name &amp; &quot;: &quot; _
-			&amp; &quot; only up to 4 args supported - got 5&quot; _
-		)
-	End If
-	applyDC = out
-End Function
+
 
 
 Function typeOf(x As Variant)
@@ -1023,6 +1211,10 @@ Function [test_Type======================================]
 	
 	test_bootstrapTypes()
 	test_Type_hasType()
+	
+	test_Type_dot_str()
+	
+	test_Type_applyDC()
 		
 	&apos;test_Type_isDataType()
 	&apos;test_Type_TypeCtor()
@@ -1581,7 +1773,7 @@ Function bootstrapTypes()
 	).x
 	
 	
-	&apos; So what&apos;s the type of cDataCtor, ie what should we put it&apos;s 
+	&apos; So what&apos;s the type of cDataCtor, ie what should we put in its 
 	&apos; typeCtor field?
 	&apos; It&apos;s the very simple data type
 	&apos;   TDataCtor = DataCtor Str (List TypeExpr)
@@ -1831,7 +2023,7 @@ Function bootstrapTypes()
 	))
 	&apos; There we have left empty the argTypes field, again because we
 	&apos; a List itself there. But we already filled in the type ctor:
-	assertEqual(DataValue_same(field(DataCtor_typeCtor, cCons), tcList), True).x
+	assert_same(field(DataCtor_typeCtor, cCons), tcList).x
 	
 	&apos; With those two data ctors we can now make List values.
 	&apos; We already made one from cNil : vNil. It represents the 
@@ -1907,6 +2099,7 @@ Function bootstrapTypes()
 	vParam = _newDataValue(cParam, Array(0))
 	assertEqual(DataValue_toString(vParam), _
 		&quot;(Type.TypeParam 0)&quot;).x
+	vParam.str = &quot;a0&quot;
 	
 	Dim cApp As DataValue
 	cApp = _newDataValue(cDataCtor, Array( _
@@ -1927,6 +2120,7 @@ Function bootstrapTypes()
 	vApp = _newDataValue(cApp, Array(tcList, vParam))
 	assertEqual(DataValue_toString(vApp), _
 		&quot;(Type.TypeApp (TDataTypeCtor.DataTypeCtor &apos;List&apos; 1 [Nil, Cons]) (Type.TypeParam 0))&quot;).x
+	vApp.str = &quot;List &quot; &amp; vParam.str
 	
 	&apos; With vParam and vApp we can fix the argTypes List of cCons:
 	argTypes = _
@@ -2312,14 +2506,16 @@ Function test_Type_hasType
 
 	assertThrows(hasType, Array(TDataCtor, DataCtor)).x
 	
-	assertEqual(hasType(             List_nil,			TList), True).x
-	assertEqual(hasType(List_cons(1, List_nil),			TList), True).x
+	assertEqual(hasType(             List_nil,	TList),		True).x
+	assertEqual(hasType(List_cons(1, List_nil),	TList),		True).x
+	assertEqual(hasType(List_cons,				TList),		False).x
+	assertEqual(hasType(List_cons,				TDataCtor),	True).x
 		
 	assertEqual(hasType(TString,						TType), True).x
 	assertEqual(hasType(TInteger,						TType), True).x
 	assertEqual(hasType(TypeParam(0),					TType), True).x
 	assertEqual(hasType(TypeApp(TList, TypeParam(0)),	TType), True).x
-	
+
 	&apos; NYI
 	&apos;assertEqual(hasType(3, TypeParam(0)), True).x
 	&apos; NYI
@@ -2373,10 +2569,114 @@ Function test_Type_hasType
 	assertEqual(hasType(List_nil,		TInteger),	False).x
 	assertEqual(hasType(List_cons,		TInteger),	False).x
 
+	&apos; depending on isSubtypeOf
+	
+	&apos;assertEqual(hasType(TDataCtor,		TType), True).x
+	&apos;assertEqual(hasType(TDataTypeCtor,	TType), True).x
+	&apos;assertEqual(hasType(TList,			TType), True).x
+	&apos;assertEqual(hasType(TType,			TType), True).x
 
-	&apos;assertEqual(hasType(), True).x
+	&apos;assertEqual(isSubTypeOf(TDataCtor,		TType), False).x
+	&apos;assertEqual(isSubTypeOf(TDataTypeCtor,	TType), True).x
+	&apos;assertEqual(isSubTypeOf(TList,			TType), False).x
+	&apos;assertEqual(isSubTypeOf(TString,		TType), True).x
+	&apos;assertEqual(isSubTypeOf(TInteger,		TType), True).x
 
+	&apos;assertEqual(hasType(DataCtor,				TType), False).x
+	&apos;assertEqual(hasType(DataTypeCtor,			TType), False).x
+	&apos;assertEqual(hasType(List_nil,				TType), False).x
+	&apos;assertEqual(hasType(List_cons(1, List_nil),	TType),	False).x
+	&apos;assertEqual(hasType(List_cons,				TType),	False).x
+	
 End Function
+
+Function test_Type_dot_str()
+	assertEqual(TDataTypeCtor.str,	&quot;TDataTypeCtor&quot;).x
+	assertEqual(TDataCtor.str,		&quot;TDataCtor&quot;).x
+	assertEqual(TType.str, 			&quot;Type&quot;).x
+	assertEqual(TList.str,			&quot;List&quot;).x
+
+	assertEqual(DataTypeCtor.str,	&quot;TDataTypeCtor.DataTypeCtor&quot;).x
+	assertEqual(DataCtor.str,		&quot;TDataCtor.DataCtor&quot;).x
+	
+	Dim vNil, vStr, vInt
+	Dim cNil, cStr, cInt
+	vNil = List_nil
+	cNil = ctorOf(vNil)
+	assertEqual(vNil.str,		&quot;[]&quot;).x
+	assertEqual(cNil.str,		&quot;List.Nil&quot;).x
+	assertEqual(List_cons.str,	&quot;List.Cons&quot;).x
+	
+	vStr = TString  : cStr = ctorOf(vStr)
+	vInt = TInteger : cInt = ctorOf(vInt)
+	assertEqual(vStr.str,	&quot;Str&quot;).x
+	assertEqual(vInt.str,	&quot;Int&quot;).x
+	assertEqual(cStr.str,	&quot;Type.String&quot;).x
+	assertEqual(cInt.str,	&quot;Type.Integer&quot;).x
+	
+	assertEqual(TypeParam.str,		&quot;Type.TypeParam&quot;).x
+	assertEqual(TypeParam(0).str,	&quot;a0&quot;).x
+	assertEqual(TypeParam(1).str,	&quot;a1&quot;).x
+	assertEqual(TypeParam(2).str,	&quot;a2&quot;).x
+	
+	assertEqual(TypeApp.str,						&quot;Type.TypeApp&quot;).x
+	assertEqual(TypeApp(TList, TypeParam(0)).str,	&quot;List a0&quot;).x
+	assertEqual(TypeApp(TList, TString).str,		&quot;List Str&quot;).x
+	assertEqual(TypeApp(TList, TInteger).str,		&quot;List Int&quot;).x
+	assertEqual(TypeApp(TList, TType).str,			&quot;List Type&quot;).x
+
+	Dim t : t = TypeApp(TList, TypeApp(TList, TString))
+	assertEqual(t.str,	&quot;List (List Str)&quot;).x
+	
+End Function
+
+Function test_Type_applyDC()
+	Dim a
+	a = applyDC(TypeParam, 0)
+	assertEqual(hasType(a, TType), True).x
+	
+	a = applyDC(TypeParam)
+	assertEqual(isFn(a), True).x
+	
+	a = apply(applyDC(TypeParam), 0)
+	assertEqual(hasType(a, TType), True).x
+	
+	a = applyDC(TypeApp, TList)
+	assertEqual(isFn(a), True).x
+	a = apply(a, TypeParam(0))
+	assertEqual(hasType(a, TType), True).x
+	
+	a = applyDC(List_cons, 42)
+	assertEqual(isFn(a), True).x
+	assertEqual(TList_equ(apply(a, List_nil), List(42)), True).x
+	
+	a = applyDC(List_cons, 42, List_nil)
+	assertEqual(TList_equ(a, List(42)), True).x
+	
+	a = applyDC(List_cons)
+	assertEqual(isFn(a), True).x
+	a = apply(a, 4711)
+	assertEqual(isFn(a), True).x
+	a = apply(a, List_nil)
+	assertEqual(TList_equ(a, List(4711)), True).x
+	
+	Dim tc, cFoo, cBar
+	tc = applyDC(DataTypeCtor, &quot;TFoo&quot;, 0, nil)
+	cFoo = mkDataCtor(tc, &quot;Foo&quot;, emptyArray)
+	cBar = mkDataCtor(tc, &quot;Bar&quot;, emptyArray)
+	show(cBar.str, DataValue_toString(cBar))
+	a = applyDC(cFoo)
+	show(a.str, DataValue_toString(a))
+	
+	assert_same(applyDC(cFoo), a).x
+	refute_same(applyDC(cBar), a).x
+	a = applyDC(cBar)
+	assert_same(applyDC(cBar), a).x
+	
+End Function
+
+&apos; ##############################################
+
 
 Function asdf
 	&apos; But before we go on to make one, let&apos;s make things a bit more 
@@ -2436,15 +2736,9 @@ Function asdf
 		End Select
 	Next i
 	assertEqual(what, &quot;aFoo aBar aFoo &quot;).x
-	
 
 		
 End Function
-
-
-
-&apos; ##############################################
-
 
 Function test_Type_TypeCtor()
 	Dim tc0, tc1

@@ -229,13 +229,17 @@ Function equ(Optional a As Variant, Optional b As Variant)
 				Case Else
 					If isObject(a) Then	&apos;they are instances of the same custom type (with non-empty.tyname)
 						&apos; ATTENTION: do NOT access .tyname directly!
-						Dim tyName As String
+						Dim tyName As String, equFn As Object
 						If isDataValue(a) Then
 							tyName = &quot;T&quot; &amp; typeCtorName(ctorOf(a))
 						Else
 							tyName = _tyname(a)
 						End If
-						result = apply(tyName &amp; &quot;_equ&quot;, a, b)
+						equFn = lookupFn(tyName &amp; &quot;_equ&quot;)
+						If isEmpty(equFn) Then
+							croak(&quot;equ: cannot compare values of type &quot; &amp; ta)
+						End If
+						result = apply(equFn, a, b)
 					ElseIf isArray(a) Then
 						croak(&quot;equ: NYI - comparing arrays&quot;)
 					Else

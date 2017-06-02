@@ -4,13 +4,11 @@
 Option Explicit
 
 Type TTestPass
-	n As Integer
 	isFail As Boolean	
 	x As String
 End Type
 
 Type TTestFail
-	n As Integer
 	isFail As Boolean	
 	actual As Variant
 	expected As Variant
@@ -52,23 +50,25 @@ JustSomething:
 End Function
 
 Function mkFail(actual As Variant, expected As Variant, msg As String)
-	Dim result As Object
-	Set result = new TTestFail
-	result.isFail = True
-	result.actual = actual
-	result.expected = expected
-	result.msg = msg
+	Dim out As Object
+	Set out = new TTestFail
+	out.isFail = True
+	out.actual = actual
+	out.expected = expected
+	out.msg = msg
 	If (testLevel = 0) Then
 		MsgBox(&quot;FAIL: &quot; &amp; msg)
 	End If
-	mkFail = result
+	mkFail = out
 End Function
 
 Function mkPass()
-	Dim result As Object
-	Set result = New TTestPass
-	result.isFail = False
-	mkPass = result
+	Static out As Object
+	If isNull(out) Then
+		out = New TTestPass
+		out.isFail = False
+	End If
+	mkPass = out
 End Function
 
 Function assertThrows(vF As Variant, args As Array, Optional errNo As Integer)
@@ -497,8 +497,9 @@ End Function
 
 
 Function [test_All ============]()
-	Dim tm As Double
+	Dim tm As Double, aCount As Long
 	tm = GetSystemTicks()
+	aCount = assertionCount
 	
 	test_Common()
 	test_Array()
@@ -513,8 +514,10 @@ Function [test_All ============]()
 	[test_Expr======================================]()
 	[test_Type======================================]()
 	
+	
+	aCount = assertionCount - aCount
 	tm = (GetSystemTicks() - tm) / ticksPerSec
-	show(&quot;time for all tests: &quot;, tm)
+	show(&quot;ttl secs: &quot; &amp; tm &amp; NL &amp; &quot;ttl assertions: &quot; &amp; aCount)
 End Function
 
 
