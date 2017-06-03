@@ -11,18 +11,17 @@ End Sub
 
 &apos; --- constructors ---
 
-Function nil()
-	nil = List_nil
-End Function
-
 Function cons(Optional x, Optional xs)
-	Dim out As Variant : Static oFn As Object
+	Dim out As Variant : Static oFn As Object : Static c As Object
+	If isNull(oFn) Then
+		oFn = Fn.cons
+		c = Tp.List_Cons
+	End If
 	If isMissing(xs) Then
-		If isNull(oFn) Then : oFn = Fn.cons : End If
 		out = _apply(oFn, x, xs)
 	Else
 		If isList(xs) Then
-			out = List_cons(x, xs)
+			out = applyDC(c, x, xs)
 		Else
 			croak(&quot;cons: invalid tail - expected a List but got a &quot; &amp; typeOf(xs) &amp; &quot;:&quot; &amp; NL &amp; toString(xs))
 		End If
@@ -32,11 +31,6 @@ End Function
 
 &apos; --- ctor test ---
 
-Function isNil(Optional xs)
-	If isMissing(xs) Then : isNil = Fn.isNil : Else
-		isNil = List_isNil(xs)
-	End If
-End Function
 
 &apos; --- destructors ---
 
@@ -45,7 +39,8 @@ Function car(Optional xs)
 	If isNil(xs) Then
 		croak(&quot;car: nil&quot;)
 	Else
-		car = List_car(xs)
+		&apos;car = List_car(xs)
+		car = field(0, xs)
 	End If
 End Function
 
@@ -54,13 +49,21 @@ Function cdr(Optional xs)
 	If isNil(xs) Then
 		croak(&quot;cdr: nil&quot;)
 	Else
-		cdr = List_cdr(xs)
+		&apos;cdr = List_cdr(xs)
+		cdr = field(1, xs)
 	End If
 End Function
 
-Function length(Optional xs)
+Function length(Optional ByVal xs)
 	If isMissing(xs) Then : length = Fn.length : Else
-		length = List_length(xs)
+		&apos;length = List_length(xs)
+		Dim out As Integer
+		out = 0
+		Do Until isNil(xs)
+			out = out + 1
+			xs = cdr(xs)
+		Loop
+		length = out
 	End If
 End Function
 
@@ -402,13 +405,53 @@ Function List( _
 	If Not(IsMissing(a10)) Then
 		croak(&quot;List(...): cannot handle more than 10 args&quot;)
 	End If
-	Dim out
-	If isMissing(a0) Then
-		out = nil
+	Dim out As Object : out = nil
+
+	&apos;If Not(isMissing(a0)) Then
+	&apos;	&apos; tail-call:
+	&apos;	out = cons(a0, List(a1, a2, a3, a4, a5, a6, a7, a8, a9))
+	&apos;End If
+
+	If isMissing(a4) Then
+		If isMissing(a2) Then
+			If isMissing(a0) Then
+				Goto List_end
+			ElseIf isMissing(a1) Then
+				Goto List_0
+			Else
+				Goto List_1
+			End If
+		ElseIf isMissing(a3) Then
+			Goto List_2
+		Else
+			Goto List_3
+		End If
+	ElseIf isMissing(a7) Then
+		If isMissing(a5) Then
+			Goto List_4
+		ElseIf isMissing(a6) Then
+			Goto List_5
+		Else
+			Goto List_6
+		End If
+	ElseIf isMissing(a8) Then
+		Goto List_7
+	ElseIf isMissing(a9) Then
+		Goto List_8
 	Else
-		&apos; tail-call:
-		out = cons(a0, List(a1, a2, a3, a4, a5, a6, a7, a8, a9))
+		Goto List_9
 	End If
+List_9:	out = cons(a9, out)
+List_8:	out = cons(a8, out)
+List_7:	out = cons(a7, out)
+List_6:	out = cons(a6, out)
+List_5:	out = cons(a5, out)
+List_4:	out = cons(a4, out)
+List_3:	out = cons(a3, out)
+List_2:	out = cons(a2, out)
+List_1:	out = cons(a1, out)
+List_0:	out = cons(a0, out)
+List_end:
 	List = out
 End Function
 
