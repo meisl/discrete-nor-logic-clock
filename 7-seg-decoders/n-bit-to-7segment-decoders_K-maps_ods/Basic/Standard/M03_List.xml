@@ -53,7 +53,15 @@ End Function
 &apos; --- type test ---
 
 Function isList(Optional x As Variant)
-	isList = hasType(x, TList)
+	Static oFn As Object
+	If isMissing(x) Then
+		If isNull(oFn) Then : oFn = Fn.isList : End If
+		isList = oFn
+	Else
+		Dim c As Object : c = ctorOf(x)
+		&apos;isList = hasType(x, TList)
+		isList = DataValue_same(c, Tp.List_Nil) Or DataValue_same(c, Tp.List_Cons)
+	End If
 End Function
 
 
