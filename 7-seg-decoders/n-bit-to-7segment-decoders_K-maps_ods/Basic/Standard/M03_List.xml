@@ -11,23 +11,6 @@ End Sub
 
 &apos; --- constructors ---
 
-Function cons(Optional x, Optional xs)
-	Dim out As Variant : Static oFn As Object : Static c As Object
-	If isNull(oFn) Then
-		oFn = Fn.cons
-		c = Tp.List_Cons
-	End If
-	If isMissing(xs) Then
-		out = _apply(oFn, x, xs)
-	Else
-		If isList(xs) Then
-			out = applyDC(c, x, xs)
-		Else
-			croak(&quot;cons: invalid tail - expected a List but got a &quot; &amp; typeOf(xs) &amp; &quot;:&quot; &amp; NL &amp; toString(xs))
-		End If
-	End If
-	cons = out
-End Function
 
 &apos; --- ctor test ---
 
