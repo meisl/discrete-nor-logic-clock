@@ -71,28 +71,28 @@ Function test_getBounds()
 	Dim typeName_List : typeName_List = &quot;Data/List&quot;
 	Dim bs As Variant
 	bs = getBounds(Array())
-	assertEqual(typeOf(bs), typeName_List).x
+	assertEqual(typeStr(bs), typeName_List).x
 	assertEqual(toString(bs), &quot;[[0, -1, 0]]&quot;).x
 
 	bs = getBounds(Array(1))
-	assertEqual(typeOf(bs), typeName_List).x
+	assertEqual(typeStr(bs), typeName_List).x
 	assertEqual(toString(bs), &quot;[[0, 0, 1]]&quot;).x
 
 	bs = getBounds(Array(1, 2, 3))
-	assertEqual(typeOf(bs), typeName_List).x
+	assertEqual(typeStr(bs), typeName_List).x
 	assertEqual(toString(bs), &quot;[[0, 2, 3]]&quot;).x
 
 	bs = getBounds(Array(1, Array(2, 3)))
-	assertEqual(typeOf(bs), typeName_List).x
+	assertEqual(typeStr(bs), typeName_List).x
 	assertEqual(toString(bs), &quot;[[0, 1, 2]]&quot;).x
 
 	bs = getBounds(DimArray(1, 2, 3))
-	assertEqual(typeOf(bs), typeName_List).x
+	assertEqual(typeStr(bs), typeName_List).x
 	assertEqual(toString(bs), &quot;[[0, 1, 2], [0, 2, 3], [0, 3, 4]]&quot;).x
 
 	Dim a(1 To 5, -7 To 2)
 	bs = getBounds(a)
-	assertEqual(typeOf(bs), typeName_List).x
+	assertEqual(typeStr(bs), typeName_List).x
 	assertEqual(toString(bs), &quot;[[1, 5, 5], [-7, 2, 10]]&quot;).x
 End Function
 
@@ -100,24 +100,24 @@ Function test_getSizes()
 	Dim typeName_List : typeName_List = &quot;Data/List&quot;
 	Dim bs As Variant
 	bs = getSizes(Array())
-	assertEqual(typeOf(bs), typeName_List).x
+	assertEqual(typeStr(bs), typeName_List).x
 	assertEqual(toString(bs), &quot;[0]&quot;).x
 
 	bs = getSizes(Array(1, 2, 3))
-	assertEqual(typeOf(bs), typeName_List).x
+	assertEqual(typeStr(bs), typeName_List).x
 	assertEqual(toString(bs), &quot;[3]&quot;).x
 
 	bs = getSizes(Array(1, Array(2, 3)))
-	assertEqual(typeOf(bs), typeName_List).x
+	assertEqual(typeStr(bs), typeName_List).x
 	assertEqual(toString(bs), &quot;[2]&quot;).x
 
 	bs = getSizes(DimArray(1, 2, 3))
-	assertEqual(typeOf(bs), typeName_List).x
+	assertEqual(typeStr(bs), typeName_List).x
 	assertEqual(toString(bs), &quot;[2, 3, 4]&quot;).x
 
 	Dim a(1 To 5, -7 To 2)
 	bs = getSizes(a)
-	assertEqual(typeOf(bs), typeName_List).x
+	assertEqual(typeStr(bs), typeName_List).x
 	assert_toString_equals(bs, List(5, 10)).x
 End Function
 

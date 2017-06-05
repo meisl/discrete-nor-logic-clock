@@ -208,8 +208,8 @@ Function equ(Optional a As Variant, Optional b As Variant)
 		result = False
 	Else
 		Dim ta As String, tb As String, tmp As String
-		ta = typeOf(a)
-		tb = typeOf(b)
+		ta = typeStr(a)
+		tb = typeStr(b)
 		If (ta &lt;&gt; tb) Then
 			If (isNull(a) And startsWith(tb, ta)) Or (isNull(b) And startsWith(ta, tb)) Then
 				result = False
@@ -254,7 +254,7 @@ End Function
 Function toString(ByVal v As Variant) As String
 	Dim result As String
 	Dim tp As String
-	tp = typeOf(v)
+	tp = typeStr(v)
 	Select Case tp
 		Case &quot;String&quot;
 			Dim t As String
@@ -315,7 +315,7 @@ End Function
 
 Function readHex(arg As Variant) As Long
 	Dim result As Long, t As String
-	t = typeOf(arg)
+	t = typeStr(arg)
 	Select Case t
 		Case &quot;Array&quot;
 			result = readHex(Join(arg))
@@ -635,7 +635,7 @@ Function test_swap()
 End Function
 
 Function test_add()
-	assertEqual(typeOf(add( 0,  0)),  &quot;Long&quot;).x
+	assertEqual(typeStr(add( 0,  0)),  &quot;Long&quot;).x
 	assertEqual(add( 0,  0),  0).x
 	assertEqual(add( 0,  1),  1).x
 	assertEqual(add( 1,  1),  2).x
@@ -895,39 +895,39 @@ Function test_equ()
 	assertEqual(equ(Nothing, Nothing), True).x
 	
 	Dim vEmpty          As Variant
-	assertEqual(typeOf(vEmpty), &quot;Empty&quot;).x
+	assertEqual(typeStr(vEmpty), &quot;Empty&quot;).x
 	
 	Dim vNothing		As Variant
 	vNothing = Nothing
-	assertEqual(typeOf(vNothing), &quot;Object&quot;).x
+	assertEqual(typeStr(vNothing), &quot;Object&quot;).x
 		
 	Dim oNothing        As Object
-	assertEqual(typeOf(oNothing), &quot;Object&quot;).x
+	assertEqual(typeStr(oNothing), &quot;Object&quot;).x
 	
 	Dim oUninitTyName   As Object
 	Set oUninitTyName = New TTest_Tyname
-	assertEqual(typeOf(oUninitTyName), &quot;Object/&quot;).x
+	assertEqual(typeStr(oUninitTyName), &quot;Object/&quot;).x
 	
 	Dim vUninitTyName As Variant
 	vUninitTyName = oUninitTyName
-	assertEqual(typeOf(vUninitTyName), &quot;Object/&quot;).x
+	assertEqual(typeStr(vUninitTyName), &quot;Object/&quot;).x
 	
 	Dim oInitTyName     As Object
 	Set oInitTyName = New TTest_Tyname
 	oInitTyName.tyname = &quot;foobar&quot;
-	assertEqual(typeOf(oInitTyName), &quot;Object/foobar&quot;).x
+	assertEqual(typeStr(oInitTyName), &quot;Object/foobar&quot;).x
 
 	Dim vInitTyName As Variant
 	vInitTyName = oInitTyName
-	assertEqual(typeOf(vInitTyName), &quot;Object/foobar&quot;).x
+	assertEqual(typeStr(vInitTyName), &quot;Object/foobar&quot;).x
 	
 	Dim oUninitNoTyName As Object
 	oUninitNoTyName = New TTest_NoTyname
-	assertEqual(typeOf(oUninitNoTyName), &quot;Object&quot;).x
+	assertEqual(typeStr(oUninitNoTyName), &quot;Object&quot;).x
 
 	Dim vUninitNoTyName As Variant
 	vUninitNoTyName = oUninitNoTyName
-	assertEqual(typeOf(vUninitNoTyName), &quot;Object&quot;).x
+	assertEqual(typeStr(vUninitNoTyName), &quot;Object&quot;).x
 	
 	&apos; Empty is comparable to anything:
 	assertEqual(equ(Empty, Empty),		True).x
@@ -1031,7 +1031,7 @@ Function test_readHex()
 	Dim aLong As Long
 	&apos;31 bit
 	aLong = 212855723
-	assertEqual(typeOf(readHex( &quot;CAFEBAB&quot;)), typeOf(aLong)).x
+	assertEqual(typeStr(readHex( &quot;CAFEBAB&quot;)), typeStr(aLong)).x
 	assertEqual(readHex( &quot;CAFEBAB&quot;), aLong).x
 	aLong = 233495534
 	assertEqual(readHex( &quot;deadbee&quot;), aLong).x

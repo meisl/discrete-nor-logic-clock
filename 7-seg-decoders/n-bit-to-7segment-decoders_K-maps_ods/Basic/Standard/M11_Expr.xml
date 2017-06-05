@@ -43,7 +43,7 @@ Function isExpr(Optional x As Variant)
 	If isMissing(x) Then
 		out = oFn
 	Else
-		out = (typeOf(x) = &quot;Object/&quot; &amp; TExpr_tyname)
+		out = (typeStr(x) = &quot;Object/&quot; &amp; TExpr_tyname)
 	End If
 	isExpr = out
 End Function
@@ -57,7 +57,7 @@ Function TExpr_same(Optional x As Object, Optional y As Object)
 		If isExpr(x) And isExpr(y) Then
 			out = (x.id = y.id)
 		Else
-			croak(&quot;TExpr_same: invalid types &quot; &amp; typeOf(x) &amp; &quot;, &quot; &amp; typeOf(y))
+			croak(&quot;TExpr_same: invalid types &quot; &amp; typeStr(x) &amp; &quot;, &quot; &amp; typeStr(y))
 		End If
 	End If
 	TExpr_same = out

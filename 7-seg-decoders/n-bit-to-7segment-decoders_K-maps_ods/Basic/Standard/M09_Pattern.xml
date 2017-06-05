@@ -35,7 +35,7 @@ Function isPattern(Optional x As Variant)
 	If isMissing(x) Then
 		out = oFn
 	Else
-		out = (typeOf(x) = &quot;Object/&quot; &amp; TPattern_tyname)
+		out = (typeStr(x) = &quot;Object/&quot; &amp; TPattern_tyname)
 	End If
 	isPattern = out
 End Function

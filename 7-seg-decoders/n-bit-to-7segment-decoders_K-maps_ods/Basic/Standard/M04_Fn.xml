@@ -647,8 +647,8 @@ Function [test_Fn ===============]()
 	assertEqual(arity(eq5), 1).x
 	
 	&apos; partially applied fns also have a proper .tyname:
-	&apos; Note typeOf is the BASIC type, not the actual fn type
-	assertEqual(typeOf(eq5), typeOf(fId)).x
+	&apos; Note typeStr is the BASIC type, not the actual fn type
+	assertEqual(typeStr(eq5), typeStr(fId)).x
 	
 	Dim eq5_7 As Variant
 	eq5_7 = apply1(eq5, 7)

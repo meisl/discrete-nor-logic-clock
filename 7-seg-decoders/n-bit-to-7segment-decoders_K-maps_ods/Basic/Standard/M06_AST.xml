@@ -30,7 +30,7 @@ Function dtOpt_promoteSingleTerminal()  : dtOpt_promoteSingleTerminal  = 8 : End
 
 
 Function isASN(x As Variant) As Boolean
-	isASN = (typeOf(x) = &quot;Object/&quot; &amp; TASN_tyname)
+	isASN = (typeStr(x) = &quot;Object/&quot; &amp; TASN_tyname)
 End Function
 
 Function TASN_dot( _
@@ -80,7 +80,7 @@ Function mkASN( _
 		result.tyname = &quot;TASN&quot;
 		result.label = label
 		result.value = value
-		If Not(typeOf(children) = typeOf(nil)) Then
+		If Not(typeStr(children) = typeStr(nil)) Then
 			croak(&quot;mkASN: invalid list of children &quot; &amp; toString(children))
 		End If
 		result.children = children
@@ -780,7 +780,7 @@ Function test_AST_mkASN()
 	Dim n0 As Object
 	n0 = mkASN(&quot;foo&quot;, &quot;bar&quot;, nil)
 	
-	assertEqual(typeOf(n0), &quot;Object/TASN&quot;).x
+	assertEqual(typeStr(n0), &quot;Object/TASN&quot;).x
 	assertEqual(length(asnChildren(n0)), 0).x
 	assertEqual(asnChildCount(n0), 0).x
 	assertEqual(asnIsLeaf(n0), True).x

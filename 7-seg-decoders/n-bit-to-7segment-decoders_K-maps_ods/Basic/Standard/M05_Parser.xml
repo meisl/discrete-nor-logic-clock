@@ -59,7 +59,7 @@ End Sub
 &apos;==================================================================
 
 Function isParser(x As Variant)
-	isParser = (typeOf(x) = typeOf(pFail))
+	isParser = (typeStr(x) = typeStr(pFail))
 End Function
 
 
@@ -322,7 +322,7 @@ End Function
 
 Function isParseFailure(parseResult) As Boolean
 	isParseFailure = isEmpty(parseResult)
-&apos;	If typeOf(parseResult) &lt;&gt; typeOf(parseFailure) Then
+&apos;	If typeStr(parseResult) &lt;&gt; typeStr(parseFailure) Then
 &apos;		isParseFailure = False
 &apos;	Else
 &apos;		isParseFailure = equ(parseResult, parseFailure)
@@ -1742,8 +1742,8 @@ Function assert_parses(p As Parser, ByVal ss As Variant, expVal As Variant, expP
 		actual = applyP(p, ss(i), 1)
 		actVal = actual(0)
 		actPos = actual(1)
-		actTyp = typeOf(actVal)
-		expTyp = typeOf(expVal)
+		actTyp = typeStr(actVal)
+		expTyp = typeStr(expVal)
 		actStr = toString(actVal)
 		expStr = toString(expVal)
 		

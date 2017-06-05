@@ -327,7 +327,7 @@ Function adjoin(Optional xs, Optional ys)
 		If isList(ys) Then
 			adjoin = foldr(cons, ys, xs)
 		Else
-			croak(&quot;adjoin: expected List as 2nd arg - got &quot; &amp; typeOf(ys) _
+			croak(&quot;adjoin: expected List as 2nd arg - got &quot; &amp; typeStr(ys) _
 				&amp; NL &amp; toString(ys))
 		End If
 	End If
@@ -476,7 +476,7 @@ Function [test_List ===============]()
 	test_List_isList()
 	test_List_isNil_and_cons()
 	test_List_length()
-	test_List_typeOf()
+	test_List_typeStr()
 	test_List_TList_toString()
 	test_List_polymorphic_toString()
 	test_List_List()
@@ -562,12 +562,12 @@ Function test_List_length()
 	assertEqual(apply(length,	cons(0, 	cons(0, nil))), 2).x
 End Function
 
-Function test_List_typeOf()
-	assertEqual(typeOf(nil), &quot;Data/List&quot;).x
+Function test_List_typeStr()
+	assertEqual(typeStr(nil), &quot;Data/List&quot;).x
 	
 	Dim lst
 	lst = cons(5, nil)
-	assertEqual(typeOf(lst), &quot;Data/List&quot;).x
+	assertEqual(typeStr(lst), &quot;Data/List&quot;).x
 End Function
 
 Function test_List_TList_toString()

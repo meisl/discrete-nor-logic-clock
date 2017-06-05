@@ -387,7 +387,7 @@ _vtXX: &apos; vt =1, =6, &gt;17 and not Array
 _ctorOf_error:
 	On Local Error Goto 0 &apos; disable error handler
 	croak(&quot;ctorOf: object with invalid .ctor :: &quot; _
-	    &amp; typeOf(out) &amp; NL &amp; toString(out))
+	    &amp; typeStr(out) &amp; NL &amp; toString(out))
 End Function
 
 Function isCtorOf(c As Object, v As Variant)
@@ -632,7 +632,7 @@ Function cons(Optional x, Optional xs)
 		If isList(xs) Then
 			out = applyDC(c, x, xs)
 		Else
-			croak(&quot;cons: invalid tail - expected a List but got a &quot; &amp; typeOf(xs) &amp; &quot;:&quot; &amp; NL &amp; toString(xs))
+			croak(&quot;cons: invalid tail - expected a List but got a &quot; &amp; typeStr(xs) &amp; &quot;:&quot; &amp; NL &amp; toString(xs))
 		End If
 	End If
 	cons = out
@@ -1251,7 +1251,7 @@ Function applyTC(tc As TypeCtor, typeArgs As Array) As DataType
 				End If
 			Else
 				croak(&quot;applyTc: invalid type arg &quot; _
-					&amp; &quot;- expected a Type, not &quot; &amp; typeOf(a) _
+					&amp; &quot;- expected a Type, not &quot; &amp; typeStr(a) _
 					&amp; &quot;: &quot; &amp; NL &amp; toString(a) _
 				)
 			End If
@@ -1309,8 +1309,8 @@ Function Type_equ(a As Object, b As Object)
 		&apos;ElseIf ... &apos;TODO: Type_equ for other Types
 		End If
 	Else
-		croak(&quot;Type_equ: cannot compare &quot; &amp; typeOf(a) _
-			&amp; &quot; and &quot; &amp; typeOf(b))
+		croak(&quot;Type_equ: cannot compare &quot; &amp; typeStr(a) _
+			&amp; &quot; and &quot; &amp; typeStr(b))
 	End If
 	Type_equ = out
 End Function
@@ -1323,7 +1323,7 @@ End Function
 
 
 
-Function typeOf(x As Variant)
+Function typeStr(x As Variant)
 	Dim out As String, c As Object, tc As Object
 	c = ctorOf(x)
 	If DataValue_same(ctorOf(c), Tp.Native) Then
@@ -1333,7 +1333,7 @@ Function typeOf(x As Variant)
 		&apos; They cannot be &quot;applied&quot; to construct values.
 		&apos; They do however contain x&apos;s TypeName, VarType and short_name.
 		If DataValue_same(c, Tp.Native_Object) Then &apos; x is not a DataValue
-			out = _typeOf(x)
+			out = _typeStr(x)
 		Else
 			out = field(Ntv_typeName, c)
 		End If
@@ -1341,16 +1341,16 @@ Function typeOf(x As Variant)
 		tc = typeCtorOf(c)
 		out = &quot;Data/&quot; &amp; field(DataTypeCtor_name, tc)
 	End If
-	typeOf = out
+	typeStr = out
 End Function
 
-Function _typeOf(o As Object)
+Function _typeStr(o As Object)
 	Dim out As String
 	out = &quot;Object&quot;
-	On Local Error Goto _typeOf_end
+	On Local Error Goto _typeStr_end
 	out = out &amp; &quot;/&quot; &amp; _tyname(o)
-_typeOf_end:
-	_typeOf = out
+_typeStr_end:
+	_typeStr = out
 End Function
 
 Function _tyname(o As Object)
@@ -1364,14 +1364,14 @@ Function isString(Optional x As Variant)
 	If isMissing(x) Then
 		isString = Fn.isString
 	Else
-		isString = (typeOf(x) = typeOf(&quot;&quot;))
+		isString = (typeStr(x) = typeStr(&quot;&quot;))
 	End If
 End Function
 
 Function isInteger(Optional x As Variant)
 	Dim out As Variant
 	If isMissing(x) Then : out = Fn.isInteger
-	Else 				 : out = (typeOf(x) = typeOf(0))
+	Else 				 : out = (typeStr(x) = typeStr(0))
 	End If
 	isInteger = out
 End Function
@@ -1384,7 +1384,7 @@ Function [test_Type======================================]
 	test_Type_DataValue()
 	test_Type_ctorOf()
 	
-	&apos;test_Type_typeOf()
+	&apos;test_Type_typeStr()
 	test_Type_isObject()
 	test_Type_isString()
 	test_Type_isInteger()
@@ -1491,61 +1491,61 @@ End Function
 &apos; actual tests
 &apos; ----------------------------------------------------
 
-Function test_Type_typeOf()
-	assertEqual(typeOf(0), &quot;Integer&quot;).x
-	assertEqual(typeOf(1), &quot;Integer&quot;).x
-	assertEqual(typeOf(-42), &quot;Integer&quot;).x
+Function test_Type_typeStr()
+	assertEqual(typeStr(0), &quot;Integer&quot;).x
+	assertEqual(typeStr(1), &quot;Integer&quot;).x
+	assertEqual(typeStr(-42), &quot;Integer&quot;).x
 	
-	assertEqual(typeOf(&quot;&quot;), &quot;String&quot;).x
-	assertEqual(typeOf(&quot;1&quot;), &quot;String&quot;).x
+	assertEqual(typeStr(&quot;&quot;), &quot;String&quot;).x
+	assertEqual(typeStr(&quot;1&quot;), &quot;String&quot;).x
 	
-	assertEqual(typeOf(3.14), &quot;Double&quot;).x
+	assertEqual(typeStr(3.14), &quot;Double&quot;).x
 
-	assertEqual(typeOf(Array()), &quot;Array&quot;).x
+	assertEqual(typeStr(Array()), &quot;Array&quot;).x
 
-	assertEqual(typeOf(Empty), &quot;Empty&quot;).x
-	assertEqual(typeOf(Nothing), &quot;Object&quot;).x
+	assertEqual(typeStr(Empty), &quot;Empty&quot;).x
+	assertEqual(typeStr(Nothing), &quot;Object&quot;).x
 
 
 	Dim t1 As New TTest_NoTyName
-	assertEqual(typeOf(t1), &quot;Object&quot;).x
+	assertEqual(typeStr(t1), &quot;Object&quot;).x
 
 	Dim t2 As New TTest_TyName
 	t2.tyname = &quot;foobar&quot;
-	assertEqual(typeOf(t2), &quot;Object/foobar&quot;).x
+	assertEqual(typeStr(t2), &quot;Object/foobar&quot;).x
 	
 	Dim a
 	a = Tp.DataCtor	&apos; the data ctor
-	assertEqual(typeOf(a), &quot;Data/TDataCtor&quot;).x
+	assertEqual(typeStr(a), &quot;Data/TDataCtor&quot;).x
 	a = applyDC(DataCtor)	&apos; fn that applies the data ctor
-	assertEqual(typeOf(a), &quot;Object/TFn&quot;).x
+	assertEqual(typeStr(a), &quot;Object/TFn&quot;).x
 	a = TDataCtor
-	assertEqual(typeOf(a), &quot;Data/TDataTypeCtor&quot;).x
+	assertEqual(typeStr(a), &quot;Data/TDataTypeCtor&quot;).x
 	a = TDataTypeCtor
-	assertEqual(typeOf(a), &quot;Data/TDataTypeCtor&quot;).x
+	assertEqual(typeStr(a), &quot;Data/TDataTypeCtor&quot;).x
 	a = Tp.DataTypeCtor	&apos; the data ctor
-	assertEqual(typeOf(a), &quot;Data/TDataCtor&quot;).x
+	assertEqual(typeStr(a), &quot;Data/TDataCtor&quot;).x
 	a = applyDC(DataTypeCtor)	&apos; the fn that applies the data ctor
-	assertEqual(typeOf(a), &quot;Object/TFn&quot;).x
+	assertEqual(typeStr(a), &quot;Object/TFn&quot;).x
 	
 	a = TList	&apos; the data type ctor
-	assertEqual(typeOf(a), &quot;Data/TDataTypeCtor&quot;).x
+	assertEqual(typeStr(a), &quot;Data/TDataTypeCtor&quot;).x
 	a = Tp.List	&apos; the data type ctor
-	assertEqual(typeOf(a), &quot;Data/TDataTypeCtor&quot;).x
+	assertEqual(typeStr(a), &quot;Data/TDataTypeCtor&quot;).x
 	a = TList	&apos; the data type ctor
-	assertEqual(typeOf(a), &quot;Data/TDataTypeCtor&quot;).x
+	assertEqual(typeStr(a), &quot;Data/TDataTypeCtor&quot;).x
 	a = TList(Tp.TType_Int)	&apos; the applied data type ctor
-	assertEqual(typeOf(a), &quot;Data/[Int]&quot;).x
+	assertEqual(typeStr(a), &quot;Data/[Int]&quot;).x
 	
 	a = Tp.List_Nil	&apos; the data ctor
-	assertEqual(typeOf(a), &quot;Data/TDataCtor&quot;).x
+	assertEqual(typeStr(a), &quot;Data/TDataCtor&quot;).x
 	a = nil	&apos; returns the singleton *value*
-	assertEqual(typeOf(a), &quot;Data/[a0]&quot;).x
+	assertEqual(typeStr(a), &quot;Data/[a0]&quot;).x
 	
 	a = Tp.List_Cons	&apos; the data ctor
-	assertEqual(typeOf(a), &quot;Data/TDataCtor&quot;).x
+	assertEqual(typeStr(a), &quot;Data/TDataCtor&quot;).x
 	a = cons(nil, nil)	&apos; a cons value
-	assertEqual(typeOf(a), &quot;Data/[[a0]]&quot;).x
+	assertEqual(typeStr(a), &quot;Data/[[a0]]&quot;).x
 	
 End Function
 
@@ -2871,11 +2871,11 @@ Function test_Type_hasType
 	&apos;assertEqual(hasType(TList,			TType), True).x
 	&apos;assertEqual(hasType(TType,			TType), True).x
 
-	&apos;assertEqual(isSubTypeOf(TDataCtor,		TType), False).x
-	&apos;assertEqual(isSubTypeOf(TDataTypeCtor,	TType), True).x
-	&apos;assertEqual(isSubTypeOf(TList,			TType), False).x
-	&apos;assertEqual(isSubTypeOf(TString,		TType), True).x
-	&apos;assertEqual(isSubTypeOf(TInteger,		TType), True).x
+	&apos;assertEqual(isSubtypeOf(TDataCtor,		TType), False).x
+	&apos;assertEqual(isSubtypeOf(TDataTypeCtor,	TType), True).x
+	&apos;assertEqual(isSubtypeOf(TList,			TType), False).x
+	&apos;assertEqual(isSubtypeOf(TString,		TType), True).x
+	&apos;assertEqual(isSubtypeOf(TInteger,		TType), True).x
 
 	assertEqual(hasType(DataCtor,				TType), False).x
 	&apos;assertEqual(hasType(DataTypeCtor,			TType), False).x
@@ -3020,21 +3020,21 @@ Function asdf
 	x = _mkValueFrom_lax(cFoo, Array())
 	y = _mkValueFrom_lax(cBar, Array())
 	z = _mkValueFrom_lax(cFoo, Array())
-	&apos; the function istypeOf takes a type and a value, and tests
+	&apos; the function isTypeOf takes a type and a value, and tests
 	&apos; whether the value has the given type:
-	assertEqual(istypeOf(tcFooOrBar, x), True).x
-	assertEqual(istypeOf(tcFooOrBar, y), True).x
-	assertEqual(istypeOf(tcFooOrBar, z), True).x
+	assertEqual(isTypeOf(tcFooOrBar, x), True).x
+	assertEqual(isTypeOf(tcFooOrBar, y), True).x
+	assertEqual(isTypeOf(tcFooOrBar, z), True).x
 	&apos; But of course, FooOrBar itself is NOT a FooOrBar
-	assertEqual(istypeOf(tcFooOrBar, tcFooOrBar), False).x
+	assertEqual(isTypeOf(tcFooOrBar, tcFooOrBar), False).x
 	&apos; Rather it is a TDataTypeCtor
-	assertEqual(istypeOf(tcDataTypeCtor, tcFooOrBar), True).x
+	assertEqual(isTypeOf(tcDataTypeCtor, tcFooOrBar), True).x
 	&apos; Similarly, neither cFoo nor cBar are FooBar s:
-	assertEqual(istypeOf(tcFooOrBar, cFoo), False).x
-	assertEqual(istypeOf(tcFooOrBar, cBar), False).x
+	assertEqual(isTypeOf(tcFooOrBar, cFoo), False).x
+	assertEqual(isTypeOf(tcFooOrBar, cBar), False).x
 	&apos; They&apos;re data constructors:
-	assertEqual(istypeOf(tcDataCtor, cFoo), True).x
-	assertEqual(istypeOf(tcDataCtor, cBar), True).x
+	assertEqual(isTypeOf(tcDataCtor, cFoo), True).x
+	assertEqual(isTypeOf(tcDataCtor, cBar), True).x
 	
 	&apos; We can also dispatch on the values&apos; ctors (names).
 	&apos; Since extracting the ctor&apos;s name will be common, we&apos;ll
