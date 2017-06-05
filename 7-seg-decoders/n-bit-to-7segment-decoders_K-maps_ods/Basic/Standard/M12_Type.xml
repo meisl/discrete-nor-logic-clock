@@ -22,8 +22,10 @@ Type Tp
 	List_Nil		As Object
 	List_Cons		As Object
 	
+	TNative			As Object
+	Native			As Object
+	
 	TType			As Object
-	TType_Ntv		As Object
 	TType_Param		As Object
 	TType_App		As Object
 	
@@ -125,18 +127,18 @@ Function Tp() &apos; bootstrap TType and data types
 		tcList.ctor			= cDataTypeCtor
 		out.DataTypeCtor = cDataTypeCtor
 		
-		&apos; Now we need types to fix up argType fields
+		&apos; Now we need types to fix up the argTypes fields
 		
-		Dim tcType
-		tcType = _mkDataTypeCtor(&quot;Type&quot;, 0)
-		out.TType = tcType
+		Dim tcNative
+		tcNative =  _mkDataTypeCtor(&quot;TNative&quot;, 0)
+		out.TNative = tcNative
 		
-		Dim cNtv &apos; data ctor of TType for native types
-				 &apos; later: argTypes = [Ntv Str, Ntv Str, Ntv Int]
-		cNtv = _mkDataCtor(tcType, &quot;Ntv&quot;, vNil)
-		out.TType_Ntv = cNtv
+		Dim cNtv &apos; data ctor of TNative for native types
+				 &apos; later: its argTypes = [Native Str, Native Str, Native Int]
+		cNtv = _mkDataCtor(tcNative, &quot;Native&quot;, vNil)
+		out.Native = cNtv
 		
-		&apos; make Type.Ntv instances:
+		&apos; make Native instances:
 		
 		Dim nStr
 		nStr = _newDataValue(cNtv, Array( _
@@ -159,6 +161,11 @@ Function Tp() &apos; bootstrap TType and data types
 		&apos; TODO: cNtv.x
 		
 		
+		
+		Dim tcType
+		tcType = _mkDataTypeCtor(&quot;Type&quot;, 0)
+		out.TType = tcType
+				
 		Dim cParam
 		cParam = _mkDataCtor(tcType, &quot;Param&quot;, _
 			_newDataValue(cCons, Array(nInt, _
@@ -200,12 +207,13 @@ Function Tp() &apos; bootstrap TType and data types
 			List(nStr, vApp, tcDataTypeCtor)
 		
 		&apos; set dataCtors fields
-		tcDataTypeCtor.fields(DataTypeCtor_dataCtors) =	List(cDataTypeCtor)
 		tcDataCtor.fields(DataTypeCtor_dataCtors) =	List(cDataCtor)
 		tcList.fields(DataTypeCtor_dataCtors) =	_
 			List(cNil, cCons)
-		tcType.fields(DataTypeCtor_dataCtors) =	_
-			List(cNtv, cParam, cApp)
+		
+		&apos;tcDataTypeCtor.fields(DataTypeCtor_dataCtors) =	List(cDataTypeCtor)
+		&apos;tcType.fields(DataTypeCtor_dataCtors) =	_
+		&apos;	List(cNtv, cParam, cApp)
 
 		out.TDataTypeCtor.str	= &quot;TDataTypeCtor&quot;
 		out.DataTypeCtor.str	= &quot;DataTypeCtor :: Str -&gt; Int -&gt; (List TDataCtor) -&gt; TDataTypeCtor&quot;
@@ -213,8 +221,11 @@ Function Tp() &apos; bootstrap TType and data types
 		out.TDataCtor.str		= &quot;TDataCtor&quot;
 		out.DataCtor.str		= &quot;DataCtor :: Str -&gt; (List Type) -&gt; TDataTypeCtor -&gt; TDataCtor&quot;
 
+		out.TNative.str			= &quot;TNative&quot;
+		out.Native.str			= &quot;Native&quot;
+
 		out.TType.str			= &quot;Type&quot;
-		out.TType_Ntv.str		= &quot;Native&quot;
+		&apos;out.TType_Ntv.str		= &quot;Native&quot;
 		out.TType_Param.str		= &quot;Param :: Int -&gt; Type&quot;
 		out.TType_App.str		= &quot;App :: Type -&gt; Type -&gt; Type&quot;
 		
@@ -223,6 +234,7 @@ Function Tp() &apos; bootstrap TType and data types
 		
 		&apos; -- more BASIC types:
 		out.Native_Boolean	= applyDC(cNtv, &quot;Bool&quot;,	 TypeName(CBool(0)), VarType(CBool(0))	)
+		out.Native_Boolean.str = &quot;Bool&quot;
 		out.Native_Byte 	= applyDC(cNtv, &quot;Byte&quot;,	 TypeName(CByte(0)), VarType(CByte(0))	)
 		out.Native_Integer	= nInt		
 		out.Native_Long 	= applyDC(cNtv, &quot;Long&quot;,	 TypeName(CLng(0)),  VarType(CLng(0))	)
@@ -424,7 +436,7 @@ Function _DataValue_genericToString( _
 	Dim cStr   As String
 	Dim fStr   As String
 	
-	If inStr(seen, v.id &amp; &quot;&quot;) &lt;&gt; 0 Then
+	If inStr(seen, &quot; &quot; &amp; v.id) &lt;&gt; 0 Then
 		out = &quot;{ id: &quot; &amp; v.id &amp; &quot; }&quot;
 	Else
 		seen = v.id &amp; &quot; &quot; &amp; seen 
@@ -932,7 +944,7 @@ Function _DataValue_toString(v As DataValue, ByRef seen As String)
 	Dim out As String
 	Dim typeStr As String, ctorStr As String
 	Dim ctor As DataValue, fields As Variant
-	If inStr(seen, v.id &amp; &quot;&quot;) &lt;&gt; 0 Then
+	If inStr(seen, &quot; &quot; &amp; v.id) &lt;&gt; 0 Then
 		out = &quot;{ id: &quot; &amp; v.id &amp; &quot; }&quot;
 	Else
 		seen = seen &amp; &quot; &quot; &amp; v.id
@@ -1009,7 +1021,7 @@ Function _DataValue_toString(v As DataValue, ByRef seen As String)
 								argsStr = argsStr &amp; &quot;, &quot;
 							End If
 							at = field(0, argTypes) &apos; &quot;car&quot;
-							argsStr = argsStr &amp; _DataValue_toString_Type(at, seen)	&apos; &lt;------ type-to-string here
+							argsStr = argsStr &amp; _DataValue_toString(at, seen)	&apos; &lt;------ type-to-string here
 							argTypes = field(1, argTypes) &apos; &quot;cdr&quot;
 						Loop
 						argsStr = argsStr &amp; &quot;]&quot; 
@@ -1021,6 +1033,8 @@ Function _DataValue_toString(v As DataValue, ByRef seen As String)
 					&apos;croak(&quot;DataValue_toString/non-array, non-dataValue argTypes: NYI&quot; &amp; NL &amp; NL &amp; toString(argTypes))
 				End If
 				argsStr = argsStr &amp; &quot; &quot; &amp; field(DataTypeCtor_name, field(DataCtor_typeCtor, v))
+			ElseIf typeStr = &quot;Type&quot; Then
+				out = _DataValue_toString_Type(v, seen)
 			Else
 				argsStr = _DataValue_toString_Array(fields, seen)
 			End If
@@ -1312,11 +1326,12 @@ End Function
 Function typeOf(x As Variant)
 	Dim out As String, c As Object, tc As Object
 	c = ctorOf(x)
-	If DataValue_same(ctorOf(c), Tp.TType_Ntv) Then
+	If DataValue_same(ctorOf(c), Tp.Native) Then
 		&apos; Special case: native values have as &quot;ctors&quot;
-		&apos; *values* of data ctor Type.Ntv. These values
-		&apos; are NOT data ctors themselves.
-		&apos; But they do contain x&apos;s TypeName, VarType and short_name
+		&apos; members of the enum TNative. They are not
+		&apos; data ctors, but rather &quot;NativeTypeCtor&quot; s.
+		&apos; They cannot be &quot;applied&quot; to construct values.
+		&apos; They do however contain x&apos;s TypeName, VarType and short_name.
 		If DataValue_same(c, Tp.Native_Object) Then &apos; x is not a DataValue
 			out = _typeOf(x)
 		Else
@@ -1408,10 +1423,10 @@ End Type
 
 
 Function test_same(x As Variant, y As Variant, exp As Boolean)
+	Dim out, lvl As Integer, msg As String
 	If Not(isDataValue(x)) Or Not(isDataValue(y)) Then
 		Goto test_same_invalid_args
 	End If
-	Dim out, lvl As Integer, msg As String
 	testLevel = testLevel + 1
 	out = assertEqual(DataValue_same(x, y), exp)
 	testLevel = testLevel - 1
@@ -1427,10 +1442,13 @@ Function test_same(x As Variant, y As Variant, exp As Boolean)
 	test_same = out
 	Exit Function
 test_same_invalid_args:
+	dim xStr : xStr = toString(x)
+	dim yStr : yStr = toString(y)
 	msg = IIf(exp, &quot;assert&quot;, &quot;refute&quot;) _
-		&amp; &quot;_same: invalid args &quot; &amp; NL &amp; toString(x) _
-		&amp; NL &amp; NL &amp; toString(y)
-	croak(msg)
+		&amp; &quot;_same: invalid args &quot; &amp; NL &amp; xStr _
+		&amp; NL &amp; NL &amp; yStr
+	&apos;croak(msg)
+	test_same = mkFail(x, y, msg)
 End Function
 
 Function assert_same(act As Variant, exp As Variant)
@@ -1722,18 +1740,18 @@ Function test_Type_ctorOf(Optional missing)
 	assertEqual(VarType(boolArray),		vtArr + 11).x
 	
 	&apos; ATTENTION cByte, cInt, ... are BASIC *keywords*!
-	Dim _Byte	 : _Byte	= Tp.TType_Byte
-	Dim _Int	 : _Int		= Tp.TType_Int
-	Dim _Lng	 : _Lng		= Tp.TType_Long
-	Dim _Sng	 : _Sng		= Tp.TType_Single
-	Dim _Dbl	 : _Dbl		= Tp.TType_Double
-	Dim _Str	 : _Str		= Tp.TType_Str
-	Dim _Bool	 : _Bool	= Tp.TType_Boolean
-	Dim _Obj 	 : _Obj		= Tp.TType_Object
-	Dim _Empty	 : _Empty	= Tp.TType_Empty
-	Dim _Date	 : _Date	= Tp.TType_Date
-	Dim _Array	 : _Array	= Tp.TType_Array
-	Dim _Variant : _Variant	= Tp.TType_Variant
+	Dim _Byte	 : _Byte	= Tp.Native_Byte
+	Dim _Int	 : _Int		= Tp.Native_Integer
+	Dim _Lng	 : _Lng		= Tp.Native_Long
+	Dim _Sng	 : _Sng		= Tp.Native_Single
+	Dim _Dbl	 : _Dbl		= Tp.Native_Double
+	Dim _Str	 : _Str		= Tp.Native_String
+	Dim _Bool	 : _Bool	= Tp.Native_Boolean
+	Dim _Obj 	 : _Obj		= Tp.Native_Object
+	Dim _Empty	 : _Empty	= Tp.Native_Empty
+	Dim _Date	 : _Date	= Tp.Native_Date
+	Dim _Array	 : _Array	= Tp.Native_Array
+	Dim _Variant : _Variant	= Tp.Native_Variant
 	
 	assert_same(ctorOf(Nothing),		_Obj).x
 	assert_same(ctorOf(Empty),			_Empty).x
@@ -2451,7 +2469,7 @@ End Function
 
 Function test_bootstrapTypes()
 	Dim tcType As Variant
-	tcType = TType
+	tcType = Tp.TType
 	assertEqual(isDataValue(tcType), True).x
 	assertEqual(fieldCount( tcType), 3).x
 	assertEqual(field(DataTypeCtor_name,  tcType), &quot;Type&quot;).x
@@ -2459,7 +2477,7 @@ Function test_bootstrapTypes()
 	&apos; field dataCtors later
 
 	Dim cDataTypeCtor As Variant
-	cDataTypeCtor = DataTypeCtor
+	cDataTypeCtor = Tp.DataTypeCtor
 	assertEqual(isDataValue(cDataTypeCtor), True).x
 	assertEqual(fieldCount( cDataTypeCtor), 3).x
 	assertEqual(field(DataTypeCtor_name, cDataTypeCtor), &quot;DataTypeCtor&quot;).x
@@ -2469,7 +2487,7 @@ Function test_bootstrapTypes()
 	refute_same(cDataTypeCtor, tcType).x
 
 	Dim tcDataTypeCtor As Variant
-	tcDataTypeCtor = TDataTypeCtor
+	tcDataTypeCtor = Tp.TDataTypeCtor
 	assertEqual(isDataValue(tcDataTypeCtor), True).x
 	assertEqual(fieldCount( tcDataTypeCtor), 3).x
 	assertEqual(field(DataTypeCtor_name, tcDataTypeCtor), &quot;TDataTypeCtor&quot;).x
@@ -2483,7 +2501,7 @@ Function test_bootstrapTypes()
 	refute_same(tcDataTypeCtor, cDataTypeCtor).x
 
 	Dim cDataCtor As Variant
-	cDataCtor = DataCtor
+	cDataCtor = Tp.DataCtor
 	assertEqual(isDataValue(cDataCtor), True).x
 	assertEqual(fieldCount( cDataCtor), 3).x
 	assertEqual(field(DataCtor_name, cDataCtor), &quot;DataCtor&quot;).x
@@ -2496,7 +2514,7 @@ Function test_bootstrapTypes()
 	refute_same(cDataCtor, tcDataTypeCtor).x
 	
 	Dim tcDataCtor As Variant
-	tcDataCtor = TDataCtor
+	tcDataCtor = Tp.TDataCtor
 	assertEqual(isDataValue(tcDataCtor), True).x
 	assertEqual(fieldCount( tcDataCtor), 3).x
 	assertEqual(field(DataTypeCtor_name,  tcDataCtor), &quot;TDataCtor&quot;).x
@@ -2513,7 +2531,7 @@ Function test_bootstrapTypes()
 	refute_same(tcDataCtor, cDataCtor).x
 	
 	Dim tcList As Variant
-	tcList = TList
+	tcList = Tp.List
 	assertEqual(isDataValue(tcList), True).x
 	assertEqual(fieldCount(tcList), 3).x
 	assertEqual(field(DataTypeCtor_name,  tcList), &quot;List&quot;).x
@@ -2688,31 +2706,29 @@ Function test_bootstrapTypes()
 	&apos;--- data ctors of TType
 
 	dataCtors = field(DataTypeCtor_dataCtors, tcType)
-	assertEqual(List_length(dataCtors), 3).x
-	Dim cNtv	: cNtv	 = Tp.TTYpe_Ntv
-	Dim cParam	: cParam = Tp.TTYpe_Param
-	Dim cApp	: cApp	 = Tp.TTYpe_App
-	assert_same(List_nth(0, dataCtors), cNtv).x
+	assertEqual(List_length(dataCtors), 2).x
+	Dim cParam	: cParam = Tp.TType_Param
+	Dim cApp	: cApp	 = Tp.TType_App
+	assert_same(List_nth(0, dataCtors), cApp).x
 	assert_same(List_nth(1, dataCtors), cParam).x
-	assert_same(List_nth(2, dataCtors), cApp).x
+	
+	assert_hasTypeCtor(cParam, 	tcType).x
+	assert_hasTypeCtor(cApp, 	tcType).x
 
+	&apos;--- native types
+	Dim nStr : nStr = Tp.Native_String
+	Dim nInt : nInt = Tp.Native_Integer
+	
+	refute_same(nStr, nInt).x
 
 	&apos;--- fix argument order for DataTypeCtor
 	Dim argTypes, at
 	argTypes = field(DataCtor_argTypes, cDataTypeCtor)
 	assertEqual(List_length(argTypes), 3).x
 	
-	at = List_nth(0, argTypes)
-	assert_hasTypeCtor(ctorOf(at), tcType).x
-	assertEqual(fieldCount(at), 0).x &apos; singleton value
-	assertEqual(ctorName(at), &quot;String&quot;).x
-	
-	at = List_nth(1, argTypes)
-	assert_hasTypeCtor(ctorOf(at), tcType).x
-	assertEqual(fieldCount(at), 0).x &apos; singleton value
-	assertEqual(ctorName(at), &quot;Integer&quot;).x
-	
-	&apos; third arg should be (App TList TDataCtor) - later
+	assert_same(List_nth(DataTypeCtor_name,			argTypes), nStr).x
+	assert_same(List_nth(DataTypeCtor_arity, 		argTypes), nInt).x
+	&apos; third argType should be (App TList TDataCtor) - later
 
 	
 	&apos;--- TType data ctor: Param (Ntv Int)
@@ -2723,7 +2739,7 @@ Function test_bootstrapTypes()
 	assertEqual(field(DataCtor_name,     cParam),  &quot;Param&quot;).x
 	argTypes =  field(DataCtor_argTypes, cParam)
 	assertEqual(List_length(argTypes), 1).x
-	assert_same(List_nth(0, argTypes), vInt).x
+	assert_same(List_nth(0, argTypes), nInt).x
 
 	&apos;--- apply data ctor Param
 	Dim vParam As Variant
@@ -2747,13 +2763,13 @@ Function test_bootstrapTypes()
 
 	&apos;--- apply data ctor App
 	Dim vApp As Variant
-	vApp = TypeApp(tcList, vInt)
+	vApp = TypeApp(tcList, nInt)
 	assertEqual(isDataValue(vApp),	True	).x
 	assertEqual( fieldCount(vApp),	2		).x
 	assert_hasCtor(         vApp,	cApp	).x	
 
 	assert_same(field(0,	vApp),	tcList).x
-	assert_same(field(1,	vApp),	vInt).x
+	assert_same(field(1,	vApp),	nInt).x
 	
 	&apos; TODO: make convenience fn TypeApp return a TFn on 0 args
 	&apos;assertThrows(TypeApp, Array(vInt, tcList))
