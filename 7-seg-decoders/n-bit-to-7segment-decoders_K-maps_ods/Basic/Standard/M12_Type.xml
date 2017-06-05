@@ -243,7 +243,7 @@ Function Tp() &apos; bootstrap TType and data types
 		out.Native_String 	= nStr
 		out.Native_Object	= applyDC(cNtv, &quot;Obj&quot;,	 TypeName(Nothing),  VarType(Nothing)	)
 		out.Native_Empty	= applyDC(cNtv, &quot;Empty&quot;, TypeName(Empty),	 VarType(Empty)		)
-		out.Native_Array	= applyDC(cNtv, &quot;Array&quot;, TypeName(Array()),  VarType(Array())	)
+		out.Native_Array	= applyDC(cNtv, &quot;Array&quot;, &quot;Array&quot;,  VarType(Array())	)
 		out.Native_Date		= applyDC(cNtv, &quot;Date&quot;,	 TypeName(Date),  	 VarType(Date)		)
 		Dim aVariant As Variant
 		out.Native_Variant	= applyDC(cNtv, &quot;Variant&quot;, TypeName(aVariant), VarType(aVariant))
@@ -1206,7 +1206,22 @@ Function _isDataType(x As DataType) As Boolean
 End Function
 
 Function isType(t As Variant)
-	isType = isDataType(t) Or False
+	Dim out
+	out = False
+	If isObject(t) Then
+		On Local Error Goto isType_end
+		Dim c : c = _ctor(t) &apos; DON&apos;t dot-access it!
+		If DataValue_same(c, Tp.DataTypeCtor) Then
+			out = True
+		ElseIf DataValue_same(c, Tp.Native) Then
+			out = True
+		ElseIf DataValue_same(_ctor(c), Tp.DataCtor) Then
+			&apos; DON&apos;t use typeCtorOf
+			out = DataValue_same(field(DataCtor_typeCtor, c), Tp.TType)
+		End If
+	End If
+isType_end:
+	isType = out
 End Function
 
 Function isArrowType(x As Variant)
@@ -1378,7 +1393,9 @@ End Function
 
 
 Function [test_Type======================================]
-	test_bootstrapTypes()	
+	test_bootstrapTypes()
+	
+	test_Type_isType()	
 	
 	test_Type_isDataValue()
 	test_Type_DataValue()
@@ -1804,18 +1821,18 @@ Function test_Type_ctorOf(Optional missing)
 	assert_same(ctorOf(Tp.TType),		Tp.DataTypeCtor).x
 	assert_same(ctorOf(Tp.TType_App),	Tp.DataCtor).x
 	assert_same(ctorOf(Tp.TType_Param),	Tp.DataCtor).x
-	assert_same(ctorOf(_Byte),			Tp.DataCtor).x
-	assert_same(ctorOf(_Int),			Tp.DataCtor).x
-	assert_same(ctorOf(_Lng),			Tp.DataCtor).x
-	assert_same(ctorOf(_Sng),			Tp.DataCtor).x
-	assert_same(ctorOf(_Dbl),			Tp.DataCtor).x
-	assert_same(ctorOf(_Str),			Tp.DataCtor).x
-	assert_same(ctorOf(_Bool),			Tp.DataCtor).x
-	assert_same(ctorOf(_Empty),			Tp.DataCtor).x
-	assert_same(ctorOf(_Obj),			Tp.DataCtor).x
-	assert_same(ctorOf(_Date),			Tp.DataCtor).x
-	assert_same(ctorOf(_Array),			Tp.DataCtor).x
-	assert_same(ctorOf(_Variant),		Tp.DataCtor).x
+	assert_same(ctorOf(_Byte),			Tp.Native).x
+	assert_same(ctorOf(_Int),			Tp.Native).x
+	assert_same(ctorOf(_Lng),			Tp.Native).x
+	assert_same(ctorOf(_Sng),			Tp.Native).x
+	assert_same(ctorOf(_Dbl),			Tp.Native).x
+	assert_same(ctorOf(_Str),			Tp.Native).x
+	assert_same(ctorOf(_Bool),			Tp.Native).x
+	assert_same(ctorOf(_Empty),			Tp.Native).x
+	assert_same(ctorOf(_Obj),			Tp.Native).x
+	assert_same(ctorOf(_Date),			Tp.Native).x
+	assert_same(ctorOf(_Array),			Tp.Native).x
+	assert_same(ctorOf(_Variant),		Tp.Native).x
 	
 	Dim _Nil  : _Nil  = Tp.List_Nil
 	Dim _Cons : _Cons = Tp.List_Cons
@@ -1829,8 +1846,6 @@ Function test_Type_ctorOf(Optional missing)
 	Dim vCons : vCons = field(DataCtor_argTypes, _Cons)
 	assert_same(ctorOf(vCons),	_Cons).x
 
-	assert_same(ctorOf(applyDC(_Str)),	_Cons).x
-	
 End Function
 
 Function bootstrapTypes()
@@ -2778,6 +2793,73 @@ Function test_bootstrapTypes()
 	&apos;--- apply data ctor DataTypeCtor
 	Dim tcUnit
 
+End Function
+
+Function test_Type_isType
+	assertEqual(isType(Tp.TDataTypeCtor),			True).x
+	assertEqual(isType(Tp.DataTypeCtor),			False).x
+	assertEqual(isType(Tp.TDataCtor),				True).x
+	assertEqual(isType(Tp.DataCtor),				False).x
+	assertEqual(isType(Tp.TNative),					True).x
+	assertEqual(isType(Tp.Native),					False).x
+	assertEqual(isType(Tp.TType),					True).x
+	assertEqual(isType(Tp.TType_Param),				False).x
+	assertEqual(isType(TypeParam(0)),				True).x
+	assertEqual(isType(Tp.TType_App),				False).x
+	assertEqual(isType(TypeApp(TList, Tp.TType)),	True).x
+	
+	assertEqual(isType(Tp.Native_Boolean),	True).x
+	assertEqual(isType(Tp.Native_Byte),		True).x
+	assertEqual(isType(Tp.Native_Integer),	True).x
+	assertEqual(isType(Tp.Native_Long),		True).x
+	assertEqual(isType(Tp.Native_Single),	True).x
+	assertEqual(isType(Tp.Native_Double),	True).x
+	assertEqual(isType(Tp.Native_String),	True).x
+
+	assertEqual(isType(Tp.Native_Object),	True).x
+	assertEqual(isType(Tp.Native_Empty),	True).x
+	assertEqual(isType(Tp.Native_Array),	True).x
+	assertEqual(isType(Tp.Native_Date),		True).x
+	assertEqual(isType(Tp.Native_Variant),	True).x
+	
+	&apos; unapplied List type ctor ??
+	&apos;assertEqual(isType(Tp.List),				True).x
+	assertEqual(isType(TList(Tp.Native_Long)),	True).x
+	assertEqual(isType(Tp.List_Nil),			False).x
+	assertEqual(isType(nil),					False).x
+	assertEqual(isType(Tp.List_Cons),			False).x
+	assertEqual(isType(cons(1, nil)),			False).x
+	assertEqual(isType(List()),					False).x
+	assertEqual(isType(List(1)),				False).x
+	assertEqual(isType(List(1, 2)),				False).x
+
+	assertEqual(isType(&quot;&quot;),				False).x
+	assertEqual(isType(&quot;a&quot;),			False).x
+	assertEqual(isType(&quot;foobar&quot;),		False).x
+	assertEqual(isType(Nothing),		False).x
+	assertEqual(isType(Empty),			False).x
+	assertEqual(isType(True),			False).x
+	assertEqual(isType(False),			False).x
+	assertEqual(isType( 0),				False).x
+	assertEqual(isType( 1),				False).x
+	assertEqual(isType(-1),				False).x
+	assertEqual(isType( 32766),			False).x &apos;0x7FFE
+	assertEqual(isType( 32767),			False).x &apos;0x7FFF
+	assertEqual(isType( 32768),			False).x &apos;0x8000 (!)
+	assertEqual(isType( 65534),			False).x &apos;0xFFFE
+	assertEqual(isType( 65535),			False).x &apos;0xFFFF
+	assertEqual(isType( 65536),			False).x &apos;0x80000
+	assertEqual(isType(-32766),			False).x &apos;0x8002
+	assertEqual(isType(-32767),			False).x &apos;0x8001
+	assertEqual(isType(-32768),			False).x &apos;0x8000
+	assertEqual(isType(-32769),			False).x &apos;0x17FFF (!)
+	assertEqual(isType(-65534),			False).x &apos;0xFFFE
+	assertEqual(isType(-65535),			False).x &apos;0xFFFF
+	assertEqual(isType(-65536),			False).x &apos;0x80000
+	assertEqual(isType(3.14),			False).x
+	assertEqual(isType(Array()),		False).x
+	assertEqual(isType(Array(42)),		False).x
+	assertEqual(isType(Array(42)),		False).x
 End Function
 
 Function test_Type_hasType

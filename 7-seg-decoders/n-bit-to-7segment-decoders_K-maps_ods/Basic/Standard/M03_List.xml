@@ -60,7 +60,9 @@ Function isList(Optional x As Variant)
 	Else
 		Dim c As Object : c = ctorOf(x)
 		&apos;isList = hasType(x, TList)
-		isList = DataValue_same(c, Tp.List_Nil) Or DataValue_same(c, Tp.List_Cons)
+		isList = CBool(DataValue_same(c, Tp.List_Nil) _
+					Or DataValue_same(c, Tp.List_Cons) _
+		)
 	End If
 End Function
 
