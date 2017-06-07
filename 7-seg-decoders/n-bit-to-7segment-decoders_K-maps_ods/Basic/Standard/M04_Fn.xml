@@ -16,6 +16,7 @@ End Type
 Type TFnObjs
 	_instances	As Object
 	
+	typeOf		As Object
 	ctorOf		As Object
 	
 	isEmpty		As Object
@@ -129,6 +130,7 @@ Function Fn
 		Dim fs As Object : fs = nil
 		out = New TFnObjs
 				
+		out.typeOf		= mkFn(fs, &quot;typeOf&quot;,		1, &quot;Any -&gt; Type&quot;)
 		out.ctorOf		= mkFn(fs, &quot;ctorOf&quot;,		1, &quot;Any -&gt; Maybe TDataCtor&quot;)
 		
 		out.isEmpty		= mkFn(fs, &quot;isEmpty&quot;,		1, &quot;Any -&gt; Bool&quot;)
@@ -418,6 +420,7 @@ Function applyLast(ByVal fn As Object, arg As Variant)
 applyLast_of_one:
 	a0 = arg
 	Select Case name
+		Case &quot;typeOf&quot;:				out = typeOf(				a0)
 		Case &quot;ctorOf&quot;:				out = ctorOf(				a0)
 		
 		Case &quot;isEmpty&quot;:				out = isEmpty(				a0)
