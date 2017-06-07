@@ -402,14 +402,14 @@ Function ctorName(v As DataValue)
 	ctorName = out
 End Function
 
-Function typeCtorOf(c)
+Function typectorOf(c)
 	&apos;require(hasType, c, TDataCtor)
 	typeCtorOf = c.fields(DataCtor_typeCtor)
 End Function
 
 Function typeCtorName(c)
 	&apos;require(hasType, c, TDataCtor)
-	typeCtorName = field(DataTypeCtor_name, typeCtorOf(c))
+	typeCtorName = field(DataTypeCtor_name, typectorOf(c))
 End Function
 
 
@@ -585,18 +585,29 @@ Function nil()
 End Function
 
 Function isNil(Optional xs)
-	Static oFn As Object, vNil As Object
+	Static oFn As Object, cNil As Object, cCons As Object
+	Dim out
 	If isNull(oFn) Then 
 		oFn = Fn.isNil
-		vNil = nil
+		cNil  = Tp.List_Nil
+		cCons = Tp.List_Cons
 	End If
 	If isMissing(xs) Then
-		isNil = oFn
-	ElseIf isList(xs) Then
-		isNil = DataValue_same(xs, nil)
+		out = oFn
 	Else
-		croak(&quot;isNil: expected a List but got &quot; &amp; NL &amp; toString(xs)
+		On Local Error Goto isNil_typeError
+		Dim c
+		c = _ctor(xs)
+		If DataValue_same(c, cCons) Then
+			out = False
+		ElseIf DataValue_same(c, cNil) Then
+			out = True
+		Else
+isNil_typeError:
+			croak(&quot;isNil: expected a List but got &quot; &amp; NL &amp; toString(xs))
+		End If
 	End If
+	isNil = out
 End Function
 
 Function List_cons(Optional x As Variant, Optional xs As Variant)
@@ -721,7 +732,7 @@ Function TypeApp(Optional tc As Object, Optional ta As Object)
 		tcCtor = ctorOf(tc)
 		If isEmpty(tcCtor) Then
 			Goto TypeApp_invalid_1st_arg
-		ElseIf DataValue_same(typeCtorOf(tcCtor), TDataTypeCtor) Then
+		ElseIf DataValue_same(tcCtor, DataTypeCtor) Then
 			&apos; has it arity &gt; 0 ?
 			r = field(DataTypeCtor_arity, tc)
 			If r &lt; 1 Then
@@ -731,32 +742,29 @@ Function TypeApp(Optional tc As Object, Optional ta As Object)
 		ElseIf DataValue_same(tcCtor, cApp) Then
 			&apos; TODO: TypeApp.str/typeCtor - has it arity &gt; 1 ?
 			tcStr = tc.str
+		Else
+			Goto TypeApp_invalid_1st_arg
 		End If
 		
 		&apos; ta must be a &quot;complete&quot; type,
-		&apos; ie: a DataTypeCtor with arity &gt; 0
-		&apos;  or a TypeApp with no unbound TypeParam s
+		&apos; ie: a DataTypeCtor with arity = 0
+		&apos;  or a TypeApp
 		&apos;  or a TypeParam
-		&apos;  or a native type (Str, Int, ...)
-		Dim taCtor As Object, taStr As String
-		taCtor = ctorOf(ta)
-		If isEmpty(taCtor) Then
+		&apos;  or a native type (Native_Str, Native_Int, ...)
+		If Not(isType(ta)) Then &apos; ensures all the above
 			Goto TypeApp_invalid_2nd_arg
-		ElseIf DataValue_same(typeCtorOf(taCtor), TDataTypeCtor) Then
-			&apos; has it arity = 0 ?
-			r = field(DataTypeCtor_arity, ta)
-			If r &gt; 0 Then
-				Goto TypeApp_invalid_2nd_arg
-			End If
-			taStr = field(DataTypeCtor_name, ta)
-		ElseIf DataValue_same(taCtor, cApp) Then
-			&apos; TODO: TypeApp.str/typeArg - has it arity = 0 ?
-			taStr = ta.str
-			If Not(startsWith(taStr, &quot;[&quot;)) Then
-				taStr = &quot;(&quot; &amp; taStr &amp; &quot;)&quot;
-			End If
 		Else
-			taStr = ta.str
+			Dim taCtor As Object, taStr As String
+			taCtor = ctorOf(ta)
+			If DataValue_same(taCtor, DataTypeCtor) Then
+				taStr = field(DataTypeCtor_name, ta)
+			ElseIf DataValue_same(taCtor, cApp) Then
+				If Not(startsWith(taStr, &quot;[&quot;)) Then
+					taStr = &quot;(&quot; &amp; taStr &amp; &quot;)&quot;
+				End If
+			Else
+				taStr = ta.str
+			End If
 		End If
 		
 		If DataValue_same(tc, TList) Then
@@ -846,7 +854,7 @@ Function applyDC(c, _
 	Optional a3, _
 	Optional a4 _
 )
-	If Not(isCtorOf(Tp.DataCtor, c)) Then
+	If Not(isctorOf(Tp.DataCtor, c)) Then
 		croak(&quot;applyDC: not a data ctor: &quot; &amp; NL &amp; toString(c))
 	End If
 	Dim out As Object
@@ -1159,7 +1167,7 @@ Function mkDataCtor( _
 	cName 	 As String, _
 	argTypes As Array _
 )
-	If Not(isCtorOf(Tp.DataTypeCtor, typeCtor)) Then
+	If Not(isctorOf(Tp.DataTypeCtor, typeCtor)) Then
 		croak(&quot;mkDataCtor: type error - expected TDataTypeCtor&quot; _
 			&amp; NL &amp; &quot;got: &quot; &amp; toString(typeCtor))
 	End If
@@ -1353,7 +1361,7 @@ Function typeStr(x As Variant)
 			out = field(Ntv_typeName, c)
 		End If
 	Else &apos; x is normal DataValue
-		tc = typeCtorOf(c)
+		tc = typectorOf(c)
 		out = &quot;Data/&quot; &amp; field(DataTypeCtor_name, tc)
 	End If
 	typeStr = out
@@ -1395,7 +1403,7 @@ End Function
 Function [test_Type======================================]
 	test_bootstrapTypes()
 	
-	test_Type_isType()	
+	test_Type_isType()
 	
 	test_Type_isDataValue()
 	test_Type_DataValue()
@@ -2860,6 +2868,15 @@ Function test_Type_isType
 	assertEqual(isType(Array()),		False).x
 	assertEqual(isType(Array(42)),		False).x
 	assertEqual(isType(Array(42)),		False).x
+	
+	assertEqual(isType(CBool(0)),		False).x
+	assertEqual(isType(CByte(0)),		False).x
+	assertEqual(isType(CInt(0)),		False).x
+	assertEqual(isType(CLng(0)),		False).x
+	assertEqual(isType(CSng(0)),		False).x
+	assertEqual(isType(CDbl(0)),		False).x
+	assertEqual(isType(Date),			False).x
+
 End Function
 
 Function test_Type_hasType

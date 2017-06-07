@@ -522,6 +522,10 @@ Function test_List_isNil_and_cons()
 &apos;	assertThrows(isNil, Array()).x		&apos; assertThrows can&apos;t test call with 0 args
 	assertThrows(isNil, Array(Empty)).x
 	assertThrows(isNil, Array(Nothing)).x
+	assertThrows(isNil, Array(&quot;foo&quot;)).x
+	assertThrows(isNil, Array(Tp.List)).x		&apos; a DataTypeCtor
+	assertThrows(isNil, Array(Tp.List_Nil)).x	&apos; a DataCtor
+	assertThrows(isNil, Array(Tp.List_Cons)).x	&apos; a DataCtor
 
 	assertThrows(cons, Array(42, Empty)).x
 	assertThrows(cons, Array(42, Nothing)).x
