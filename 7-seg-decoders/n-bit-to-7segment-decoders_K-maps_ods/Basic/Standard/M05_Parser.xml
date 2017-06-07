@@ -59,7 +59,11 @@ End Sub
 &apos;==================================================================
 
 Function isParser(x As Variant)
-	isParser = (typeStr(x) = typeStr(pFail))
+	Static parserType As Object
+	If isNull(parserType) Then
+		parserType = typeOf(pFail)
+	End If
+	isParser = DataValue_same(typeOf(x), parserType)
 End Function
 
 
@@ -1724,7 +1728,7 @@ refute_parses_failed:
 	refute_parses = testResult
 End Function
 
-Function assert_parses(p As Parser, ByVal ss As Variant, expVal As Variant, expPos As Integer)
+Function assert_parses(p As Variant, ByVal ss As Variant, expVal As Variant, expPos As Integer)
 	assertEqual(isParser(p), True).x
 	Dim actual As Variant, expected As Variant
 	Dim msg As String

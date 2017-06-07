@@ -1031,7 +1031,7 @@ Function test_readHex()
 	Dim aLong As Long
 	&apos;31 bit
 	aLong = 212855723
-	assertEqual(typeStr(readHex( &quot;CAFEBAB&quot;)), typeStr(aLong)).x
+	assertEqual(VarType(readHex( &quot;CAFEBAB&quot;)), VarType(CLng(0))).x
 	assertEqual(readHex( &quot;CAFEBAB&quot;), aLong).x
 	aLong = 233495534
 	assertEqual(readHex( &quot;deadbee&quot;), aLong).x

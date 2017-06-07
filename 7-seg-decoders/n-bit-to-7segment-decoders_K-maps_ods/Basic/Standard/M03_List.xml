@@ -57,13 +57,19 @@ Function isList(Optional x As Variant)
 	If isMissing(x) Then
 		If isNull(oFn) Then : oFn = Fn.isList : End If
 		isList = oFn
+		Exit Function
 	Else
-		Dim c As Object : c = ctorOf(x)
+		Dim c As Object
+		On Local Error Goto isList_returns_False
+		c = _ctor(x)
 		&apos;isList = hasType(x, TList)
 		isList = CBool(DataValue_same(c, Tp.List_Nil) _
 					Or DataValue_same(c, Tp.List_Cons) _
 		)
+		Exit Function
 	End If
+isList_returns_False:
+	isList = False
 End Function
 
 
@@ -478,7 +484,6 @@ Function [test_List ===============]()
 	test_List_isList()
 	test_List_isNil_and_cons()
 	test_List_length()
-	test_List_typeStr()
 	test_List_TList_toString()
 	test_List_polymorphic_toString()
 	test_List_List()
@@ -568,13 +573,6 @@ Function test_List_length()
 	assertEqual(apply(length,	cons(0, 	cons(0, nil))), 2).x
 End Function
 
-Function test_List_typeStr()
-	assertEqual(typeStr(nil), &quot;Data/List&quot;).x
-	
-	Dim lst
-	lst = cons(5, nil)
-	assertEqual(typeStr(lst), &quot;Data/List&quot;).x
-End Function
 
 Function test_List_TList_toString()
 	Dim a

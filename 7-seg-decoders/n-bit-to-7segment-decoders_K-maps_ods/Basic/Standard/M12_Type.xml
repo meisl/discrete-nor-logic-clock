@@ -232,25 +232,36 @@ Function Tp() &apos; bootstrap TType and data types
 		nInt.str 				= cNtv.str &amp; &quot;_Int&quot;
 		
 		&apos; -- more BASIC types:
-		out.Native_Boolean	= applyDC(cNtv, &quot;Bool&quot;,	 TypeName(CBool(0)), VarType(CBool(0))	)
-		out.Native_Boolean.str = &quot;Bool&quot;
-		out.Native_Byte 	= applyDC(cNtv, &quot;Byte&quot;,	 TypeName(CByte(0)), VarType(CByte(0))	)
+		out.Native_Boolean	= _mkNative(&quot;Bool&quot;,		CBool(0))
+		out.Native_Byte		= _mkNative(&quot;Byte&quot;,		CByte(0))
 		out.Native_Integer	= nInt		
-		out.Native_Long 	= applyDC(cNtv, &quot;Long&quot;,	 TypeName(CLng(0)),  VarType(CLng(0))	)
-		out.Native_Single	= applyDC(cNtv, &quot;Sng&quot;, 	 TypeName(CSng(0)),  VarType(CSng(0))	)
-		out.Native_Double	= applyDC(cNtv, &quot;Dbl&quot;,	 TypeName(CDbl(0)),  VarType(CDbl(0))	)
+		out.Native_Long 	= _mkNative(&quot;Long&quot;,		CLng(0))
+		out.Native_Single	= _mkNative(&quot;Single&quot;,	CSng(0))
+		out.Native_Double	= _mkNative(&quot;Double&quot;,	CDbl(0))
 		out.Native_String 	= nStr
-		out.Native_Object	= applyDC(cNtv, &quot;Obj&quot;,	 TypeName(Nothing),  VarType(Nothing)	)
-		out.Native_Empty	= applyDC(cNtv, &quot;Empty&quot;, TypeName(Empty),	 VarType(Empty)		)
-		out.Native_Array	= applyDC(cNtv, &quot;Array&quot;, &quot;Array&quot;,  VarType(Array())	)
-		out.Native_Date		= applyDC(cNtv, &quot;Date&quot;,	 TypeName(Date),  	 VarType(Date)		)
+		out.Native_Object	= _mkNative(&quot;Obj&quot;,		Nothing)
+		out.Native_Empty	= _mkNative(&quot;Empty&quot;,	Empty)
+		out.Native_Array	= _mkNative(&quot;Array&quot;,	Array())
+		out.Native_Date		= _mkNative(&quot;Date&quot;,		Date)
 		Dim aVariant As Variant
-		out.Native_Variant	= applyDC(cNtv, &quot;Variant&quot;, TypeName(aVariant), VarType(aVariant))
+		out.Native_Variant	= _mkNative(&quot;Variant&quot;,	aVariant)
 						
 	End If
 	Tp = out
 End Function
 
+Function _mkNative(shortName As String, sampleValue As Variant)
+	Dim out
+	If isArray(sampleValue) Then
+		out = applyDC(Tp.Native, _
+			shortName, &quot;Array&quot;, VarType(sampleValue))
+	Else
+		out = applyDC(Tp.Native, _
+			shortName, TypeName(sampleValue), VarType(sampleValue))
+	End If
+	out.str = Tp.Native.str &amp; &quot;_&quot; &amp; shortName
+	_mkNative = out
+End Function
 
 &apos; duck-type like test:
 &apos; - does it have member .ctor of (BASIC) type Object?
@@ -699,15 +710,6 @@ Function List_length(ByVal xs As Variant)
 	List_length = out
 End Function
 
-Function TString()
-	Static out As Object : If isNull(out) Then : out = Tp.TType_Str.x : End If
-	TString = out
-End Function
-
-Function TInteger()
-	Static out As Object : If isNull(out) Then : out = Tp.TType_Int.x : End If
-	TInteger = out
-End Function
 
 Function TypeParam(Optional i As Integer)
 	Static c As Object : If isNull(c) Then : c = Tp.TType_Param : End If
@@ -721,8 +723,6 @@ Function TypeParam(Optional i As Integer)
 	End If
 	TypeParam = out
 End Function
-
-
 
 Function TypeApp(Optional tc As Object, Optional ta As Object)
 	Static cApp As Object : If isNull(cApp) Then : cApp = Tp.TType_App : End If
@@ -766,7 +766,10 @@ Function TypeApp(Optional tc As Object, Optional ta As Object)
 			taCtor = ctorOf(ta)
 			If DataValue_same(taCtor, DataTypeCtor) Then
 				taStr = field(DataTypeCtor_name, ta)
+			ElseIf DataValue_same(taCtor, Tp.Native) Then
+				taStr = field(Ntv_shortName, ta)
 			ElseIf DataValue_same(taCtor, cApp) Then
+				taStr = ta.str
 				If Not(startsWith(taStr, &quot;[&quot;)) Then
 					taStr = &quot;(&quot; &amp; taStr &amp; &quot;)&quot;
 				End If
@@ -816,33 +819,23 @@ Function hasType(Optional v As Variant, Optional t As Object)
 		If isMissing(v) Then	: out = oFn
 		Else					: out = apply1(oFn, v)
 		End If
-	Else
-		out = False
-		Dim tOk As Boolean
-		tOk = False
-		Dim ct As Object, tc As Object, cv As Object
-		ct = ctorOf(t)
-		If DataValue_same(ct, Tp.DataTypeCtor) Then
-			&apos; fine: t is a data type
-			tOk = True
-		ElseIf DataValue_same(ct, DataCtor) Then
-			tc = field(DataCtor_typeCtor, cv)
-			If DataValue_same(tc, Tp.TType) Then
-				&apos; fine: t is either a Type.Ntv, a Type.Param or a Type.App
-				tOk = True
+	ElseIf isType(t) Then
+		If DataValue_same(t, Tp.TType) Then
+			out = isType(v)
+		Else
+			out = False
+			Dim tv As Object
+			tv = typeOf(v)
+			If DataValue_same(tv, t) Then
+				out = True
+			Else
+				&apos; TODO: subtype relation
 			End If
 		End If
-		If Not(tOk) Then
-			Goto hasType_invalidType
-		End If
-		
-		
+	Else
+		croak(&quot;hasType: not a type: &quot; &amp; toString(t))	
 	End If	
-		
 	hasType = out
-	Exit Function
-hasType_invalidType:
-	croak(&quot;hasType: not a type: &quot; &amp; toString(t))	
 End Function
 
 &apos;Function requireType(t As Object, v As Variant)
@@ -897,11 +890,11 @@ Function applyDC(c, _
 		Dim typeStr As String
 		For i = n To r - 1
 			t = List_nth(i, ats)
-			&apos;If (t.str &lt;&gt; &quot;&quot;) Then
-			&apos;	typeStr = typeStr &amp; t.str &amp; &quot; -&gt; &quot;
-			&apos;Else
+			If (t.str &lt;&gt; &quot;&quot;) Then
+				typeStr = typeStr &amp; t.str &amp; &quot; -&gt; &quot;
+			Else
 				typeStr = typeStr &amp; _DataValue_toString_Type(t, &quot;&quot;) &amp; &quot; -&gt; &quot;
-			&apos;End If
+			End If
 		Next i
 		typeStr = typeStr &amp; typeCtorName(c)
 		Dim oFn As Object
@@ -1398,14 +1391,14 @@ Function isString(Optional x As Variant)
 	If isMissing(x) Then
 		isString = Fn.isString
 	Else
-		isString = (typeStr(x) = typeStr(&quot;&quot;))
+		isString = DataValue_same(typeOf(x), Tp.Native_String)
 	End If
 End Function
 
 Function isInteger(Optional x As Variant)
 	Dim out As Variant
 	If isMissing(x) Then : out = Fn.isInteger
-	Else 				 : out = (typeStr(x) = typeStr(0))
+	Else 				 : out = DataValue_same(typeOf(x), Tp.Native_Integer)
 	End If
 	isInteger = out
 End Function
@@ -1419,17 +1412,13 @@ Function [test_Type======================================]
 	test_Type_typeOf()
 	test_Type_typeStr()
 	test_Type_isType()
-
-	
-	
-	&apos;test_Type_typeStr()
 	test_Type_isObject()
 	test_Type_isString()
 	test_Type_isInteger()
 	
 	test_Type_hasType()
 	
-	&apos;test_Type_dot_str()
+	test_Type_dot_str()
 	
 	test_Type_applyDC()
 		
@@ -2951,83 +2940,123 @@ Function test_Type_hasType
 	assertEqual(hasType(TDataCtor,		TDataTypeCtor), True).x
 	assertEqual(hasType(TDataTypeCtor,	TDataTypeCtor), True).x
 	assertEqual(hasType(TType, 			TDataTypeCtor), True).x
-	assertEqual(hasType(TList, 			TDataTypeCtor), True).x
-	
+		
 	assertEqual(hasType(DataCtor,		TDataTypeCtor), False).x
 	assertEqual(hasType(DataTypeCtor,	TDataTypeCtor), False).x
 
 	assertThrows(hasType, Array(TDataCtor, DataCtor)).x
 	
-	assertEqual(hasType(nil,			TList),		True).x
-	assertEqual(hasType(List(1),		TList),		True).x
-	assertEqual(hasType(Tp.List_Cons,	TList),		False).x
-	assertEqual(hasType(Tp.List_Cons,	TDataCtor),	True).x
+	assertEqual(hasType(Tp.List,		TType),			False).x
+	assertEqual(hasType(Tp.List,		TDataTypeCtor),	True).x
+	assertEqual(hasType(Tp.List,		TDataCtor),		False).x
+	assertEqual(hasType(Tp.List_Nil,	TDataCtor),		True).x
+	assertEqual(hasType(Tp.List_Cons,	TDataCtor),		True).x
+	assertEqual(hasType(Tp.List_Nil,	TType),			False).x
+	assertEqual(hasType(Tp.List_Cons,	TType),			False).x
+	assertEqual(hasType(List(0),		TType),			False).x
+	assertEqual(hasType(List(0, &quot;one&quot;),	TType),			False).x
+	
+	Dim a		: a		= TypeParam(0)
+	Dim nBool	: nBool	= Tp.Native_Boolean
+	Dim nByte	: nByte	= Tp.Native_Byte
+	Dim nInt	: nInt	= Tp.Native_Integer
+	Dim nLong	: nLong	= Tp.Native_Long
+	Dim nStr	: nStr	= Tp.Native_String
+	Dim nVar	: nVar	= Tp.Native_Variant
 		
-	assertEqual(hasType(TString,						TType), True).x
-	assertEqual(hasType(TInteger,						TType), True).x
-	assertEqual(hasType(TypeParam(0),					TType), True).x
-	assertEqual(hasType(TypeApp(TList, TypeParam(0)),	TType), True).x
+	assertEqual(hasType(a,					TType), True).x
+	assertEqual(hasType(TypeApp(TList, a),	TType), True).x
+	assertEqual(hasType(TList(a),			TType), True).x
+	assertEqual(hasType(TList(nInt),		TType), True).x
+	
+	assertEqual(hasType(nBool,				Tp.TNative), True).x
+	assertEqual(hasType(nByte,				Tp.TNative), True).x
+	assertEqual(hasType(nInt,				Tp.TNative), True).x
+	assertEqual(hasType(nLong,				Tp.TNative), True).x
+	assertEqual(hasType(nStr,				Tp.TNative), True).x
+	assertEqual(hasType(nVar,				Tp.TNative), True).x
+
+	assertEqual(hasType(nBool,				TType), True).x
+	assertEqual(hasType(nByte,				TType), True).x
+	assertEqual(hasType(nInt,				TType), True).x
+	assertEqual(hasType(nLong,				TType), True).x
+	assertEqual(hasType(nStr,				TType), True).x
+	assertEqual(hasType(nVar,				TType), True).x
+	
+	
+	assertEqual(hasType(&quot;&quot;,				nStr),	 True).x
+	assertEqual(hasType(&quot;a&quot;,			nStr),	 True).x
+	assertEqual(hasType(&quot;foobar&quot;,		nStr),	 True).x
+	assertEqual(hasType(Nothing,		nStr),	False).x
+	assertEqual(hasType(Empty,			nStr),	False).x
+	assertEqual(hasType(True,			nStr),	False).x
+	assertEqual(hasType(False,			nStr),	False).x
+	assertEqual(hasType(0,				nStr),	False).x
+	assertEqual(hasType(1,				nStr),	False).x
+	assertEqual(hasType(3.14,			nStr),	False).x
+	assertEqual(hasType(Array(),		nStr),	False).x
+	assertEqual(hasType(Array(42),		nStr),	False).x
+	assertEqual(hasType(Array(42),		nStr),	False).x
+	assertEqual(hasType(TList,			nStr),	False).x
+	assertEqual(hasType(Tp.List_Nil,	nStr),	False).x
+	assertEqual(hasType(Tp.List_Cons,	nStr),	False).x
+	assertEqual(hasType(nil,			nStr),	False).x
+	assertEqual(hasType(List(),			nStr),	False).x
+	assertEqual(hasType(List(1),		nStr),	False).x
+	assertEqual(hasType(List(1, 2),		nStr),	False).x
+
+	assertEqual(hasType(&quot;&quot;,				nInt),	False).x
+	assertEqual(hasType(&quot;a&quot;,			nInt),	False).x
+	assertEqual(hasType(&quot;foobar&quot;,		nInt),	False).x
+	assertEqual(hasType(Nothing,		nInt),	False).x
+	assertEqual(hasType(Empty,			nInt),	False).x
+	assertEqual(hasType(True,			nInt),	False).x
+	assertEqual(hasType(False,			nInt),	False).x
+	assertEqual(hasType( 0,				nInt),	 True).x
+	assertEqual(hasType( 1,				nInt),	 True).x
+	assertEqual(hasType(-1,				nInt),	 True).x
+	assertEqual(hasType( 32766,			nInt),	 True).x &apos;0x7FFE
+	assertEqual(hasType( 32767,			nInt),	 True).x &apos;0x7FFF
+	assertEqual(hasType( 32768,			nInt),	False).x &apos;0x8000 (!)
+	assertEqual(hasType( 65534,			nInt),	False).x &apos;0xFFFE
+	assertEqual(hasType( 65535,			nInt),	False).x &apos;0xFFFF
+	assertEqual(hasType( 65536,			nInt),	False).x &apos;0x80000
+	assertEqual(hasType(-32766,			nInt),	 True).x &apos;0x8002
+	assertEqual(hasType(-32767,			nInt),	 True).x &apos;0x8001
+	assertEqual(hasType(-32768,			nInt),	 True).x &apos;0x8000
+	assertEqual(hasType(-32769,			nInt),	False).x &apos;0x17FFF (!)
+	assertEqual(hasType(-65534,			nInt),	False).x &apos;0xFFFE
+	assertEqual(hasType(-65535,			nInt),	False).x &apos;0xFFFF
+	assertEqual(hasType(-65536,			nInt),	False).x &apos;0x80000
+	assertEqual(hasType(3.14,			nInt),	False).x
+	assertEqual(hasType(Array(),		nInt),	False).x
+	assertEqual(hasType(Array(42),		nInt),	False).x
+	assertEqual(hasType(Array(42),		nInt),	False).x
+	assertEqual(hasType(TList,			nInt),	False).x
+	assertEqual(hasType(Tp.List_Nil,	nInt),	False).x
+	assertEqual(hasType(Tp.List_Cons,	nInt),	False).x
+	assertEqual(hasType(nil,			nInt),	False).x
+	assertEqual(hasType(List(),			nInt),	False).x
+	assertEqual(hasType(List(1),		nInt),	False).x
+	assertEqual(hasType(List(1, 2),		nInt),	False).x
+	
+	&apos; list	
+	
+	&apos;assertEqual(hasType(nil,			TList(a)),		True).x
+	&apos;assertEqual(hasType(nil,			TList(nInt)),	True).x
+	&apos;assertEqual(hasType(nil,			TList(nStr)),	True).x
+	&apos;assertEqual(hasType(nil,			TList(nVar)),	True).x
+	
+	&apos;assertEqual(hasType(List(1),		TList(a)),		True).x
+	&apos;assertEqual(hasType(List(1),		TList(nInt)),	True).x
+	&apos;assertEqual(hasType(List(1),		TList(nStr)),	False).x
+	&apos;assertEqual(hasType(List(1),		TList(nVar)),	False).x
 
 	&apos; NYI
 	&apos;assertEqual(hasType(3, TypeParam(0)), True).x
 	&apos; NYI
 	&apos;assertEqual(hasType(3, TypeApp(TList TString)), True).x
-	
-	assertEqual(hasType(&quot;&quot;,				TString),	 True).x
-	assertEqual(hasType(&quot;a&quot;,			TString),	 True).x
-	assertEqual(hasType(&quot;foobar&quot;,		TString),	 True).x
-	assertEqual(hasType(Nothing,		TString),	False).x
-	assertEqual(hasType(Empty,			TString),	False).x
-	assertEqual(hasType(True,			TString),	False).x
-	assertEqual(hasType(False,			TString),	False).x
-	assertEqual(hasType(0,				TString),	False).x
-	assertEqual(hasType(1,				TString),	False).x
-	assertEqual(hasType(3.14,			TString),	False).x
-	assertEqual(hasType(Array(),		TString),	False).x
-	assertEqual(hasType(Array(42),		TString),	False).x
-	assertEqual(hasType(Array(42),		TString),	False).x
-	assertEqual(hasType(TList,			TString),	False).x
-	assertEqual(hasType(Tp.List_Nil,	TString),	False).x
-	assertEqual(hasType(Tp.List_Cons,	TString),	False).x
-	assertEqual(hasType(nil,			TString),	False).x
-	assertEqual(hasType(List(),			TString),	False).x
-	assertEqual(hasType(List(1),		TString),	False).x
-	assertEqual(hasType(List(1, 2),		TString),	False).x
 
-	assertEqual(hasType(&quot;&quot;,				TInteger),	False).x
-	assertEqual(hasType(&quot;a&quot;,			TInteger),	False).x
-	assertEqual(hasType(&quot;foobar&quot;,		TInteger),	False).x
-	assertEqual(hasType(Nothing,		TInteger),	False).x
-	assertEqual(hasType(Empty,			TInteger),	False).x
-	assertEqual(hasType(True,			TInteger),	False).x
-	assertEqual(hasType(False,			TInteger),	False).x
-	assertEqual(hasType( 0,				TInteger),	 True).x
-	assertEqual(hasType( 1,				TInteger),	 True).x
-	assertEqual(hasType(-1,				TInteger),	 True).x
-	assertEqual(hasType( 32766,			TInteger),	 True).x &apos;0x7FFE
-	assertEqual(hasType( 32767,			TInteger),	 True).x &apos;0x7FFF
-	assertEqual(hasType( 32768,			TInteger),	False).x &apos;0x8000 (!)
-	assertEqual(hasType( 65534,			TInteger),	False).x &apos;0xFFFE
-	assertEqual(hasType( 65535,			TInteger),	False).x &apos;0xFFFF
-	assertEqual(hasType( 65536,			TInteger),	False).x &apos;0x80000
-	assertEqual(hasType(-32766,			TInteger),	 True).x &apos;0x8002
-	assertEqual(hasType(-32767,			TInteger),	 True).x &apos;0x8001
-	assertEqual(hasType(-32768,			TInteger),	 True).x &apos;0x8000
-	assertEqual(hasType(-32769,			TInteger),	False).x &apos;0x17FFF (!)
-	assertEqual(hasType(-65534,			TInteger),	False).x &apos;0xFFFE
-	assertEqual(hasType(-65535,			TInteger),	False).x &apos;0xFFFF
-	assertEqual(hasType(-65536,			TInteger),	False).x &apos;0x80000
-	assertEqual(hasType(3.14,			TInteger),	False).x
-	assertEqual(hasType(Array(),		TInteger),	False).x
-	assertEqual(hasType(Array(42),		TInteger),	False).x
-	assertEqual(hasType(Array(42),		TInteger),	False).x
-	assertEqual(hasType(TList,			TInteger),	False).x
-	assertEqual(hasType(Tp.List_Nil,	TInteger),	False).x
-	assertEqual(hasType(Tp.List_Cons,	TInteger),	False).x
-	assertEqual(hasType(nil,			TInteger),	False).x
-	assertEqual(hasType(List(),			TInteger),	False).x
-	assertEqual(hasType(List(1),		TInteger),	False).x
-	assertEqual(hasType(List(1, 2),		TInteger),	False).x
 
 	&apos; depending on isSubtypeOf
 	
@@ -3042,17 +3071,6 @@ Function test_Type_hasType
 	&apos;assertEqual(isSubtypeOf(TString,		TType), True).x
 	&apos;assertEqual(isSubtypeOf(TInteger,		TType), True).x
 
-	assertEqual(hasType(DataCtor,				TType), False).x
-	&apos;assertEqual(hasType(DataTypeCtor,			TType), False).x
-	
-	assertEqual(hasType(TList,			TType),	False).x
-	assertEqual(hasType(Tp.List_Nil,	TType),	False).x
-	assertEqual(hasType(Tp.List_Cons,	TType),	False).x
-	assertEqual(hasType(nil,			TType),	False).x
-	assertEqual(hasType(List(),			TType),	False).x
-	assertEqual(hasType(List(1),		TType),	False).x
-	assertEqual(hasType(List(1, 2),		TType),	False).x
-	
 End Function
 
 Function test_Type_dot_str()
@@ -3078,28 +3096,54 @@ Function test_Type_dot_str()
 	&apos;assertEqualcCons.str,	&quot;List.Cons&quot;).x
 	assertEqual(cCons.str,	&quot;Cons :: a0 -&gt; (List a0) -&gt; (List a0)&quot;).x
 	
-	Dim vStr, vInt
-	Dim cStr, cInt
-	vStr = TString  : cStr = ctorOf(vStr)
-	vInt = TInteger : cInt = ctorOf(vInt)
-	assertEqual(vStr.str,	&quot;Str&quot;).x
-	assertEqual(vInt.str,	&quot;Int&quot;).x
-	assertEqual(cStr.str,	&quot;Type.String&quot;).x
-	assertEqual(cInt.str,	&quot;Type.Integer&quot;).x
+	Dim cNtv	: cNtv	= Tp.Native
+	Dim nBool	: nBool	= Tp.Native_Boolean
+	Dim nByte	: nByte	= Tp.Native_Byte
+	Dim nInt	: nInt	= Tp.Native_Integer
+	Dim nLong	: nLong	= Tp.Native_Long
+	Dim nSng	: nSng	= Tp.Native_Single
+	Dim nDbl	: nDbl	= Tp.Native_Double
+	Dim nStr	: nStr	= Tp.Native_String
+	Dim nDate	: nDate	= Tp.Native_Date
+	Dim nEmpty	: nEmpty = Tp.Native_Empty
+	Dim nObj	: nObj	= Tp.Native_Object
+	Dim nArr	: nArr	= Tp.Native_Array
+	Dim nVar	: nVar	= Tp.Native_Variant
+		
+	assertEqual(nBool.str,	cNtv.str &amp; &quot;_Bool&quot;).x
+	assertEqual(nByte.str,	cNtv.str &amp; &quot;_Byte&quot;).x
+	assertEqual(nInt.str,	cNtv.str &amp; &quot;_Int&quot;).x
+	assertEqual(nLong.str,	cNtv.str &amp; &quot;_Long&quot;).x
+	assertEqual(nSng.str,	cNtv.str &amp; &quot;_Single&quot;).x
+	assertEqual(nDbl.str,	cNtv.str &amp; &quot;_Double&quot;).x
+	assertEqual(nStr.str,	cNtv.str &amp; &quot;_Str&quot;).x
+	assertEqual(nDate.str,	cNtv.str &amp; &quot;_Date&quot;).x
+	assertEqual(nEmpty.str,	cNtv.str &amp; &quot;_Empty&quot;).x
+	assertEqual(nObj.str,	cNtv.str &amp; &quot;_Obj&quot;).x
+	assertEqual(nArr.str,	cNtv.str &amp; &quot;_Array&quot;).x
+	assertEqual(nVar.str,	cNtv.str &amp; &quot;_Variant&quot;).x
 	
-	assertEqual(TypeParam.str,		&quot;Type.TypeParam&quot;).x
+	&apos;assertEqual(TypeParam.str,		&quot;Type.Param&quot;).x
+	assertEqual(TypeParam.str,		&quot;Param :: Int -&gt; Type&quot;).x
 	assertEqual(TypeParam(0).str,	&quot;a0&quot;).x
 	assertEqual(TypeParam(1).str,	&quot;a1&quot;).x
 	assertEqual(TypeParam(2).str,	&quot;a2&quot;).x
 	
-	assertEqual(TypeApp.str,						&quot;Type.TypeApp&quot;).x
-	assertEqual(TypeApp(TList, TypeParam(0)).str,	&quot;List a0&quot;).x
-	assertEqual(TypeApp(TList, TString).str,		&quot;List Str&quot;).x
-	assertEqual(TypeApp(TList, TInteger).str,		&quot;List Int&quot;).x
-	assertEqual(TypeApp(TList, TType).str,			&quot;List Type&quot;).x
+	&apos;assertEqual(TypeApp.str,				&quot;Type.App&quot;).x
+	&apos;assertEqual(TList(TypeParam(0)).str,	&quot;List a0&quot;).x
+	&apos;assertEqual(TList(nStr).str,			&quot;List Str&quot;).x
+	&apos;assertEqual(TList(nInt).str,			&quot;List Int&quot;).x
+	&apos;assertEqual(TList(TType).str,			&quot;List Type&quot;).x
+	
+	assertEqual(TypeApp.str,				&quot;App :: Type -&gt; Type -&gt; Type&quot;).x
+	assertEqual(TList(TypeParam(0)).str,	&quot;[a0]&quot;).x
+	assertEqual(TList(nStr).str,			&quot;[Str]&quot;).x
+	assertEqual(TList(nInt).str,			&quot;[Int]&quot;).x
+	assertEqual(TList(TType).str,			&quot;[Type]&quot;).x
 
-	Dim t : t = TypeApp(TList, TypeApp(TList, TString))
-	assertEqual(t.str,	&quot;List (List Str)&quot;).x
+	Dim t : t = TList(TList(nStr))
+	&apos;assertEqual(t.str,	&quot;List (List Str)&quot;).x
+	assertEqual(t.str,	&quot;[[Str]]&quot;).x
 	
 End Function
 
@@ -3127,11 +3171,11 @@ Function test_Type_applyDC()
 	assertEqual(isFn(a), True).x
 	a = apply(a, nil)
 	assert_hasCtor(a, c).x
-	assertEqual(TList_equ(c, List(42)), True).x
+	assertEqual(TList_equ(a, List(42)), True).x
 	
 	a = applyDC(c, 42, nil)
 	assert_hasCtor(a, c).x
-	assertEqual(TList_equ(c, List(42)), True).x
+	assertEqual(TList_equ(a, List(42)), True).x
 		
 	a = applyDC(c)
 	assertEqual(isFn(a), True).x
@@ -3149,7 +3193,7 @@ Function test_Type_applyDC()
 	&apos;show(cBar.str, DataValue_toString(cBar))
 	a = applyDC(cFoo)
 	&apos;show(a.str, DataValue_toString(a))
-	
+	&apos; should return singleton instances
 	assert_same(applyDC(cFoo), a).x
 	refute_same(applyDC(cBar), a).x
 	a = applyDC(cBar)
