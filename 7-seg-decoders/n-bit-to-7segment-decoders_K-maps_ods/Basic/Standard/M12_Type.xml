@@ -49,6 +49,7 @@ Const DataCtor_name     = 0
 Const DataCtor_argTypes = 1
 Const DataCtor_typeCtor = 2
 
+
 Const DataTypeCtor_name  	 = 0
 Const DataTypeCtor_arity 	 = 1
 Const DataTypeCtor_dataCtors = 2
@@ -60,6 +61,18 @@ Const Ntv_varType   = 2
 Sub Main
 	[test_Type======================================]()
 End Sub
+
+Function _DataTypeCtor_name(x)
+	_DataTypeCtor_name = _destructure(Tp.DataTypeCtor, 0, x)
+End Function
+
+Function _DataTypeCtor_arity(x)
+	_DataTypeCtor_arity = _destructure(Tp.DataTypeCtor, 1, x)
+End Function
+
+Function _DataTypeCtor_dataCtors(x)
+	_DataTypeCtor_dataCtors = _destructure(Tp.DataTypeCtor, 2, x)
+End Function
 
 
 Function _newDataValue(ctor As DataValue, ByRef args As Array)
@@ -428,7 +441,40 @@ Function typeCtorName(c)
 	typeCtorName = field(DataTypeCtor_name, typectorOf(c))
 End Function
 
-
+&apos; --------------------------------------------------------------
+	
+Function _destructure(c As Object, i As Integer, Optional v As Variant)
+	Dim out
+	If isMissing(v) Then
+		out = apply(Fn.destructure, c, i)
+	Else
+		On Local Error Goto _destructure_error
+		If DataValue_same(_ctor(v), c) Then
+			out = field(i, v)
+		Else
+_destructure_error:
+			On Local Error Goto 0 &apos; disable error handler
+			Dim cName : cName = field(DataCtor_name, c)
+			Dim tExp : tExp = field(DataCtor_typeCtor, c)
+			Dim r, k : r = field(DataTypeCtor_arity, tExp)
+			For k = 0 To r - 1
+				tExp = TypeApp(tExp, TypeParam(k))
+			Next k
+			Dim msg
+			msg = &quot;destructure &quot; &amp; cName &amp; &quot; &quot; &amp; i &amp; &quot;: &quot;
+			If hasType(v, tExp) Then
+				&apos; wrong data ctor
+				msg = msg &amp; &quot; wrong ctor &quot; &amp; ctorName(v)
+			Else
+				Dim tAct : tAct = typeOf(v)
+				&apos; wrong type
+				msg = msg &amp; &quot; expected a &quot; &amp; tExp.str &amp; &quot;, not a &quot; &amp; tAct.str
+			End If
+			croak(msg)
+		End If
+	End If
+	_destructure = out
+End Function
 
 
 
@@ -542,9 +588,29 @@ Function TDataTypeCtor()
 	TDataTypeCtor = out
 End Function
 
+
 Function TDataCtor()
 	Static out As Object : If isNull(out) Then : out = Tp.TDataCtor : End If
 	TDataCtor = out
+End Function
+
+Function nameOf(x)
+	On Local Error Goto nameOf_error
+	Dim out, c : c = _ctor(x)
+	If DataValue_same(c, Tp.DataCtor) Then
+		out = field(DataCtor_name, x)
+	ElseIf DataValue_same(c, Tp.DataTypeCtor) Then
+		out = field(DataTypeCtor_name, x)
+	Else
+nameOf_error:
+		croak(&quot;nameOf: expected DataCtor or DataTypeCtor - got &quot; _
+			&amp; typeOf(x).str)
+	End If
+	nameOf = out
+End Function
+
+Function argTypes(Optional dataCtor)
+	argTypes = _destructure(Tp.DataCtor, 1, dataCtor)
 End Function
 
 Function TList(Optional typeArg)
@@ -595,37 +661,6 @@ Function DataTypeCtor( _
 	DataTypeCtor = out
 End Function
 
-
-	
-Function _destructure(c As Object, i As Integer, Optional v As Variant)
-	Dim out
-	If isMissing(v) Then
-		out = apply(Fn.destructure, c, i)
-	Else
-		On Local Error Goto _destructure_error
-		If DataValue_same(_ctor(v), c) Then
-			out = field(i, v)
-		Else
-_destructure_error:
-			Dim tExp : tExp = field(DataCtor_typeCtor, c)
-			Dim r, i : r = field(DataTypeCtor_arity, tExp)
-			For i = 0 To r - 1
-				tExp = TypeApp(tExp, TypeParam(i))
-			Next i
-			If hasType(v, tExp) Then
-				&apos; wrong data ctor
-				croak(&quot;destructure: expected &quot; &amp; field(DataCtor_name, c) &amp; &quot; - got &quot; &amp; ctorName(v))
-			Else
-				Dim tAct : tAct = typeOf(v)
-				&apos; wrong type
-				croak(&quot;destructure: expected &quot; &amp; tExp.str &amp; &quot; - got &quot; &amp; tAct.str)
-			End If
-		End If
-	End If
-	_destructure = out
-End Function
-
-
 Function TypeParam(Optional i As Integer)
 	Static c As Object : If isNull(c) Then : c = Tp.TType_Param : End If
 	Dim out
@@ -645,52 +680,59 @@ Function TypeApp(Optional tc As Object, Optional ta As Object)
 	If isMissing(tc) Then
 		out = cApp
 	Else
+		Dim r As Integer
 		&apos;out = applyDC(cApp, tc, ta)
 		out = _newDataValue(cApp, Array(tc, ta))
 		
 		&apos; tc must be an &quot;applicable&quot; type,
 		&apos; ie: a DataTypeCtor with arity &gt; 0
 		&apos;     or a TypeApp with at least 1 unbound TypeParam
-		Dim tcCtor As Variant, r As Integer, tcStr As String
-		tcCtor = ctorOf(tc)
-		If isEmpty(tcCtor) Then
-			Goto TypeApp_invalid_1st_arg
-		ElseIf DataValue_same(tcCtor, DataTypeCtor) Then
-			&apos; has it arity &gt; 0 ?
-			r = field(DataTypeCtor_arity, tc)
-			If r &lt; 1 Then
+		If isType(tc) Then
+			r = Type_arity(tc)
+			If r &gt; 0 Then
+				Dim tcCtor As Variant, tcStr As String
+				tcCtor = _ctor(tc)
+				If DataValue_same(tcCtor, DataTypeCtor) Then
+					tcStr = field(DataTypeCtor_name, tc)
+				ElseIf DataValue_same(tcCtor, cApp) Then
+					tcStr = tc.str
+				Else
+					show(&quot;TypeApp/NYI: &quot;, tc).boom
+				End If
+			Else
 				Goto TypeApp_invalid_1st_arg
 			End If
-			tcStr = field(DataTypeCtor_name, tc)
-		ElseIf DataValue_same(tcCtor, cApp) Then
-			&apos; TODO: TypeApp.str/typeCtor - has it arity &gt; 1 ?
-			tcStr = tc.str
 		Else
 			Goto TypeApp_invalid_1st_arg
 		End If
-		
+				
 		&apos; ta must be a &quot;complete&quot; type,
 		&apos; ie: a DataTypeCtor with arity = 0
 		&apos;  or a TypeApp
 		&apos;  or a TypeParam
 		&apos;  or a native type (Native_Str, Native_Int, ...)
-		If Not(isType(ta)) Then &apos; ensures all the above
-			Goto TypeApp_invalid_2nd_arg
-		Else
-			Dim taCtor As Object, taStr As String
-			taCtor = ctorOf(ta)
-			If DataValue_same(taCtor, DataTypeCtor) Then
-				taStr = field(DataTypeCtor_name, ta)
-			ElseIf DataValue_same(taCtor, Tp.Native) Then
-				taStr = field(Ntv_shortName, ta)
-			ElseIf DataValue_same(taCtor, cApp) Then
-				taStr = ta.str
-				If Not(startsWith(taStr, &quot;[&quot;)) Then
-					taStr = &quot;(&quot; &amp; taStr &amp; &quot;)&quot;
+		If isType(ta) Then
+			r = Type_arity(ta)
+			If r = 0 Then
+				Dim taCtor As Object, taStr As String
+				taCtor = _ctor(ta)
+				If DataValue_same(taCtor, DataTypeCtor) Then
+					taStr = field(DataTypeCtor_name, ta)
+				ElseIf DataValue_same(taCtor, Tp.Native) Then
+					taStr = field(Ntv_shortName, ta)
+				ElseIf DataValue_same(taCtor, cApp) Then
+					taStr = ta.str
+					If Not(startsWith(taStr, &quot;[&quot;)) Then
+						taStr = &quot;(&quot; &amp; taStr &amp; &quot;)&quot;
+					End If
+				Else
+					taStr = ta.str
 				End If
 			Else
-				taStr = ta.str
+				Goto TypeApp_invalid_2nd_arg
 			End If
+		Else
+			Goto TypeApp_invalid_2nd_arg
 		End If
 		
 		If DataValue_same(tc, TList) Then
@@ -703,14 +745,40 @@ Function TypeApp(Optional tc As Object, Optional ta As Object)
 	TypeApp = out
 	Exit Function
 TypeApp_invalid_1st_arg:
-	croak(&quot;TypeApp: cannot apply &quot; &amp; toString(tc))	
+	&apos;show(&quot;TypeApp: cannot apply &quot; &amp; toString(tc))
 	Exit Function
 TypeApp_invalid_2nd_arg:
-	croak(&quot;TypeApp: invalid type arg &quot; &amp; toString(ta))	
+	show(&quot;TypeApp: invalid type arg &quot; &amp; toString(ta)).boom
 End Function
 
 &apos; --------------------------------------------------------------
 
+Function TypeApp_typeFn(Optional x)
+	TypeApp_typeFn = _destructure(Tp.TType_App, 0, x)
+End Function
+
+Function TypeApp_typeArg(Optional x)
+	TypeApp_typeArg = _destructure(Tp.TType_App, 1, x)
+End Function
+
+Function Type_arity(x)
+	Dim out
+	On Local Error Goto Type_arity_error
+	Dim ct : ct = _ctor(x)
+	If DataValue_same(ct, Tp.DataTypeCtor) Then
+		out = field(DataTypeCtor_arity, x)
+	ElseIf DataValue_same(ct, Tp.TType_App) Then
+		out = CInt(Type_arity(TypeApp_typeFn(x)) - 1)
+	ElseIf isType(x) Then
+		out = 0
+	Else
+Type_arity_error:
+		On Local Error Goto 0 &apos; disable error handler
+		show(&quot;Type_arity: expected a Type, not a &quot; _
+			&amp; typeStr(x)).boom
+	End If
+	Type_arity = out
+End Function
 
 &apos;Function isSubtypeOf(s As Object, t As Object)
 &apos;	Dim out
@@ -1136,7 +1204,7 @@ Function isType(t As Variant)
 		If DataValue_same(c, Tp.Native) Then
 			out = True
 		ElseIf DataValue_same(c, Tp.DataTypeCtor) Then
-			out = (field(DataTypeCtor_arity, t) = 0)
+			out = True
 		ElseIf DataValue_same(_ctor(c), Tp.DataCtor) Then
 			&apos; DON&apos;t use typeCtorOf
 			out = DataValue_same(field(DataCtor_typeCtor, c), Tp.TType)
@@ -1279,7 +1347,9 @@ Function [test_Type======================================]
 	test_Type_dot_str()
 	
 	test_Type_applyDC()
+	test_Type_destructure()
 
+	test_Type_Type_arity()
 End Function
 
 &apos; some dummy (BASIC) Type s used in tests
@@ -2456,15 +2526,13 @@ Function test_bootstrapTypes()
 	assert_same(field(0,	vApp),	tcList).x
 	assert_same(field(1,	vApp),	nInt).x
 	
-	
-	vApp = TypeApp(TList(nInt), nStr)
-	
-	&apos; TODO: make convenience fn TypeApp return a TFn on 0 args
-	&apos;assertThrows(TypeApp, Array(vInt, tcList))
+	&apos; TODO: make fn TypeApp return a TFn on 0 args
+	&apos;assertThrows(TypeApp, Array(TList(nInt), nStr))
+	&apos;assertThrows(TypeApp, Array(nInt, tcList))
 	
 	
 	&apos;--- apply data ctor DataTypeCtor
-	Dim tcUnit
+	
 
 End Function
 
@@ -2741,7 +2809,7 @@ Function test_Type_isType
 	assertEqual(isType(Tp.Native_Variant),	True).x
 	
 	&apos; unapplied List type ctor ??
-	assertEqual(isType(Tp.List),				False).x
+	assertEqual(isType(Tp.List),				True).x
 	assertEqual(isType(TList(Tp.Native_Long)),	True).x
 	assertEqual(isType(Tp.List_Nil),			False).x
 	assertEqual(isType(nil),					False).x
@@ -2801,7 +2869,7 @@ Function test_Type_hasType
 
 	assertThrows(hasType, Array(TDataCtor, DataCtor)).x
 	
-	assertEqual(hasType(Tp.List,		TType),			False).x
+	assertEqual(hasType(Tp.List,		TType),			True).x
 	assertEqual(hasType(Tp.List,		TDataTypeCtor),	True).x
 	assertEqual(hasType(Tp.List,		TDataCtor),		False).x
 	assertEqual(hasType(Tp.List_Nil,	TDataCtor),		True).x
@@ -2919,7 +2987,7 @@ Function test_Type_hasType
 	
 	assertEqual(hasType(TDataCtor,		TType), True).x
 	assertEqual(hasType(TDataTypeCtor,	TType), True).x
-	assertEqual(hasType(TList,			TType), False).x
+	assertEqual(hasType(TList,			TType), True).x
 	assertEqual(hasType(TType,			TType), True).x
 
 	&apos;assertEqual(isSubtypeOf(TDataCtor,		TType), False).x
@@ -3119,9 +3187,51 @@ Function asdf
 		End Select
 	Next i
 	assertEqual(what, &quot;aFoo aBar aFoo &quot;).x
-
 		
 End Function
+
+Function test_Type_destructure()
+	Dim vP : vP = TypeParam(42)
+	Dim vA : vA = TypeApp(TList, vP)
+	Dim f
+	
+	f = _destructure(Tp.TType_Param, 0)
+	assertEqual(isFn(f), True).x
+	assertThrows(f, Array(vA)).x
+	assertEqual(apply(f, vP), 42).x
+	
+	f = _destructure(Tp.TType_App, 0)
+	assertEqual(isFn(f), True).x
+	assertThrows(f, Array(vP)).x
+	assert_same(apply(f, vA), TList).x
+	
+	f = _destructure(Tp.TType_App, 1)
+	assertEqual(isFn(f), True).x
+	assertThrows(f, Array(vP)).x
+	assert_same(apply(f, vA), vP).x
+
+End Function
+
+Function test_Type_Type_arity()
+	assertEqual(Type_arity(Tp.TDataTypeCtor), 	0).x
+	assertEqual(Type_arity(Tp.TDataCtor), 		0).x
+	assertEqual(Type_arity(Tp.TType),			0).x
+	assertEqual(Type_arity(Tp.List), 			1).x
+	assertEqual(Type_arity(Tp.TNative), 		0).x
+	assertEqual(Type_arity(TypeParam(0)),		0).x
+	assertEqual(Type_arity(TypeParam(1)),		0).x
+
+	&apos; don&apos;t use applyDC, nor TypeApp(..)
+	Dim cApp, nStr, vApp
+	cApp = Tp.TType_App : nStr = Tp.Native_String
+	vApp = _newDataValue(cApp, Array(Tp.List, nStr))
+	assertEqual(Type_arity(vApp),				0).x
+	
+	&apos;assertThrows(Type_arity, Array(nil)).x	
+	&apos;assertThrows(Type_arity, Array(&quot;foo&quot;)).x	
+
+End Function
+
 
 
 </script:module>

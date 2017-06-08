@@ -3,10 +3,10 @@
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M09_Pattern" script:language="StarBasic">REM  *****  BASIC  *****
 Option Explicit
 
-&apos; data Pattern a = Any
-&apos;                | Val a
-&apos;                | Var Str
-&apos;                | Dat TypeCtor [Pattern Any]  ~~~~~
+&apos; data Pattern = Any
+&apos;              | Val Type.Any
+&apos;              | Var Str
+&apos;              | Dat TypeCtor [Pattern]
 
 Const TPattern_tyname = &quot;TPattern&quot;
 Type TPattern
@@ -17,9 +17,27 @@ End Type
 
 
 Sub Main
+	TPattern
 	[test_Pattern======================================]()
 End Sub
 
+
+Function TPattern()
+	Static out As Object
+	If isNull(out) Then
+		Dim tcPat
+		tcPat = _mkDataTypeCtor(&quot;Pattern&quot;, 0)
+		out = tcPat
+		Dim cAny, cVar, cVal, cData
+		cAny  = _mkDataCtor(tcPat, &quot;Any&quot;, nil)
+		cVar  = _mkDataCtor(tcPat, &quot;Var&quot;, List(Tp.Native_String))
+		cVal  = _mkDataCtor(tcPat, &quot;Val&quot;, List(Tp.Native_Variant))
+		cData = _mkDataCtor(tcPat, &quot;Data&quot;, List(TDataCtor, TList(tcPat)))
+		&apos;msgbox(hasType(&quot;asdf&quot;, Tp.Native_Variant))
+		show(cData.str)
+	End If
+	TPattern = out
+End Function
 
 Function newPattern(which As String, a0 As Variant)
 	Dim out As New TPattern
