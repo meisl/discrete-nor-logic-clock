@@ -9,33 +9,130 @@ Sub Main
 End Sub
 
 
-&apos; --- constructors ---
+&apos; --- constructor fns ---
 
+Function nil()
+	Static out As Object : If isNull(out) Then : out = Tp.List_Nil.x : End If
+	nil = out
+End Function
+
+Function cons(Optional x, Optional xs)
+	Static oFn As Object, cCons As Object
+	Dim out As Variant
+	If isNull(oFn) Then
+		oFn = Fn.cons
+		cCons = Tp.List_Cons
+	End If
+	If isMissing(xs) Then
+		If isMissing(x) Then
+			out = oFn
+			&apos;out = cCons
+		Else
+			out = _apply(oFn, x)
+			&apos;out = applyDC(cCons, x)
+		End If
+	Else
+		If isList(xs) Then
+			out = _newDataValue(cCons, Array(x, xs))
+		Else
+			croak(&quot;cons: invalid tail - expected a List but got a &quot; _
+				&amp; typeStr(xs) &amp; &quot;:&quot; &amp; NL &amp; toString(xs))
+		End If
+	End If
+	cons = out
+End Function
+
+&apos; --- type test ---
+
+Function isList(Optional x As Variant)
+	Static oFn As Object, cNil As Object, cCons As Object
+	If isMissing(x) Then
+		If isNull(oFn) Then : oFn = Fn.isList : End If
+		isList = oFn
+		Exit Function
+	Else
+		If isNull(cNil) Then
+			cNil  = Tp.List_Nil
+			cCons = Tp.List_Cons
+		End If
+		Dim c As Object
+		On Local Error Goto isList_returns_False
+		c = _ctor(x)
+		&apos;isList = hasType(x, TList)
+		isList = CBool(DataValue_same(c, cNil) _
+					Or DataValue_same(c, cCons) _
+		)
+		Exit Function
+	End If
+isList_returns_False:
+	isList = False
+End Function
 
 &apos; --- ctor test ---
 
+Function isNil(Optional xs)
+	Static oFn As Object, cNil As Object, cCons As Object
+	Dim out
+	If isNull(oFn) Then 
+		oFn = Fn.isNil
+		cNil  = Tp.List_Nil
+		cCons = Tp.List_Cons
+	End If
+	If isMissing(xs) Then
+		out = oFn
+	Else
+		On Local Error Goto isNil_typeError
+		Dim c
+		c = _ctor(xs)
+		If DataValue_same(c, cCons) Then
+			out = False
+		ElseIf DataValue_same(c, cNil) Then
+			out = True
+		Else
+isNil_typeError:
+			croak(&quot;isNil: expected a List but got &quot; &amp; NL &amp; toString(xs))
+		End If
+	End If
+	isNil = out
+End Function
 
-&apos; --- destructors ---
+&apos; --- destructor fns ---
 
 Function car(Optional xs)
-	If isMissing(xs) Then : car = Fn.car : Exit Function : End If
-	If isNil(xs) Then
-		croak(&quot;car: nil&quot;)
-	Else
-		&apos;car = List_car(xs)
-		car = field(0, xs)
-	End If
+	Static cCons As Object : If isNull(cCons) Then : cCons = Tp.List_Cons : End If
+	car = _destructure(cCons, 0, xs)
 End Function
 
 Function cdr(Optional xs)
-	If isMissing(xs) Then : cdr = Fn.cdr : Exit Function : End If
-	If isNil(xs) Then
-		croak(&quot;cdr: nil&quot;)
-	Else
-		&apos;cdr = List_cdr(xs)
-		cdr = field(1, xs)
-	End If
+	Static cCons As Object : If isNull(cCons) Then : cCons = Tp.List_Cons : End If
+	cdr = _destructure(cCons, 1, xs)
 End Function
+
+Function nth(ByVal n As Integer, ByVal xs As Variant)
+	Do Until (n = 0)
+		xs = cdr(xs)
+		n = n - 1
+	Loop
+	nth = car(xs)
+End Function
+
+
+Function cadr(xs)
+	cadr = nth(1, xs)
+End Function
+
+Function cddr(xs)
+	cddr = cdr(cdr(xs))
+End Function
+
+Function caddr(xs)
+	caddr = nth(2, xs)
+End Function
+
+Function cdddr(xs)
+	cdddr = cdr(cddr(xs))
+End Function
+
 
 Function length(Optional ByVal xs)
 	If isMissing(xs) Then : length = Fn.length : Else
@@ -50,27 +147,7 @@ Function length(Optional ByVal xs)
 	End If
 End Function
 
-&apos; --- type test ---
 
-Function isList(Optional x As Variant)
-	Static oFn As Object
-	If isMissing(x) Then
-		If isNull(oFn) Then : oFn = Fn.isList : End If
-		isList = oFn
-		Exit Function
-	Else
-		Dim c As Object
-		On Local Error Goto isList_returns_False
-		c = _ctor(x)
-		&apos;isList = hasType(x, TList)
-		isList = CBool(DataValue_same(c, Tp.List_Nil) _
-					Or DataValue_same(c, Tp.List_Cons) _
-		)
-		Exit Function
-	End If
-isList_returns_False:
-	isList = False
-End Function
 
 
 &apos; --- toString ---
@@ -140,13 +217,6 @@ End Function
 
 &apos; --- fns on List ---
 
-Function cadr(xs)
-	cadr = car(cdr(xs))
-End Function
-
-Function caddr(xs)
-	caddr = cadr(cdr(xs))
-End Function
 
 Function map(Optional f As Variant, Optional xs As Object)
 	Dim result As Variant
@@ -533,6 +603,8 @@ Function test_List_isNil_and_cons()
 	assertThrows(isNil, Array(Tp.List_Cons)).x	&apos; a DataCtor
 
 	assertThrows(cons, Array(42, Empty)).x
+	assertThrows(cons(42), Array(Empty)).x
+	
 	assertThrows(cons, Array(42, Nothing)).x
 	assertThrows(cons, Array(42, True)).x
 	assertThrows(cons, Array(42, False)).x
@@ -650,29 +722,55 @@ Function test_List_List()
 End Function
 
 Function test_List_car()
-	assertThrows(Fn.car, Array(nil)).x
 	assertEqual(car(List(1   	)), 1).x
 	assertEqual(car(List(2, 1	)), 2).x
 	assertEqual(car(List(3, 2, 1)), 3).x
 
+	
 	assertEqual(isFn(Fn.car), 	True).x	&apos; from Fn object
+	assertEqual(arity(Fn.car), 	   1).x
+	
+	assertThrows(Fn.car, Array(nil)).x
+	assertThrows(Fn.car, Array(&quot;foo&quot;)).x
+	
+	assertEqual(apply(car, List(1   	)), 1).x
+	assertEqual(apply(car, List(2, 1	)), 2).x
+	assertEqual(apply(car, List(3, 2, 1	)), 3).x
+	
+	
 	assertEqual(isFn(car), 		True).x	&apos; from 0-arg call
 	assertEqual(arity(car), 	   1).x
-
+	
+	assertThrows(car, Array(nil)).x
+	assertThrows(car, Array(&quot;foo&quot;)).x
+	
 	assertEqual(apply(car, List(1   	)), 1).x
 	assertEqual(apply(car, List(2, 1	)), 2).x
 	assertEqual(apply(car, List(3, 2, 1	)), 3).x
 End Function
 
 Function test_List_cdr()
-	assertThrows(Fn.cdr, Array(nil)).x
 	assertEqual(toString(cdr(List(1   	 ))), &quot;[]&quot;).x
 	assertEqual(toString(cdr(List(2, 1	 ))), &quot;[1]&quot;).x
 	assertEqual(toString(cdr(List(3, 2, 1))), &quot;[2, 1]&quot;).x
 
+
 	assertEqual(isFn(Fn.cdr), 	True).x	&apos; from Fn object
+	assertEqual(arity(Fn.cdr), 	   1).x
+
+	assertThrows(Fn.cdr, Array(nil)).x
+	assertThrows(Fn.cdr, Array(&quot;foo&quot;)).x
+
+	assertEqual(toString(apply(Fn.cdr, List(1   	))), &quot;[]&quot;).x
+	assertEqual(toString(apply(Fn.cdr, List(2, 1	))), &quot;[1]&quot;).x
+	assertEqual(toString(apply(Fn.cdr, List(3, 2, 1))),  &quot;[2, 1]&quot;).x
+
+
 	assertEqual(isFn(cdr), 		True).x	&apos; from 0-arg call
 	assertEqual(arity(cdr), 	   1).x
+
+	assertThrows(cdr, Array(nil)).x
+	assertThrows(cdr, Array(&quot;foo&quot;)).x
 
 	assertEqual(toString(apply(cdr, List(1   	))), &quot;[]&quot;).x
 	assertEqual(toString(apply(cdr, List(2, 1	))), &quot;[1]&quot;).x

@@ -18,6 +18,8 @@ Type TFnObjs
 	
 	typeOf		As Object
 	ctorOf		As Object
+	hasType		As Object
+	destructure	As Object
 	
 	isEmpty		As Object
 	isString	As Object
@@ -81,8 +83,6 @@ Type TFnObjs
 	mkTypeCtor			As Object
 	mkTupleType			As Object
 	
-	hasType				As Object
-	
 	TASN_dot			As Object
 	TASN_toString		As Object
 	mkASN				As Object
@@ -132,6 +132,8 @@ Function Fn
 				
 		out.typeOf		= mkFn(fs, &quot;typeOf&quot;,		1, &quot;Any -&gt; Type&quot;)
 		out.ctorOf		= mkFn(fs, &quot;ctorOf&quot;,		1, &quot;Any -&gt; Maybe TDataCtor&quot;)
+		out.hasType		= mkFn(fs, &quot;hasType&quot;,		2, &quot;Any -&gt; Typ -&gt; Bool&quot;)
+		out.destructure	= mkFn(fs, &quot;destructure&quot;,	3, &quot;TDataCtor -&gt; Int -&gt; Any -&gt; Any&quot;)
 		
 		out.isEmpty		= mkFn(fs, &quot;isEmpty&quot;,		1, &quot;Any -&gt; Bool&quot;)
 		out.isString	= mkFn(fs, &quot;isString&quot;,		1, &quot;Any -&gt; Bool&quot;)
@@ -195,8 +197,6 @@ Function Fn
 		out.maybeMakeArrowType = mkFn(fs, &quot;maybeMakeArrowType&quot;,	2, &quot;Typ -&gt; Maybe Typ -&gt; Typ&quot;)
 		out.mkTypeCtor		= mkFn(fs, &quot;mkTypeCtor&quot;,			2, &quot;Str -&gt; [Typ] -&gt; Typ&quot;)
 		out.mkTupleType		= mkFn(fs, &quot;mkTupleType&quot;,		2, &quot;Typ -&gt; [Typ] -&gt; Typ&quot;)
-		
-		out.hasType			= mkFn(fs, &quot;hasType&quot;,			2, &quot;Any -&gt; Typ -&gt; Bool&quot;)
 		
 		out.TASN_dot		= mkFn(fs, &quot;TASN_dot&quot;,			2, &quot;Str -&gt; ASN -&gt; Any&quot;)
 		out.TASN_toString	= mkFn(fs, &quot;TASN_toString&quot;,		1, &quot;ASN -&gt; Str&quot;)
@@ -468,7 +468,8 @@ applyLast_of_two:
 	a1 = arg
 	Select Case name
 		Case &quot;applyDC&quot;:				out = applyDC(			a0, a1)
-
+		Case &quot;hasType&quot;:				out = hasType(			a0, a1)
+		
 		Case &quot;TList_equ&quot;:			out = TList_equ(		a0, a1)
 		Case &quot;fstArg&quot;:				out = a0
 		Case &quot;add&quot;:					out = CLng(a0 + a1)
@@ -492,7 +493,6 @@ applyLast_of_two:
 		Case &quot;maybeMakeArrowType&quot;:	out = maybeMakeArrowType(a0, a1)
 		Case &quot;mkTypeCtor&quot;:			out = mkTypeCtor(		a0, a1)
 		Case &quot;mkTupleType&quot;:			out = mkTupleType(		a0, a1)
-		Case &quot;hasType&quot;:				out = hasType(			a0, a1)
 		Case &quot;TASN_dot&quot;:			out = TASN_dot(			a0, a1)
 		Case &quot;mkDtCClass&quot;:			out = mkDtCClass(		a0, a1)
 		Case &quot;mkDtNonterminal&quot;:		out = mkDtNonterminal(	a0, a1)
@@ -507,6 +507,7 @@ applyLast_of_three:
 	a1 = car(reverseArgs) &apos;fn.args(1)
 	a2 = arg
 	Select Case name
+		Case &quot;destructure&quot;:			out = _destructure(	a0, a1, a2)
 		Case &quot;applyDC&quot;:				out = applyDC(		a0, a1, a2)
 
 		Case &quot;swap&quot;:				out = apply(a0, a2, a1)
