@@ -865,7 +865,10 @@ End Function
 &apos;End Function
 
 Function hasType(Optional v As Variant, Optional t As Object)
-	Static oFn As Object, tcType As Object, cDataTypeCtor As Object, cApp As Object
+	Static oFn As Object, tcType As Object
+	Static cDataTypeCtor As Object, cNative As Object
+	Static nVariant As Object
+	Static cParam As Object, cApp As Object
 	Dim out As Variant
 	If isMissing(t) Then
 		If isNull(oFn) Then : oFn = Fn.hasType : End If
@@ -876,24 +879,37 @@ Function hasType(Optional v As Variant, Optional t As Object)
 		If isNull(tcType) Then
 			tcType = Tp.TType
 			cDataTypeCtor = Tp.DataTypeCtor
+			cNative = Tp.Native
+			nVariant = Tp.Native_Variant
+			cParam = Tp.TType_Param
 			cApp = Tp.TType_App
 		End If
 		If DataValue_same(t, tcType) Then
 			out = isType(v)
+		ElseIf isCtorOf(cParam, t) Then
+			&apos; TODO: hasType - type context
+			out = True
 		Else
 			out = False
 			Dim tv As Object
 			tv = typeOf(v)
 			If DataValue_same(tv, t) Then
 				out = True
+			ElseIf isCtorOf(cNative, tv) Then
+				If DataValue_same(t, nVariant) Then
+					out = True
+				Else
+					&apos; TODO: subtype relation for native types
+					out = False
+				End If			
 			ElseIf isCtorOf(cDataTypeCtor, tv) Then
 				Dim r As Integer
 				r = field(DataTypeCtor_arity, tv)
 				If (r &gt; 0) And (isCtorOf(cApp, t)) Then
-					out = DataValue_same(tv, field(0, t))
+					out = DataValue_same(tv, TypeApp_typeFn(t))
 					&apos; TODO: test type arg
 				Else
-					&apos; TODO: subtype relation
+					&apos; TODO: subtype relation for data types
 				End If
 			End If
 		End If
@@ -943,7 +959,7 @@ Function applyDC(c, _
 	If r &lt; n Then
 		Goto applyDC_too_many_args
 	End If
-	&apos;On n Goto _tc1, _tc2, _tc3, _tc4, _tc5
+	On n Goto _tc1, _tc2, _tc3, _tc4, _tc5
 	Goto _tc0
 _tc5: a = a4 : t = nth(4, ats) : If Not(hasType(a, t)) Then : Goto applyDC_typeError : End If
 _tc4: a = a3 : t = nth(3, ats) : If Not(hasType(a, t)) Then : Goto applyDC_typeError : End If
@@ -998,11 +1014,11 @@ applyDC_too_many_args:
 	applyDC = out
 	Exit Function
 applyDC_typeError:
-		croak(&quot;applyDC &quot; &amp; cName &amp; &quot;: type error: expected &quot; _
-			&amp; _DataValue_toString_Type(t) _
-			&amp; NL &amp; &quot;but got&quot; _
-			&amp; NL &amp; toString(a) _
-		)
+	dim foo : foo = hasType(a, t)	
+	croak(&quot;applyDC &quot; &amp; cName &amp; &quot;: type error: expected &quot; _
+		&amp; _DataValue_toString_Type(t) _
+		&amp; &quot;, not a &quot; &amp; typeof(a).str _
+	)
 End Function
 
 
@@ -1452,12 +1468,12 @@ Function test_same(x As Variant, y As Variant, exp As Boolean)
 	out = assertEqual(DataValue_same(x, y), exp)
 	testLevel = testLevel - 1
 	If out.isFail Then
-		msg = &quot;expected .id &quot; &amp; x.id _
+		msg = &quot;expected .id &quot; &amp; _id(x) _
 			&amp; IIf(exp, &quot;&quot;, &quot;NOT&quot;) _
-			&amp; &quot; to be same as .id &quot; &amp; y.id &amp; &quot;:&quot; _
-			&amp; NL &amp; &quot;.id &quot; &amp; x.id &amp; &quot;: &quot; &amp; DataValue_toString(x) _
+			&amp; &quot; to be same as .id &quot; &amp; _id(y) &amp; &quot;:&quot; _
+			&amp; NL &amp; &quot;.id &quot; &amp; _id(x) &amp; &quot;: &quot; &amp; DataValue_toString(x) _
 			&amp; NL _
-			&amp; NL &amp; &quot;.id &quot; &amp; y.id &amp; &quot;: &quot; &amp; DataValue_toString(y)
+			&amp; NL &amp; &quot;.id &quot; &amp; _id(y) &amp; &quot;: &quot; &amp; DataValue_toString(y)
 		out = mkFail(x, y, msg)
 	End If
 	test_same = out

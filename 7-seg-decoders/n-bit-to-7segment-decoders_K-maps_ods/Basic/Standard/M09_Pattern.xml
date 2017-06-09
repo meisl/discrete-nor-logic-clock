@@ -47,43 +47,96 @@ Function Pattern_Any()
 End Function
 
 Function Pattern_Var(Optional nm)
-	Static c As Object, oFn As Object
-	Dim out
-	If isNull(c) Then
+	Static c As Object : If isNull(c) Then
 		c = findDataCtor(TPattern, &quot;Var&quot;)
-		oFn = applyDC(c)
 	End If
-	If isMissing(nm) Then
-		out = oFn
-	Else
-		out = applyDC(c, nm)
-	End If
-	Pattern_Var = out
+	Pattern_Var = applyDC(c, nm)
 End Function
 
 Function Pattern_Var_name(Optional x)
-	Static c As Object : If isNull(c) Then : c = _ctor(Pattern_Var(&quot;x&quot;)) : End If
+	Static c As Object : If isNull(c) Then
+		c = _ctor(Pattern_Var(&quot;x&quot;))
+	End If
 	Pattern_Var_name = _destructure(c, 0, x)
 End Function
 
 Function Pattern_Const(Optional val)
-	Static c As Object, oFn As Object
-	Dim out
-	If isNull(c) Then
+	Static c As Object : If isNull(c) Then
 		c = findDataCtor(TPattern, &quot;Const&quot;)
-		oFn = applyDC(c)
 	End If
-	If isMissing(val) Then
-		out = oFn
-	Else
-		out = applyDC(c, val)
-	End If
-	Pattern_Const = out
+	Pattern_Const = applyDC(c, val)
 End Function
 
 Function Pattern_Const_value(Optional x)
-	Static c As Object : If isNull(c) Then : c = _ctor(Pattern_Const(&quot;x&quot;)) : End If
+	Static c As Object : If isNull(c) Then
+		c = _ctor(Pattern_Const(&quot;x&quot;))
+	End If
 	Pattern_Const_value = _destructure(c, 0, x)
+End Function
+
+Function Pattern_Data(Optional dc, Optional argPatterns)
+	Static oFn As Object, tcPat As Object, cDat As Object
+	If isNull(oFn) Then
+		oFn = Fn.Pattern_Data
+		tcPat = TPattern
+		cDat = findDataCtor(tcPat, &quot;Data&quot;)
+	End If
+	Dim out
+	If isMissing(dc) Then
+		out = oFn
+	ElseIf isMissing(argPatterns) Then
+		out = apply(oFn, dc)
+	Else
+		out = applyDC(cDat, dc, argPatterns)
+		&apos; still have to make sure argPatterns isa [Pattern]
+		Dim aps As Object : aps = argPatterns
+		Dim ats As Object : ats = argTypes(dc)
+		If length(aps) &lt;&gt; length(ats) Then
+			Goto Pattern_Data_2nd_arg_wrong_count
+		End If
+		Dim ap As Variant	&apos; might be whatever
+		Dim at As Object	&apos; should be a Type
+		Dim i As Integer
+		Do Until(isNil(aps))
+			ap = car(aps) : aps = cdr(aps)
+			at = car(ats) : ats = cdr(ats)
+			If hasType(ap, tcPat) Then
+				&apos; TODO: check if it is compatible with at
+			Else
+				Goto Pattern_Data_2nd_arg_type_error
+			End If
+			i = i + 1
+		Loop
+	End If
+	Pattern_Data = out
+	Exit Function
+Pattern_Data_2nd_arg_type_error:
+	On Local Error Goto 0 &apos; disable error handler
+	croak(&quot;invalid 2nd arg: expected a [TPattern]&quot; _
+		&amp; NL &amp; &quot;but there&apos;s a &quot; &amp; _str(typeOf(ap)) _
+		&amp; &quot; at index &quot; &amp; i _
+		&amp; &quot;:&quot; &amp; NL &amp; toString(ap) _
+	)
+Pattern_Data_2nd_arg_wrong_count:
+	On Local Error Goto 0 &apos; disable error handler
+	croak(&quot;invalid 2nd arg: &quot; &amp; nameOf(dc) _
+		&amp; &quot; needs &quot; &amp; length(argTypes(dc)) &amp; &quot; args&quot; _
+		&amp; NL &amp; &quot;but we got &quot; &amp; length(argPatterns) &amp; &quot; patterns&quot; _
+	)
+End Function
+
+Function Pattern_Data_ctor(Optional x)
+	Static c As Object : If isNull(c) Then
+		c = _ctor(Pattern_Data(_ctor(nil), nil))
+	End If
+	Pattern_Data_ctor = _destructure(c, 0, x)
+End Function
+
+Function Pattern_Data_args(Optional x)
+	Static c As Object : If isNull(c) Then
+		c = _ctor(Pattern_Data(_ctor(nil), nil))
+	End If
+	Pattern_Data_args = _destructure(c, 1, x)
 End Function
 
 
@@ -381,6 +434,7 @@ Function [test_Pattern======================================]()
 	test_Pattern_Any()
 	test_Pattern_Var()
 	test_Pattern_Const()
+	test_Pattern_Data()
 
 	test_Pattern_isPattern()
 	test_Pattern_toString()
@@ -425,15 +479,52 @@ Function test_Pattern_Const()
 	assert_hasCtor(vConst, cConst).x
 	&apos; destructure:
 	assertEqual(Pattern_Const_value(vConst), 42).x
-	
-	assertEqual(isFn(Pattern_Const()), True).x
-	&apos;assertThrows(Pattern_Const, Array(1)).x	&apos; TODO: typecheck in applyDC
 
 	assertEqual(Pattern_Const_value(Pattern_Const(Nothing)), Nothing).x
 	assertEqual(Pattern_Const_value(Pattern_Const(Empty)), 	 Empty).x
 	assertEqual(Pattern_Const_value(Pattern_Const(&quot;qmbl&quot;)),  &quot;qmbl&quot;).x
 	&apos;assertEqual(Pattern_Const_value(Pattern_Const()), ).x
+	
+	assertEqual(isFn(Pattern_Const()), True).x
 End Function
+
+Function test_Pattern_Data()
+	Dim cDat : cDat = findDataCtor(TPattern, &quot;Data&quot;)
+	Dim cNil : cNil = Tp.List_Nil
+	Dim vNil : vNil = nil
+	Dim pNil : pNil = Pattern_Data(cNil, vNil)
+	assert_hasCtor(pNil, cDat).x
+	&apos; destructure:
+	assert_same(Pattern_Data_ctor(pNil), cNil).x
+	assert_same(Pattern_Data_args(pNil), vNil).x
+	
+	Dim c, args, p
+	c = Tp.List_Cons
+	args = List(Pattern_Const(1), pNil)
+	p = Pattern_Data(c, args)
+	assert_hasCtor(p, cDat).x
+	&apos; destructure:
+	assert_same(Pattern_Data_ctor(p), c).x
+	assert_same(Pattern_Data_args(p), args).x
+	
+	&apos; expects a data ctor as 1st arg
+	assertThrows(Pattern_Data, Array(TList, args)).x
+	assertThrows(Pattern_Data, Array(vNil,  args)).x
+	assertThrows(Pattern_Data, Array(&quot;foo&quot;, args)).x
+	
+	&apos; expects a List as 2nd arg
+	assertThrows(Pattern_Data, Array(c, &quot;foo&quot;)).x
+	
+	&apos; expects a List of *Patterns* as 2nd arg
+	assertThrows(Pattern_Data, Array(c, List(1, pNil))).x
+	
+	&apos; Pattern list must be same length as data ctor&apos;s argTypes
+	assertThrows(Pattern_Data, Array(c, List(pNil))).x
+
+	&apos; Patterns must be compatible with data ctor&apos;s argTypes:
+	assertThrows(Pattern_Data, Array(c, List(pNil, pNil))).x
+End Function
+
 
 Function test_Pattern_isPattern()
 	assertEqual(isPattern(patAny), 			True).x
