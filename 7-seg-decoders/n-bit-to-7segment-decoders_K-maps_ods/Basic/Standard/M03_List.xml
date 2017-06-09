@@ -124,7 +124,6 @@ Function nth(ByVal n As Integer, ByVal xs As Variant)
 	nth = car(xs)
 End Function
 
-
 Function cadr(xs)
 	cadr = nth(1, xs)
 End Function
