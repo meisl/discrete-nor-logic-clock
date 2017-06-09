@@ -28,16 +28,68 @@ Function TPattern()
 		Dim tcPat
 		tcPat = _mkDataTypeCtor(&quot;Pattern&quot;, 0)
 		out = tcPat
-		Dim cAny, cVar, cVal, cData
-		cAny  = _mkDataCtor(tcPat, &quot;Any&quot;, nil)
-		cVar  = _mkDataCtor(tcPat, &quot;Var&quot;, List(Tp.Native_String))
-		cVal  = _mkDataCtor(tcPat, &quot;Val&quot;, List(Tp.Native_Variant))
-		cData = _mkDataCtor(tcPat, &quot;Data&quot;, List(TDataCtor, TList(tcPat)))
+		Dim cAny, cVar, cConst, cData
+		cAny   = _mkDataCtor(tcPat, &quot;Any&quot;, 	 nil)
+		cVar   = _mkDataCtor(tcPat, &quot;Var&quot;, 	 List(Tp.Native_String))
+		cConst = _mkDataCtor(tcPat, &quot;Const&quot;, List(Tp.Native_Variant))
+		cData  = _mkDataCtor(tcPat, &quot;Data&quot;,  List(TDataCtor, TList(tcPat)))
 		&apos;msgbox(hasType(&quot;asdf&quot;, Tp.Native_Variant))
-		show(cData.str)
+		&apos;show(cData.str)
 	End If
 	TPattern = out
 End Function
+
+Function Pattern_Any()
+	Static out As Object : If isNull(out) Then
+		out = singletonVal(findDataCtor(TPattern, &quot;Any&quot;))
+	End If
+	Pattern_Any = out
+End Function
+
+Function Pattern_Var(Optional nm)
+	Static c As Object, oFn As Object
+	Dim out
+	If isNull(c) Then
+		c = findDataCtor(TPattern, &quot;Var&quot;)
+		oFn = applyDC(c)
+	End If
+	If isMissing(nm) Then
+		out = oFn
+	Else
+		out = applyDC(c, nm)
+	End If
+	Pattern_Var = out
+End Function
+
+Function Pattern_Var_name(Optional x)
+	Static c As Object : If isNull(c) Then : c = _ctor(Pattern_Var(&quot;x&quot;)) : End If
+	Pattern_Var_name = _destructure(c, 0, x)
+End Function
+
+Function Pattern_Const(Optional val)
+	Static c As Object, oFn As Object
+	Dim out
+	If isNull(c) Then
+		c = findDataCtor(TPattern, &quot;Const&quot;)
+		oFn = applyDC(c)
+	End If
+	If isMissing(val) Then
+		out = oFn
+	Else
+		out = applyDC(c, val)
+	End If
+	Pattern_Const = out
+End Function
+
+Function Pattern_Const_value(Optional x)
+	Static c As Object : If isNull(c) Then : c = _ctor(Pattern_Const(&quot;x&quot;)) : End If
+	Pattern_Const_value = _destructure(c, 0, x)
+End Function
+
+
+
+
+
 
 Function newPattern(which As String, a0 As Variant)
 	Dim out As New TPattern
@@ -325,6 +377,11 @@ End Function
 
 
 Function [test_Pattern======================================]()
+	test_Pattern_TPattern()
+	test_Pattern_Any()
+	test_Pattern_Var()
+	test_Pattern_Const()
+
 	test_Pattern_isPattern()
 	test_Pattern_toString()
 	test_Pattern_matches_Any()
@@ -332,6 +389,50 @@ Function [test_Pattern======================================]()
 	test_Pattern_matches_Var()
 	test_Pattern_matches_List()
 	test_Pattern_matches_ASN()
+End Function
+
+Function test_Pattern_TPattern()
+	Dim tc : tc = TPattern
+	Dim dcs
+	assert_hasCtor(tc, Tp.DataTypeCtor).x
+	dcs = dataCtors(tc)
+	assertEqual(isList(dcs), True).x
+	assertEqual(isNil(dcs), False).x
+End Function
+
+Function test_Pattern_Any()
+	Dim cAny : cAny = findDataCtor(TPattern, &quot;Any&quot;)
+	Dim vAny : vAny = Pattern_Any()
+	assert_hasCtor(vAny, cAny).x
+	&apos; returns the same value again:
+	assert_same(Pattern_Any(), vAny).x
+End Function
+
+Function test_Pattern_Var()
+	Dim cVar : cVar = findDataCtor(TPattern, &quot;Var&quot;)
+	Dim vVar : vVar = Pattern_Var(&quot;foo&quot;)
+	assert_hasCtor(vVar, cVar).x
+	&apos; destructure:
+	assertEqual(Pattern_Var_name(vVar), &quot;foo&quot;).x
+	
+	assertEqual(isFn(Pattern_Var()), True).x
+	&apos;assertThrows(Pattern_Var, Array(1)).x	&apos; TODO: typecheck in applyDC
+End Function
+
+Function test_Pattern_Const()
+	Dim cConst : cConst = findDataCtor(TPattern, &quot;Const&quot;)
+	Dim vConst : vConst = Pattern_Const(42)
+	assert_hasCtor(vConst, cConst).x
+	&apos; destructure:
+	assertEqual(Pattern_Const_value(vConst), 42).x
+	
+	assertEqual(isFn(Pattern_Const()), True).x
+	&apos;assertThrows(Pattern_Const, Array(1)).x	&apos; TODO: typecheck in applyDC
+
+	assertEqual(Pattern_Const_value(Pattern_Const(Nothing)), Nothing).x
+	assertEqual(Pattern_Const_value(Pattern_Const(Empty)), 	 Empty).x
+	assertEqual(Pattern_Const_value(Pattern_Const(&quot;qmbl&quot;)),  &quot;qmbl&quot;).x
+	&apos;assertEqual(Pattern_Const_value(Pattern_Const()), ).x
 End Function
 
 Function test_Pattern_isPattern()

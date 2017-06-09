@@ -85,6 +85,31 @@ Function _newDataValue(ctor As DataValue, ByRef args As Array)
 	_newDataValue = out
 End Function
 
+&apos; old stuff, to be replaced
+Function _tyname(o As Object)
+	_tyname = o.tyname
+End Function
+
+Function _id(o As Object)
+	_id = o.id
+End Function
+
+Function _str(o As Object)
+	_str = o.str
+End Function
+
+Function _ctor(o As Object)
+	_ctor = o.ctor
+End Function
+
+Function _fields(o As Object)
+	_fields = o.fields
+End Function
+
+Function _x(o As Object)
+	_x = o.x
+End Function
+
 Function Tp() &apos; bootstrap TType and data types
 	Static out As Object
 	If isNull(out) Then
@@ -289,13 +314,6 @@ isDataValue_end:
 End Function
 
 
-Function _ctor(o As Object)
-	_ctor = o.ctor
-End Function
-
-Function _fields(o As Object)
-	_fields = o.fields
-End Function
 
 Function field(idx As Integer, v As DataValue)
 	field = v.fields(idx)
@@ -328,7 +346,7 @@ End Function
 
 Function typeOf(Optional x As Variant)
 	Static oFn As Object &apos; init only when needed (Fn() requires List)
-	Static cs As Variant
+	Static cs As Variant, cDataCtor As Object
 	&apos; ATTENTION: cByte, cInt, cLng, cSng, cDbl, cStr, cDate, cBool
 	&apos;            are BASIC *keywords*! 
 	Static _Byte, _Int, _Lng, _Sng, _Dbl, _Str, _Bool
@@ -362,6 +380,8 @@ Function typeOf(Optional x As Variant)
 		cs(11) = _Bool
 		cs(12) = _Variant
 		cs(17) = _Byte
+		
+		cDataCtor = Tp.DataCtor
 	End If
 		
 	Dim out As Variant, vt As Integer
@@ -389,10 +409,22 @@ _vtNN:
 _vt09: &apos; isObject(x) = True
 	out = _Obj
 	On Local Error Goto _typeOf_end
-	Dim c : c = _ctor(x) &apos; DON&apos;T dot-access members in here!
-	out = field(DataCtor_typeCtor, c)
-	c = _ctor(c) &apos; .ctor of x&apos;s .ctor
-	If Not(DataValue_same(c, Tp.DataCtor)) Then
+	&apos; Does x have a .ctor member?
+	Dim cx  : cx  = _ctor(x)  &apos; DON&apos;T dot-access members in here!
+	&apos; But is it (cx) a TDataCtor?
+	&apos; The field access may throw if cx ain&apos;t a TDataCtor...
+	out = field(DataCtor_typeCtor, cx)
+	&apos; But if it didn&apos;t we have to make sure that cx
+	&apos; really was constructed by DataCtor:
+	Dim ccx : ccx = _ctor(cx) &apos; .ctor of x&apos;s .ctor
+	If DataValue_same(ccx, cDataCtor) Then
+		Dim r As Integer, i As Integer
+		r = field(DataTypeCtor_arity, out)
+		&apos; TODO: typeOf - fully apply DataTypeCtor with arity &gt; 0?
+		&apos;For i = 0 To r - 1
+		&apos;	out = TypeApp(out, TypeParam(i))
+		&apos;Next i
+	Else
 		out = _Obj
 	End If
 _typeOf_end:
@@ -583,15 +615,29 @@ End Sub
 
 &apos; --------------------------------------------------------------
 
+&apos; --- TDataTypeCtor
+
 Function TDataTypeCtor()
 	Static out As Object : If isNull(out) Then : out = Tp.TDataTypeCtor : End If
 	TDataTypeCtor = out
 End Function
 
+Function dataCtors(Optional tc)
+	dataCtors = _destructure(Tp.DataTypeCtor, 2, tc)
+End Function
 
-Function TDataCtor()
-	Static out As Object : If isNull(out) Then : out = Tp.TDataCtor : End If
-	TDataCtor = out
+Function findDataCtor(tc, dcName As String)
+	Dim dcs As Object, dc as Object, out
+	dcs = dataCtors(tc)
+	Do Until isNil(dcs)
+		dc = car(dcs)
+		If nameOf(dc) = dcName Then
+			out = dc
+			Exit Do
+		End If
+		dcs = cdr(dcs)
+	Loop
+	findDataCtor = out
 End Function
 
 Function nameOf(x)
@@ -609,9 +655,31 @@ nameOf_error:
 	nameOf = out
 End Function
 
-Function argTypes(Optional dataCtor)
-	argTypes = _destructure(Tp.DataCtor, 1, dataCtor)
+&apos; --- TDataCtor
+
+Function TDataCtor()
+	Static out As Object : If isNull(out) Then : out = Tp.TDataCtor : End If
+	TDataCtor = out
 End Function
+
+Function argTypes(Optional dc)
+	argTypes = _destructure(Tp.DataCtor, 1, dc)
+End Function
+
+Function singletonVal(Optional dc)
+	Dim out
+	If isMissing(dc) Then
+		out = Fn.singletonVal
+	ElseIf isNil(argTypes(dc)) Then
+		out = _x(dc)
+	Else
+		croak(&quot;not a singleton data ctor: &quot; &amp; nameOf(dc) _
+			&amp; NL &amp; _str(dc))
+	End If
+	singletonVal = out
+End Function
+
+&apos; --- List
 
 Function TList(Optional typeArg)
 	Static tc As Object : If isNull(tc) Then : tc = Tp.List : End If
@@ -623,6 +691,8 @@ Function TList(Optional typeArg)
 	End If
 	TList = out
 End Function
+
+&apos; --- TType
 
 Function TType()
 	Static out As Object : If isNull(out) Then : out = Tp.TType : End If
@@ -903,7 +973,7 @@ _tc0:
 		End Select
 	ElseIf n = r Then
 		If r = 0 Then
-			out = c.x
+			out = singletonVal(c)
 			If isEmpty(out) Then
 				croak(&quot;applyDC &quot; &amp; cName &amp; &quot;: singleton ctor &quot; _
 					&amp; &quot; empty with .x&quot; _
@@ -1306,11 +1376,6 @@ _typeStr_end:
 	_typeStr = out
 End Function
 
-Function _tyname(o As Object)
-	_tyname = o.tyname
-End Function
-
-
 
 
 Function isString(Optional x As Variant)
@@ -1348,6 +1413,10 @@ Function [test_Type======================================]
 	
 	test_Type_applyDC()
 	test_Type_destructure()
+	test_Type_dataCtors()
+	&apos;test_Type_nameOf()
+	test_Type_findDataCtor()
+	test_Type_singletonVal()
 
 	test_Type_Type_arity()
 End Function
@@ -2963,7 +3032,7 @@ Function test_Type_hasType
 	assertEqual(hasType(List(1),		nInt),	False).x
 	assertEqual(hasType(List(1, 2),		nInt),	False).x
 	
-	&apos; list	
+	&apos; lists
 	
 	assertEqual(hasType(nil,			TList(a)),		True).x
 	assertEqual(hasType(nil,			TList(nInt)),	True).x
@@ -2972,6 +3041,9 @@ Function test_Type_hasType
 	
 	assertEqual(hasType(List(1),		TList(a)),		True).x
 	assertEqual(hasType(List(1),		TList(nInt)),	True).x
+
+	&apos; TODO: hasType(..., TList) [unapplied TList]?
+	assertEqual(hasType(List(1),		TList),		True).x
 	
 	&apos; NYI
 	&apos;assertEqual(hasType(List(1),		TList(nStr)),	False).x
@@ -2979,8 +3051,10 @@ Function test_Type_hasType
 
 	&apos; NYI
 	&apos;assertEqual(hasType(3, TypeParam(0)), True).x
-	&apos; NYI
-	&apos;assertEqual(hasType(3, TList(nStr)), False).x
+	
+	
+	assertEqual(hasType(3,		TList(nStr)), False).x
+	assertEqual(hasType(&quot;foo&quot;,	TList(nStr)), False).x
 
 
 	&apos; depending on isSubtypeOf
@@ -3210,6 +3284,60 @@ Function test_Type_destructure()
 	assertThrows(f, Array(vP)).x
 	assert_same(apply(f, vA), vP).x
 
+End Function
+
+Function test_Type_dataCtors()
+	Dim tc, dcs
+	tc = Tp.TDataTypeCtor : dcs = dataCtors(tc)
+	assert_same(dcs, field(DataTypeCtor_dataCtors, tc)).x
+	assertEqual(length(dcs), 1).x
+	
+	tc = Tp.TDataCtor : dcs = dataCtors(tc)
+	assert_same(dcs, field(DataTypeCtor_dataCtors, tc)).x
+	assertEqual(length(dcs), 1).x
+	
+	tc = Tp.TNative : dcs = dataCtors(tc)
+	assert_same(dcs, field(DataTypeCtor_dataCtors, tc)).x
+	assertEqual(length(dcs), 1).x
+	
+	tc = Tp.TType : dcs = dataCtors(tc)
+	assert_same(dcs, field(DataTypeCtor_dataCtors, tc)).x
+	assertEqual(length(dcs), 2).x
+	
+	tc = Tp.List : dcs = dataCtors(tc)
+	assert_same(dcs, field(DataTypeCtor_dataCtors, tc)).x
+	assertEqual(length(dcs), 2).x
+	
+	assertThrows(dataCtors, Array(Tp.DataTypeCtor)).x
+	assertThrows(dataCtors, Array(Tp.DataCtor)).x
+	assertThrows(dataCtors, Array(Tp.Native)).x
+	assertThrows(dataCtors, Array(Tp.TType_Param)).x
+	assertThrows(dataCtors, Array(Tp.TType_App)).x
+	assertThrows(dataCtors, Array(Tp.List_Nil)).x
+	assertThrows(dataCtors, Array(Tp.List_Cons)).x
+	assertThrows(dataCtors, Array(nil)).x
+	assertThrows(dataCtors, Array(List(1, 2, 3))).x
+End Function
+
+Function test_Type_findDataCtor()
+	assert_same(findDataCtor(Tp.TDataTypeCtor, &quot;DataTypeCtor&quot;), Tp.DataTypeCtor).x
+	assert_same(findDataCtor(Tp.TDataCtor, &quot;DataCtor&quot;), Tp.DataCtor).x
+	assert_same(findDataCtor(Tp.TNative, &quot;Native&quot;), Tp.Native).x
+	assert_same(findDataCtor(Tp.TType, &quot;Param&quot;), Tp.TType_Param).x
+	assert_same(findDataCtor(Tp.TType, &quot;App&quot;), Tp.TType_App).x
+	assert_same(findDataCtor(Tp.List, &quot;Nil&quot;), Tp.List_Nil).x
+	assert_same(findDataCtor(Tp.List, &quot;Cons&quot;), Tp.List_Cons).x
+End Function
+
+Function test_Type_singletonVal()
+	Dim v
+	v = nil
+	assert_same(singletonVal(Tp.List_Nil), v).x
+	&apos; throws if data ctor is not singleton ctor
+	assertThrows(singletonVal, Array(Tp.List_Cons)).x
+	&apos; throws if passed something not a data ctor
+	assertThrows(singletonVal, Array(v)).x
+	assertThrows(singletonVal, Array(&quot;asdf&quot;)).x
 End Function
 
 Function test_Type_Type_arity()

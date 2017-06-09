@@ -24,6 +24,7 @@ Function show(a As Variant, Optional b As Variant)
 			MsgBox(toString(a) &amp; NL &amp; NL &amp; toString(b))
 		End If
 	End If
+	show = Nothing
 End Function
 
 

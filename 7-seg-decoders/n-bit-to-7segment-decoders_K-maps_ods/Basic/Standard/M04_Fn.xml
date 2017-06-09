@@ -20,6 +20,7 @@ Type TFnObjs
 	ctorOf		As Object
 	hasType		As Object
 	destructure	As Object
+	singletonVal	As Object
 	
 	isEmpty		As Object
 	isString	As Object
@@ -134,6 +135,7 @@ Function Fn
 		out.ctorOf		= mkFn(fs, &quot;ctorOf&quot;,		1, &quot;Any -&gt; Maybe TDataCtor&quot;)
 		out.hasType		= mkFn(fs, &quot;hasType&quot;,		2, &quot;Any -&gt; Typ -&gt; Bool&quot;)
 		out.destructure	= mkFn(fs, &quot;destructure&quot;,	3, &quot;TDataCtor -&gt; Int -&gt; Any -&gt; Any&quot;)
+		out.singletonVal = mkFn(fs, &quot;singletonVal&quot;,	1, &quot;TDataCtor -&gt; Any&quot;)
 		
 		out.isEmpty		= mkFn(fs, &quot;isEmpty&quot;,		1, &quot;Any -&gt; Bool&quot;)
 		out.isString	= mkFn(fs, &quot;isString&quot;,		1, &quot;Any -&gt; Bool&quot;)
@@ -422,6 +424,7 @@ applyLast_of_one:
 	Select Case name
 		Case &quot;typeOf&quot;:				out = typeOf(				a0)
 		Case &quot;ctorOf&quot;:				out = ctorOf(				a0)
+		Case &quot;singletonVal&quot;:		out = singletonVal(			a0)
 		
 		Case &quot;isEmpty&quot;:				out = isEmpty(				a0)
 		Case &quot;isString&quot;:			out = isString(				a0)

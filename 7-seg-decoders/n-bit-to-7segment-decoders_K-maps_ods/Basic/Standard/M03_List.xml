@@ -12,7 +12,9 @@ End Sub
 &apos; --- constructor fns ---
 
 Function nil()
-	Static out As Object : If isNull(out) Then : out = Tp.List_Nil.x : End If
+	Static out As Object : If isNull(out) Then
+		out = singletonVal(Tp.List_Nil)
+	End If
 	nil = out
 End Function
 
@@ -73,12 +75,18 @@ End Function
 Function isNil(Optional xs)
 	Static oFn As Object, cNil As Object, cCons As Object
 	Dim out
-	If isNull(oFn) Then 
-		oFn = Fn.isNil
+	If isNull(cNil) Then 
 		cNil  = Tp.List_Nil
 		cCons = Tp.List_Cons
 	End If
 	If isMissing(xs) Then
+		&apos; retrieve only when needed:
+		&apos; Fn depends on nil
+		&apos; nil depends on singletonVal
+		&apos; singletonVal depends on isNil ...
+		If isNull(oFn) Then
+			oFn = Fn.isNil
+		End If
 		out = oFn
 	Else
 		On Local Error Goto isNil_typeError
