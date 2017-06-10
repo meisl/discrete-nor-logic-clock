@@ -422,8 +422,7 @@ _match_equ_test:
 			If isEmpty(v) Then
 				&apos; TODO: what if var was bound to value Empty?!
 				If isEmpty(x) Then
-					croak(&quot;match: trying to bind var &quot; &amp; nm _
-						&amp; &quot; to value Empty!&quot;)
+					Goto _match_cannot_bind_var_to_Empty
 				End If
 				out = extend(e, nm, x)
 			Else
@@ -440,33 +439,48 @@ _match_equ_test:
 				pArgs = Pattern_Data_args(p)
 				out = _matchArgs(pArgs, e, x)
 			Else
-_match_require_same_datatype:
-				If DataValue_same(typeCtorOf(cx), typeCtorOf(pCtor)) Then
-					&apos; fine, just doesn&apos;t match
-					out = Empty
-				Else
-_match_type_error:
-					On Local Error Goto _match_fuck		
-					msg = &quot;match: type error&quot; _
-						&amp; &quot; - expected Data/&quot; &amp; typeCtorName(pCtor) _
-						&amp; &quot;, not a &quot; &amp; typeStr(x)
-					On Local Error Goto 0 &apos; disable error handler
-					croak(msg)
-_match_fuck:
-					On Local Error Goto 0 &apos; disable error handler		
-				
-				End If
+				Goto _match_require_same_datatype
 			End If
 		Case Else
-			msg = &quot;match: bad pattern &quot; &amp; typeStr(p)
-			If hasType(p, TPattern) Then
-				msg = msg &amp; NL &amp; &quot;NYI?: &quot; &amp; ctorName(p)
-			End If
-			croak(msg)
 	End Select
 
 	End Select
+
+_match_done:
 	_match = out
+	Exit Function
+
+_match_bad_pattern:
+	On Local Error Goto 0 &apos; disable error handler
+	msg = &quot;match: bad pattern &quot; &amp; typeStr(p)
+	If hasType(p, TPattern) Then
+		msg = msg &amp; NL &amp; &quot;NYI?: &quot; &amp; ctorName(p)
+	End If
+	croak(msg)
+
+_match_cannot_bind_var_to_Empty:
+	On Local Error Goto 0 &apos; disable error handler
+	msg = &quot;match: trying to bind var &quot; &amp; nm _
+		&amp; &quot; to value Empty!&quot;
+	croak(msg)
+
+_match_require_same_datatype:
+	If DataValue_same(typeCtorOf(cx), typeCtorOf(pCtor)) Then
+	&apos; fine, just doesn&apos;t match
+		out = Empty
+		Goto _match_done
+	End If
+	Goto _match_type_error
+				
+_match_type_error:
+	On Local Error Goto 0 &apos; disable error handler
+	&apos;On Local Error Goto _match_fuck		
+	msg = &quot;match: type error&quot; _
+		&amp; &quot; - expected Data/&quot; &amp; typeCtorName(pCtor) _
+		&amp; &quot;, not a &quot; &amp; typeStr(x)
+	On Local Error Goto 0 &apos; disable error handler
+	croak(msg)
+
 End Function
 
 Function _matchArgs( _
