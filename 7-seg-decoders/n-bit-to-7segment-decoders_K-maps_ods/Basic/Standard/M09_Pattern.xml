@@ -351,32 +351,64 @@ Function _match( _
 	ByVal e As Variant, _
 	ByVal x As Variant _
 )
-	Static pAny		As Object	&apos; the &quot;Any&quot; pattern (singleton value)
-	Static id_pAny	As Integer	&apos; id of pAny
-	Static cpAny	As Object	&apos; ctor of pAny (singleton data ctor)
-	Static id_cpAny As Object	&apos; id of cpAny
-	Static idVar	As Integer
-	Static idConst	As Integer
-	Static idData	As Integer
-	If isNull(cAny) Then
-		pAny	 = Pattern_Any
-		id_pAny  = _id(pAny)
-		cpAny 	 = _ctor(pAny)
-		id_cpAny = _id(cpAny)
-		idVar    = _id(findDataCtor(TPattern, &quot;Var&quot;))
-		idConst  = _id(findDataCtor(TPattern, &quot;Const&quot;))
-		idData   = _id(findDataCtor(TPattern, &quot;Data&quot;))
+	Static pAny       As Object		&apos; the &quot;Any&quot; pattern (singleton value)
+	Static id_pAny    As Integer	&apos; id of pAny
+	Static cpAny      As Object		&apos; ctor of pAny (singleton data ctor)
+	Static id_cpAny   As Integer	&apos; id of cpAny
+	Static id_cpVar   As Integer	&apos; id of the &quot;Var&quot; pattern ctor
+	Static id_cpConst As Integer	&apos; id of the &quot;Const&quot; pattern ctor
+	Static pNil       As Object		&apos; pattern that matches [] (a Data pattern)
+	Static id_pNil    As Integer	&apos; id of pNil
+	Static vNil       As Object		&apos; the singleton value []
+	Static id_vNil    As Integer	&apos; id of vNil
+	Static cNil       As Object		&apos; the singleton data ctor Nil
+	Static tcList     As Object		&apos; typeCtor of cNil
+	Static cpData     As Object		&apos; the &quot;Data&quot; pattern ctor (= ctor of pNil)
+	Static id_cpData  As Integer	&apos; id of the &quot;Data&quot; pattern ctor
+	If isNull(pAny) Then
+		&apos; Let&apos;s avoid mentioning the actual name strings of the ctors!
+		pAny	   = Pattern_Any
+		id_pAny    = _id(pAny)
+		cpAny 	   = _ctor(pAny)
+		id_cpAny   = _id(cpAny)
+		id_cpVar   = _id(_ctor(Pattern_Var(&quot;x&quot;)))
+		id_cpConst = _id(_ctor(Pattern_Const(42)))
+		pNil       = patNil
+		id_pNil    = _id(pNil)
+		vNil       = nil
+		id_vNil    = _id(vNil)
+		cNil       = _ctor(vNil)
+		tcList     = typeCtorOf(cNil)
+		assert_same(tcList, TList).x
+		cpData     = _ctor(pNil)
+		&apos;assert_same(cpData, findDataCtor(TPattern, &quot;Data&quot;)).x
+		id_cpData  = _id(cpData)
 	End If
 	Dim out
-	Dim v As Variant, nm As String
-	Dim cx As Object   &apos; ctor of x (if needed)
-	Dim cp As Object   &apos; ctor field of p if p is Data : Data DataCtor ...
-	Dim args As Object &apos; args field of p if p is Data : Data ... [TPattern]
-	Dim msg As String
+	Dim v     As Variant	&apos; value of Const pattern
+	Dim nm    As String	&apos; name of Var pattern
+	Dim cx    As Object	&apos; ctor of x (if p isa Data)
+	Dim pCtor As Object	&apos; ctor field of p if p isa Data : Data DataCtor ...
+	Dim pArgs As Object	&apos; args field of p if p isa Data : Data ... [TPattern]
+	Dim msg   As String	&apos; on errors
 	
+	Select Case _id(p)
+		Case id_pAny:	out = e
+		Case id_pNil
+			pCtor = cNil &apos; make sure error handler makes right msg
+			On Local Error Goto _match_type_error
+			If _id(x) = id_vNil Then
+				out = e
+			Else
+				&apos; is it at least a List?
+				cx = _ctor(x)
+				Goto _match_require_same_datatype:
+			End If
+		Case Else
+				
 	Select Case _id(_ctor(p))
 		Case id_cpAny:		out = e
-		Case idConst
+		Case id_cpConst
 			v = Pattern_Const_value(p)
 _match_equ_test:			
 			If equ(x, v) Then
@@ -384,7 +416,7 @@ _match_equ_test:
 			Else
 				out = Empty
 			End If
-		Case idVar
+		Case id_cpVar
 			nm = Pattern_Var_name(p)
 			v = lookup(nm, e)
 			If isEmpty(v) Then
@@ -399,25 +431,30 @@ _match_equ_test:
 				&apos;out = _matches(Pattern_Const(v), e, x)
 				Goto _match_equ_test
 			End If
-		Case idData
-			cp = Pattern_Data_ctor(p)
+		Case id_cpData
+			pCtor = Pattern_Data_ctor(p)
 			On Local Error Goto _match_type_error
 			cx = _ctor(x)
 			On Local Error Goto 0 &apos; disable error handler
-			If DataValue_same(cx, cp) Then
-				args = Pattern_Data_args(p)
-				out = _matchArgs(args, e, x)
+			If DataValue_same(cx, pCtor) Then
+				pArgs = Pattern_Data_args(p)
+				out = _matchArgs(pArgs, e, x)
 			Else
-				If DataValue_same(typeCtorOf(cx), typeCtorOf(cp)) Then
+_match_require_same_datatype:
+				If DataValue_same(typeCtorOf(cx), typeCtorOf(pCtor)) Then
 					&apos; fine, just doesn&apos;t match
 					out = Empty
 				Else
 _match_type_error:
-					On Local Error Goto 0 &apos; disable error handler		
+					On Local Error Goto _match_fuck		
 					msg = &quot;match: type error&quot; _
-						&amp; &quot; - expected Data/&quot; &amp; typeCtorName(cp) _
+						&amp; &quot; - expected Data/&quot; &amp; typeCtorName(pCtor) _
 						&amp; &quot;, not a &quot; &amp; typeStr(x)
+					On Local Error Goto 0 &apos; disable error handler
 					croak(msg)
+_match_fuck:
+					On Local Error Goto 0 &apos; disable error handler		
+				
 				End If
 			End If
 		Case Else
@@ -426,6 +463,8 @@ _match_type_error:
 				msg = msg &amp; NL &amp; &quot;NYI?: &quot; &amp; ctorName(p)
 			End If
 			croak(msg)
+	End Select
+
 	End Select
 	_match = out
 End Function
