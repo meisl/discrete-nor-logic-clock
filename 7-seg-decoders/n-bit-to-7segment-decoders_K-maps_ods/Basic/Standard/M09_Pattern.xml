@@ -234,17 +234,24 @@ patList_0:
 End Function
 
 
-Function TPattern_toString(p As Object)
+Function TPattern_toString(Optional p As Object)
 	Static oFn As Object
 	If isNull(oFn) Then
 		oFn = Fn.TPattern_toString
 	End If
 	Dim out
-	out = _TPattern_toString(p)
+	If isMissing(p) Then
+		out = oFn
+	Else
+		out = _TPattern_toString(p, False)
+	End If
 	TPattern_toString = out
 End Function
 	
-Function _TPattern_toString(p As Object)
+Function _TPattern_toString( _
+	p As Object, _
+	needParens As Boolean _
+)
 	Static cAny		As Object
 	Static idAny	As Integer
 	Static idVar	As Integer
@@ -280,22 +287,28 @@ Function _TPattern_toString(p As Object)
 					Dim pHd : pHd = car(ps)
 					Dim pTl : pTl = cadr(ps)
 					If DataValue_same(pTl, patNil) Then
-						out = &quot;[&quot; &amp; _TPattern_toString(pHd) &amp; &quot;]&quot;
+						out = &quot;[&quot; &amp; _TPattern_toString(pHd, False) &amp; &quot;]&quot;
 					Else
-						out = &quot;(&quot; _
-							&amp; _TPattern_toString(pHd) _
+						out = _TPattern_toString(pHd, True) _
 							&amp; &quot;:&quot; _
-							&amp; _TPattern_toString(pTl) _
-							&amp; &quot;)&quot;
+							&amp; _TPattern_toString(pTl, True)
+						If needParens Then
+							out = &quot;(&quot; &amp; out &amp; &quot;)&quot;
+						End If
 					End If
 				Else
 					Dim q As Object
 					out = nameOf(c)
-					Do Until isNil(ps)
-						q = car(ps)
-						ps = cdr(ps)
-						out = out &amp; &quot; &quot; &amp; _TPattern_toString(q)
-					Loop
+					If Not(isNil(ps)) Then
+						Do Until isNil(ps)
+							q = car(ps)
+							ps = cdr(ps)
+							out = out &amp; &quot; &quot; &amp; _TPattern_toString(q, True)
+						Loop
+						If needParens Then
+							out = &quot;(&quot; &amp; out &amp; &quot;)&quot;
+						End If
+					End If
 				End If
 			End If	
 
@@ -804,18 +817,22 @@ Function test_Pattern_toString()
 	
 	assertEqual(toString(patNil), 	 &quot;[]&quot;).x
 	assertEqual(toString(patList()), &quot;[]&quot;).x
+	&apos; patterns for a list with exactly one elem:
 	p = patList(Pattern_Any)
 	assertEqual(TPattern_toString(p), &quot;[_]&quot;).x
 	p = patCons(Pattern_Any, patNil)
 	assertEqual(toString(p), &quot;[_]&quot;).x
+	&apos; pattern for a list with exactly two elems:
 	p = patList(Pattern_Any, Pattern_Any)
-	assertEqual(toString(p), &quot;(_:[_])&quot;).x
+	assertEqual(toString(p), &quot;_:[_]&quot;).x
+	&apos; patterns for a list with at least one elem:
 	p = patCons(Pattern_Any, Pattern_Any)
-	assertEqual(toString(p), &quot;(_:_)&quot;).x
+	assertEqual(toString(p), &quot;_:_&quot;).x
 	p = patCons(Pattern_Var(&quot;y&quot;), Pattern_Var(&quot;ys&quot;))
-	assertEqual(toString(p), &quot;(y:ys)&quot;).x
+	assertEqual(toString(p), &quot;y:ys&quot;).x
+	&apos; pattern for a list with at least two elems:
 	p = patCons(Pattern_Var(&quot;x&quot;), p)
-	assertEqual(toString(p), &quot;(x:(y:ys))&quot;).x
+	assertEqual(toString(p), &quot;x:(y:ys)&quot;).x
 	
 	&apos; patterns that match a pattern (patterns for a pattern)
 	Dim cAny : cAny = _ctor(Pattern_Any)
@@ -827,6 +844,11 @@ Function test_Pattern_toString()
 	assertEqual(TPattern_toString(p), &quot;Var &apos;x&apos;&quot;).x
 	p = Pattern_Data(cVar, List(Pattern_Var(&quot;x&quot;)))
 	assertEqual(toString(p), &quot;Var x&quot;).x
+	
+	&apos; pattern that matches a list of two Var patterns having the same varname:
+	p = patList(p, p)
+	assertEqual(TPattern_toString(p), &quot;(Var x):[Var x]&quot;).x
+	&apos;assertEqual(TPattern_toString(p), &quot;[Var x, Var x]&quot;).x
 
 	Dim cConst : cConst = findDataCtor(TPattern, &quot;Const&quot;)
 	p = Pattern_Data(cConst, List(Pattern_Const(42)))
@@ -836,7 +858,7 @@ Function test_Pattern_toString()
 	p = Pattern_Data(cData, List(Pattern_Var(&quot;ctor&quot;), Pattern_Var(&quot;args&quot;))
 	assertEqual(TPattern_toString(p), &quot;Data ctor args&quot;).x
 
-	&apos; match a particular data ctor (as opposed to a value *of* that ctor)
+	&apos; pattern to match a particular data ctor (as opposed to a value *of* that ctor)
 	Dim cDataCtor : cDataCtor = Tp.DataCtor
 	Dim cNil      : cNil = Tp.List_Nil
 	p = Pattern_Data(cDataCtor, List( _
