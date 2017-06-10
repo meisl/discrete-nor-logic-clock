@@ -351,17 +351,21 @@ Function _match( _
 	ByVal e As Variant, _
 	ByVal x As Variant _
 )
-	Static cAny		As Object
-	Static idAny	As Integer
+	Static pAny		As Object	&apos; the &quot;Any&quot; pattern (singleton value)
+	Static id_pAny	As Integer	&apos; id of pAny
+	Static cpAny	As Object	&apos; ctor of pAny (singleton data ctor)
+	Static id_cpAny As Object	&apos; id of cpAny
 	Static idVar	As Integer
 	Static idConst	As Integer
 	Static idData	As Integer
 	If isNull(cAny) Then
-		cAny = findDataCtor(TPattern, &quot;Any&quot;)
-		idAny   = _id(cAny)
-		idVar   = _id(findDataCtor(TPattern, &quot;Var&quot;))
-		idConst = _id(findDataCtor(TPattern, &quot;Const&quot;))
-		idData  = _id(findDataCtor(TPattern, &quot;Data&quot;))
+		pAny	 = Pattern_Any
+		id_pAny  = _id(pAny)
+		cpAny 	 = _ctor(pAny)
+		id_cpAny = _id(cpAny)
+		idVar    = _id(findDataCtor(TPattern, &quot;Var&quot;))
+		idConst  = _id(findDataCtor(TPattern, &quot;Const&quot;))
+		idData   = _id(findDataCtor(TPattern, &quot;Data&quot;))
 	End If
 	Dim out
 	Dim v As Variant, nm As String
@@ -371,7 +375,7 @@ Function _match( _
 	Dim msg As String
 	
 	Select Case _id(_ctor(p))
-		Case idAny:		out = e
+		Case id_cpAny:		out = e
 		Case idConst
 			v = Pattern_Const_value(p)
 _match_equ_test:			
@@ -696,7 +700,7 @@ Function [test_Pattern======================================]()
 	test_Pattern_matches_List()
 	test_Pattern_matches_Pattern()
 	
-	test_Pattern_matches_ASN()
+	&apos;test_Pattern_matches_ASN()
 End Function
 
 Function test_Pattern_TPattern()
@@ -1460,7 +1464,9 @@ Function test_Pattern_matches_Pattern()
 	refute_matches(p, e, pConstFoo	).x
 	refute_matches(p, e, p			).x
 	assert_matches(p, e, pNil		).x
-
+	&apos; pNil = Pattern_Data(cNil, nil)
+	assert_matches(p, e, Pattern_Data(cNil, nil)	).x
+	
 End Function
 	
 Function test_Pattern_matches_ASN()
