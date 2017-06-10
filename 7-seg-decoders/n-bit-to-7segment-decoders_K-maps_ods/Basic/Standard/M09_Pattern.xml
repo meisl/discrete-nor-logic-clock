@@ -42,6 +42,7 @@ End Function
 Function Pattern_Any()
 	Static out As Object : If isNull(out) Then
 		out = singletonVal(findDataCtor(TPattern, &quot;Any&quot;))
+		out.str = &quot;_&quot;
 	End If
 	Pattern_Any = out
 End Function
@@ -50,7 +51,14 @@ Function Pattern_Var(Optional nm)
 	Static c As Object : If isNull(c) Then
 		c = findDataCtor(TPattern, &quot;Var&quot;)
 	End If
-	Pattern_Var = applyDC(c, nm)
+	Dim out
+	If isMissing(nm) Then
+		out = applyDC(c)
+	Else
+		out = applyDC(c, nm)
+		out.str = &quot;´&quot; &amp; nm
+	End If
+	Pattern_Var = out
 End Function
 
 Function Pattern_Var_name(Optional x)
@@ -64,7 +72,14 @@ Function Pattern_Const(Optional val)
 	Static c As Object : If isNull(c) Then
 		c = findDataCtor(TPattern, &quot;Const&quot;)
 	End If
-	Pattern_Const = applyDC(c, val)
+	Dim out
+	If isMissing(val) Then
+		out = applyDC(c)
+	Else
+		out = applyDC(c, val)
+		out.str = &quot;´&quot; &amp; toString(val)
+	End If
+	Pattern_Const = out
 End Function
 
 Function Pattern_Const_value(Optional x)
@@ -107,16 +122,24 @@ Function Pattern_Data(Optional dc, Optional argPatterns)
 			End If
 			i = i + 1
 		Loop
+		out.str = &quot;´&quot; &amp; nameOf(dc)
+		If i &gt; 0 Then
+			out.str = out.str &amp; &quot; ...&quot;
+		End If
 	End If
 	Pattern_Data = out
 	Exit Function
 Pattern_Data_2nd_arg_type_error:
-	On Local Error Goto 0 &apos; disable error handler
-	croak(&quot;invalid 2nd arg: expected a [TPattern]&quot; _
-		&amp; NL &amp; &quot;but there&apos;s a &quot; &amp; _str(typeOf(ap)) _
+	Dim msg As String
+	On Local Error Goto Pattern_Data_2nd_arg_type_error_skipToString
+	msg = &quot;:&quot; &amp; NL &amp; toString(ap)
+Pattern_Data_2nd_arg_type_error_skipToString:
+	msg = &quot;invalid 2nd arg: expected a [TPattern]&quot; _
+		&amp; NL &amp; &quot;but there&apos;s a &quot; &amp; typeStr(ap) _
 		&amp; &quot; at index &quot; &amp; i _
-		&amp; &quot;:&quot; &amp; NL &amp; toString(ap) _
-	)
+		&amp; msg
+	On Local Error Goto 0 &apos; disable error handler
+	croak(msg)
 Pattern_Data_2nd_arg_wrong_count:
 	On Local Error Goto 0 &apos; disable error handler
 	croak(&quot;invalid 2nd arg: &quot; &amp; nameOf(dc) _
@@ -157,7 +180,9 @@ Function isPattern(Optional x)
 End Function
 
 Function patNil()
-	Static out As Object : If isNull(out) Then : out = singletonPat(nil) : End If
+	Static out As Object : If isNull(out) Then 
+		out = singletonPat(nil)
+	End If
 	patNil = out
 End Function
 
@@ -210,49 +235,76 @@ End Function
 
 
 Function TPattern_toString(p As Object)
+	Static oFn As Object
+	If isNull(oFn) Then
+		oFn = Fn.TPattern_toString
+	End If
+	Dim out
+	out = _TPattern_toString(p)
+	TPattern_toString = out
+End Function
+	
+Function _TPattern_toString(p As Object)
+	Static cAny		As Object
+	Static idAny	As Integer
+	Static idVar	As Integer
+	Static idConst	As Integer
+	Static idData	As Integer
+	If isNull(cAny) Then
+		cAny = findDataCtor(TPattern, &quot;Any&quot;)
+		idAny   = _id(cAny)
+		idVar   = _id(findDataCtor(TPattern, &quot;Var&quot;))
+		idConst = _id(findDataCtor(TPattern, &quot;Const&quot;))
+		idData  = _id(findDataCtor(TPattern, &quot;Data&quot;))
+	End If
 	Dim out As Variant
-	Select Case p.which
-		Case &quot;Any&quot;:			out = &quot;_&quot;
-		Case &quot;Var&quot;:			out = p.a0
-		Case &quot;Val&quot;
-			If isEmpty(p.a0) Then
+	&apos; TODO: specialize singleton patterns like patAny, patNil, ...
+	On Local Error Goto _TPattern_toString_error
+	Select Case _id(_ctor(p))
+		Case idAny:			out = &quot;_&quot;
+		Case idVar:			out = Pattern_Var_name(p)
+		Case idConst:
+			Dim v : v = Pattern_Const_value(p)
+			If isEmpty(v) Then
 				out = &quot;()&quot;
 			Else
-				out = toString(p.a0)
+				out = toString(v)
 			End If
-		Case &quot;Dat&quot;:			out = getFnName(p.a0)
-		Case &quot;App&quot;
-			out = &quot;(&quot; &amp; TPattern_toString(p.a0) _
-				&amp; &quot; &quot; &amp; TPattern_toString(p.a1) _
-				&amp; &quot;)&quot;
-		Case &quot;List.nil&quot;:	out = &quot;[]&quot;
-		Case &quot;List.cons&quot;
-			Dim patHd As Object, patTl As Object
-			patHd = car(p.a0)
-			patTl = cadr(p.a0)
-			If (patTl.which = patList_nil.which) Then
-				out = &quot;[&quot; _
-					&amp; TPattern_toString(patHd) _
-					&amp; &quot;]&quot;
+		Case idData:
+			If DataValue_same(p, patNil) Then
+				out = &quot;[]&quot;
 			Else
-				out = &quot;(&quot; _
-					&amp; TPattern_toString(patHd) _
-					&amp; &quot;:&quot; _
-					&amp; TPattern_toString(patTl) _
-					&amp; &quot;)&quot;
-			End If
-		Case &quot;ASN&quot;
-			out = &quot;(ASN &quot; _
-				&amp; TPattern_toString(car(p.a0)) _
-				&amp; &quot; &quot; _
-				&amp; TPattern_toString(cadr(p.a0)) _
-				&amp; &quot; &quot; _
-				&amp; TPattern_toString(caddr(p.a0)) _
-				&amp; &quot;)&quot;
+				Dim c  : c  = Pattern_Data_ctor(p)
+				Dim ps : ps = Pattern_Data_args(p)
+				If DataValue_same(c, Tp.List_Cons) Then
+					Dim pHd : pHd = car(ps)
+					Dim pTl : pTl = cadr(ps)
+					If DataValue_same(pTl, patNil) Then
+						out = &quot;[&quot; &amp; _TPattern_toString(pHd) &amp; &quot;]&quot;
+					Else
+						out = &quot;(&quot; _
+							&amp; _TPattern_toString(pHd) _
+							&amp; &quot;:&quot; _
+							&amp; _TPattern_toString(pTl) _
+							&amp; &quot;)&quot;
+					End If
+				Else
+					Dim q As Object
+					out = nameOf(c)
+					Do Until isNil(ps)
+						q = car(ps)
+						ps = cdr(ps)
+						out = out &amp; &quot; &quot; &amp; _TPattern_toString(q)
+					Loop
+				End If
+			End If	
+
 		Case Else
-			croak(&quot;TPattern_toString: unsupported pattern .which = &quot; &amp; toString(p.which))
+_TPattern_toString_error:
+			On Local Error Goto 0 &apos; disable error handler
+			croak(&quot;TPattern_toString: bad pattern &quot; &amp; typeStr(p))
 	End Select
-	TPattern_toString = out
+	_TPattern_toString = out
 End Function
 
 
@@ -730,37 +782,75 @@ Function test_Pattern_toString()
 
 	assertEqual(toString(Pattern_Const(Empty)),		&quot;()&quot;).x
 
-	assert_toString_equals(patVal(Nothing),   Nothing).x
-	assert_toString_equals(patVal(True),	     True).x
-	assert_toString_equals(patVal(False),	    False).x
-	assert_toString_equals(patVal(&quot;&quot;), 		       &quot;&quot;).x
-	assert_toString_equals(patVal(&quot;a&quot;), 	      &quot;a&quot;).x
-	assert_toString_equals(patVal(&quot;foo&quot;), 	    &quot;foo&quot;).x
-	assert_toString_equals(patVal(CR), 	  	       CR).x
-	assert_toString_equals(patVal(LF), 	  	       LF).x
-	assert_toString_equals(patVal(TAB),   	      TAB).x
-	assert_toString_equals(patVal(    0),           0).x
-	assert_toString_equals(patVal(    1),           1).x
-	assert_toString_equals(patVal(    2),           2).x
-	assert_toString_equals(patVal( 4711),        4711).x
-	assert_toString_equals(patVal(3.1415),     3.1415).x
-	assert_toString_equals(patVal(CLng(42)), CLng(42)).x
-	assert_toString_equals(patVal(CLng(42)),       42).x
+	assert_toString_equals(Pattern_Const(Nothing),   Nothing).x
+	assert_toString_equals(Pattern_Const(True),	     	True).x
+	assert_toString_equals(Pattern_Const(False),	   False).x
+	assert_toString_equals(Pattern_Const(&quot;&quot;), 		      &quot;&quot;).x
+	assert_toString_equals(Pattern_Const(&quot;a&quot;), 	      	 &quot;a&quot;).x
+	assert_toString_equals(Pattern_Const(&quot;foo&quot;), 	   &quot;foo&quot;).x
+	assert_toString_equals(Pattern_Const(CR), 	  	      CR).x
+	assert_toString_equals(Pattern_Const(LF), 	  	      LF).x
+	assert_toString_equals(Pattern_Const(TAB),   	     TAB).x
+	assert_toString_equals(Pattern_Const(    0),           0).x
+	assert_toString_equals(Pattern_Const(    1),           1).x
+	assert_toString_equals(Pattern_Const(    2),           2).x
+	assert_toString_equals(Pattern_Const( 4711),        4711).x
+	assert_toString_equals(Pattern_Const(3.1415),     3.1415).x
+	assert_toString_equals(Pattern_Const(CLng(42)), CLng(42)).x
+	assert_toString_equals(Pattern_Const(CLng(42)),       42).x
 	
-	assertEqual(toString(patVar(&quot;a&quot;)), &quot;a&quot;).x
-	assertEqual(toString(patVar(&quot;b&quot;)), &quot;b&quot;).x
+	assertEqual(toString(Pattern_Var(&quot;a&quot;)), &quot;a&quot;).x
+	assertEqual(toString(Pattern_Var(&quot;b&quot;)), &quot;b&quot;).x
 	
-	assertEqual(toString(patDat(cons)), &quot;cons&quot;).x
-	&apos;assertEqual(toString(patDat(nil)),  &quot;nil&quot;).x &apos; TODO: handle 0-arity datactors
+	assertEqual(toString(patNil), 	 &quot;[]&quot;).x
+	assertEqual(toString(patList()), &quot;[]&quot;).x
+	p = patList(Pattern_Any)
+	assertEqual(TPattern_toString(p), &quot;[_]&quot;).x
+	p = patCons(Pattern_Any, patNil)
+	assertEqual(toString(p), &quot;[_]&quot;).x
+	p = patList(Pattern_Any, Pattern_Any)
+	assertEqual(toString(p), &quot;(_:[_])&quot;).x
+	p = patCons(Pattern_Any, Pattern_Any)
+	assertEqual(toString(p), &quot;(_:_)&quot;).x
+	p = patCons(Pattern_Var(&quot;y&quot;), Pattern_Var(&quot;ys&quot;))
+	assertEqual(toString(p), &quot;(y:ys)&quot;).x
+	p = patCons(Pattern_Var(&quot;x&quot;), p)
+	assertEqual(toString(p), &quot;(x:(y:ys))&quot;).x
 	
-	p = xpApp(xpApp(patDat(cons), patVar(&quot;x&quot;)), patVar(&quot;xs&quot;))
-	assertEqual(TPattern_toString(p), &quot;((cons x) xs)&quot;).x
+	&apos; patterns that match a pattern (patterns for a pattern)
+	Dim cAny : cAny = _ctor(Pattern_Any)
+	p = Pattern_Data(cAny, nil)
+	assertEqual(toString(p), &quot;Any&quot;).x
 	
-	assertEqual(toString(patList_nil), 					&quot;[]&quot;).x
-	assertEqual(toString(patList_cons(patAny, patAny)), &quot;(_:_)&quot;).x
-	assertEqual(toString(patList_cons(patVar(&quot;x&quot;), patList_nil)), &quot;[x]&quot;).x
+	Dim cVar : cVar = findDataCtor(TPattern, &quot;Var&quot;)
+	p = Pattern_Data(cVar, List(Pattern_Const(&quot;x&quot;)))
+	assertEqual(TPattern_toString(p), &quot;Var &apos;x&apos;&quot;).x
+	p = Pattern_Data(cVar, List(Pattern_Var(&quot;x&quot;)))
+	assertEqual(toString(p), &quot;Var x&quot;).x
+
+	Dim cConst : cConst = findDataCtor(TPattern, &quot;Const&quot;)
+	p = Pattern_Data(cConst, List(Pattern_Const(42)))
+	assertEqual(TPattern_toString(p), &quot;Const 42&quot;).x
+
+	Dim cData : cData = findDataCtor(TPattern, &quot;Data&quot;)
+	p = Pattern_Data(cData, List(Pattern_Var(&quot;ctor&quot;), Pattern_Var(&quot;args&quot;))
+	assertEqual(TPattern_toString(p), &quot;Data ctor args&quot;).x
+
+	&apos; match a particular data ctor (as opposed to a value *of* that ctor)
+	Dim cDataCtor : cDataCtor = Tp.DataCtor
+	Dim cNil      : cNil = Tp.List_Nil
+	p = Pattern_Data(cDataCtor, List( _
+		Pattern_Const(nameOf(cNil)), _
+		Pattern_Var(&quot;argTypes&quot;), _
+		Pattern_Var(&quot;typeCtor&quot;) _
+	))
+	assertEqual(TPattern_toString(p), &quot;DataCtor &apos;Nil&apos; argTypes typeCtor&quot;).x
+
+	&apos; pattern that matches a pattern that matches the empty list
+	p = Pattern_Data(cData, List(p, Pattern_Any))
+	assertEqual(TPattern_toString(p), _
+		&quot;Data (DataCtor &apos;Nil&apos; argTypes typeCtor) _&quot;).x
 	
-	assertEqual(toString(patASN(patVar(&quot;lbl&quot;), patVal(Empty), patList_nil)), &quot;(ASN lbl () [])&quot;).x
 End Function
 
 Function assert_matches(p As Object, env As Variant, ByVal vs As Variant)
