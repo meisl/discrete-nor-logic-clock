@@ -325,7 +325,7 @@ Function match( _
 		If Not(hasType(p, TPattern)) Then
 			croak(&quot;match: not a pattern: &quot; &amp; typeStr(p))
 		ElseIf isMissing(e) Then 	: out = apply(oFn, p)
-		ElseIf isEmpty(e) Or isFn(e) Then
+		ElseIf isEmpty(e) Or isEnv(e) Then
 			If isMissing(x) Then	: out = apply(oFn, p, e)
 			ElseIf isEmpty(e) Then	: out = Empty
 			Else
@@ -384,6 +384,7 @@ Function _match( _
 	Dim pArgs As Object	&apos; args field of p if p isa Data : Data ... [TPattern]
 	Dim msg   As String	&apos; on errors
 	
+	&apos; special-case on singleton patterns:
 	Select Case _id(p)
 		Case id_pAny:	out = e
 		Case id_pNil
@@ -394,47 +395,47 @@ Function _match( _
 			Else
 				&apos; is it at least a List?
 				cx = _ctor(x)
-				Goto _match_require_same_datatype:
-			End If
-		Case Else
-				
-	Select Case _id(_ctor(p))
-		Case id_cpAny:		out = e
-		Case id_cpConst
-			v = Pattern_Const_value(p)
-_match_equ_test:			
-			If equ(x, v) Then
-				out = e
-			Else
-				out = Empty
-			End If
-		Case id_cpVar
-			nm = Pattern_Var_name(p)
-			v = lookup(nm, e)
-			If isEmpty(v) Then
-				&apos; TODO: what if var was bound to value Empty?!
-				If isEmpty(x) Then
-					Goto _match_cannot_bind_var_to_Empty
-				End If
-				out = extend(e, nm, x)
-			Else
-				&apos; tail-call:
-				&apos;out = _matches(Pattern_Const(v), e, x)
-				Goto _match_equ_test
-			End If
-		Case id_cpData
-			pCtor = Pattern_Data_ctor(p)
-			On Local Error Goto _match_type_error
-			cx = _ctor(x)
-			On Local Error Goto 0 &apos; disable error handler
-			If DataValue_same(cx, pCtor) Then
-				pArgs = Pattern_Data_args(p)
-				out = _matchArgs(pArgs, e, x)
-			Else
 				Goto _match_require_same_datatype
 			End If
 		Case Else
-	End Select
+				
+			Select Case _id(_ctor(p))
+				Case id_cpConst
+					v = Pattern_Const_value(p)
+_match_equ_test:			
+					If equ(x, v) Then
+						out = e
+					Else
+						out = Empty
+					End If
+				Case id_cpVar
+					nm = Pattern_Var_name(p)
+					v = lookup(nm, e)
+					If isEmpty(v) Then
+						&apos; TODO: what if var was bound to value Empty?!
+						If isEmpty(x) Then
+							Goto _match_cannot_bind_var_to_Empty
+						End If
+						out = extend(e, nm, x)
+					Else
+						&apos; tail-call:
+						&apos;out = _matches(Pattern_Const(v), e, x)
+						Goto _match_equ_test
+					End If
+				Case id_cpData
+					pCtor = Pattern_Data_ctor(p)
+					On Local Error Goto _match_type_error
+					cx = _ctor(x)
+					On Local Error Goto 0 &apos; disable error handler
+					If DataValue_same(cx, pCtor) Then
+						pArgs = Pattern_Data_args(p)
+						out = _matchArgs(pArgs, e, x)
+					Else
+						Goto _match_require_same_datatype
+					End If
+				Case Else
+					Goto _match_bad_pattern
+			End Select
 
 	End Select
 
@@ -898,6 +899,9 @@ Function test_Pattern_match()
 	apply(f, envEmpty, Empty) &apos; should not throw
 	assertThrows(f, Array(Nothing, Empty)).x
 	assertThrows(f, Array(&quot;foo&quot;, Empty)).x
+	&apos; throws if given some fn as env:
+	assertThrows(f, Array(f, Empty)).x
+	
 End Function
 
 Function test_Pattern_matches_Any()
