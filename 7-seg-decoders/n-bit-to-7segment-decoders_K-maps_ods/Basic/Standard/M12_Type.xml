@@ -242,7 +242,7 @@ Function Tp() &apos; bootstrap TType and data types
 		
 		&apos; argTypes of DataTypeCtor
 		cDataTypeCtor.fields(DataCtor_argTypes) = _
-			List(nStr, nInt, TList(tcDataTypeCtor))
+			List(nStr, nInt, TList(tcDataCtor))
 		
 		&apos; argTypes of DataCtor
 		cDataCtor.fields(DataCtor_argTypes) = _
@@ -1052,15 +1052,14 @@ Function Data_toString( _
 				out = TDataTypeCtor_toString(v, seen)
 			Case _id(TType)
 				out = TType_toString(v, False)
-			&apos;Case _id(TDataCtor)
-			&apos;	out = TDataTypeCtor_toString(v, seen)
+			Case _id(TDataCtor)
+				out = TDataCtor_toString(v)
 			Case Else
 				croak(&quot;Data_toString/NYI: a &quot; &amp; typeStr(v))
 		End Select
 	End If
 	Data_toString = out
 End Function
-
 
 Function TDataTypeCtor_toString(v As Object, ByRef seen As String)
 	Dim out
@@ -1078,6 +1077,18 @@ Function TDataTypeCtor_toString(v As Object, ByRef seen As String)
 	Loop
 	out = out &amp; &quot;])&quot;
 	TDataTypeCtor_toString = out
+End Function
+
+Function TDataCtor_toString(v As Object)
+	Dim out
+	Dim ats As Object
+	ats = argTypes(v)
+	out = typeCtorName(v) &amp; &quot;.&quot; &amp; nameOf(v)
+	Do Until isNil(ats)
+		out = out &amp; &quot; &quot; &amp; TType_toString(car(ats), True)
+		ats = cdr(ats)
+	Loop
+	TDataCtor_toString = out
 End Function
 
 Function TType_toString( _
@@ -2724,9 +2735,8 @@ Function test_bootstrapTypes()
 	assertEqual(field(DataCtor_name,     cApp),  &quot;App&quot;).x
 	argTypes =  field(DataCtor_argTypes, cApp)
 	assertEqual(length(argTypes), 2).x
-	assert_same(nth(1, argTypes), tcType).x
-	&apos; TODO: really only TDataTypeCtor? - it means only 1 type param ever!
 	assert_same(nth(0, argTypes), tcType).x
+	assert_same(nth(1, argTypes), tcType).x
 
 	&apos;--- apply data ctor App
 	Dim vApp As Variant
@@ -2744,6 +2754,50 @@ Function test_bootstrapTypes()
 	
 	
 	&apos;--- apply data ctor DataTypeCtor
+
+	
+	
+	&apos;--- argTypes of DataCtor
+	argTypes =  field(DataCtor_argTypes, cDataCtor)
+	assertEqual(length(argTypes), 3).x
+	assert_same(nth(0, argTypes), nStr).x
+	assert_same(nth(2, argTypes), tcDataTypeCtor).x
+	at = nth(1, argTypes)
+	assert_hasCtor(at, cApp).x
+	assert_same(TypeApp_typeFn(at),  tcList).x
+	assert_same(TypeApp_typeArg(at), tcType).x
+
+	&apos;--- argTypes of DataTypeCtor
+	argTypes =  field(DataCtor_argTypes, cDataTypeCtor)
+	assertEqual(length(argTypes), 3).x
+	assert_same(nth(0, argTypes), nStr).x
+	assert_same(nth(1, argTypes), nInt).x
+	at = nth(2, argTypes)
+	assert_hasCtor(at, cApp).x
+	assert_same(TypeApp_typeFn(at),  tcList).x
+	assert_same(TypeApp_typeArg(at), tcDataCtor).x
+
+	&apos;--- argTypes of Native
+	argTypes =  field(DataCtor_argTypes, Tp.Native)
+	assertEqual(length(argTypes), 3).x
+	assert_same(nth(0, argTypes), nStr).x
+	assert_same(nth(1, argTypes), nStr).x
+	assert_same(nth(2, argTypes), nInt).x
+
+	&apos;--- argTypes of List.Nil
+	argTypes =  field(DataCtor_argTypes, cNil)
+	assertEqual(length(argTypes), 0).x
+	&apos;--- argTypes of List.Cons
+	argTypes =  field(DataCtor_argTypes, cCons)
+	assertEqual(length(argTypes), 2).x
+	at = nth(0, argTypes)
+	assert_hasCtor(at, cParam).x
+	assertEqual(TypeParam_index(at), 0).x
+	at = nth(1, argTypes)
+	assert_hasCtor(at, cApp).x
+	assert_same(TypeApp_typeFn(at),  	tcList).x
+	assert_hasCtor(TypeApp_typeArg(at), cParam).x
+	assertEqual(TypeParam_index(TypeApp_typeArg(at)), 0).x
 	
 
 End Function
@@ -3365,6 +3419,25 @@ Function test_Data_toString()
 	assertEqual(TType_toString(x), &quot;TPair Str (List Int)&quot;).x
 	x = TypeApp(TypeApp(tcPair, TList(nStr)), TList(nInt))
 	assertEqual(TType_toString(x), &quot;TPair (List Str) (List Int)&quot;).x
+
+	
+	&apos; -- data ctors
+	x = Tp.DataCtor
+	assertEqual(Data_toString(x), _
+		&quot;TDataCtor.DataCtor Str (List Type) TDataTypeCtor&quot;).x
+	x = Tp.DataTypeCtor
+	assertEqual(Data_toString(x), _
+		&quot;TDataTypeCtor.DataTypeCtor Str Int (List TDataCtor)&quot;).x
+	x = Tp.TType_Param
+	assertEqual(Data_toString(x), &quot;Type.Param Int&quot;).x
+	x = Tp.TType_App
+	assertEqual(Data_toString(x), &quot;Type.App Type Type&quot;).x
+	x = Tp.List_Nil
+	assertEqual(Data_toString(x), &quot;List.Nil&quot;).x
+	x = Tp.List_Cons
+	assertEqual(Data_toString(x), &quot;List.Cons a0 (List a0)&quot;).x
+	x = cPair
+	assertEqual(Data_toString(x), &quot;TPair.Pair a0 a1&quot;).x
 
 End Function
 
