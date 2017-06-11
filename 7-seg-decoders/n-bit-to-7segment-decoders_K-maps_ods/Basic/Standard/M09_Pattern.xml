@@ -21,10 +21,10 @@ Function TPattern()
 		tcPat = _mkDataTypeCtor(&quot;Pattern&quot;, 0)
 		out = tcPat
 		Dim cAny, cVar, cConst, cData
-		cAny   = _mkDataCtor(tcPat, &quot;Any&quot;, 	 nil)
-		cVar   = _mkDataCtor(tcPat, &quot;Var&quot;, 	 List(Tp.Native_String))
-		cConst = _mkDataCtor(tcPat, &quot;Const&quot;, List(Tp.Native_Variant))
-		cData  = _mkDataCtor(tcPat, &quot;Data&quot;,  List(TDataCtor, TList(tcPat)))
+		cAny   = mkDataCtor(tcPat, &quot;Any&quot;,	nil)
+		cVar   = mkDataCtor(tcPat, &quot;Var&quot;,	List(Tp.Native_String))
+		cConst = mkDataCtor(tcPat, &quot;Const&quot;,	List(Tp.Native_Variant))
+		cData  = mkDataCtor(tcPat, &quot;Data&quot;,	List(TDataCtor, TList(tcPat)))
 		&apos;msgbox(hasType(&quot;asdf&quot;, Tp.Native_Variant))
 		&apos;show(cData.str)
 	End If
@@ -1225,6 +1225,8 @@ Function test_Pattern_matches_Pattern()
 	eOut = match(p, e, p)
 	assert_same(lookup(&quot;x&quot;, eOut), Pattern_Data_ctor(p)).x
 	assert_same(lookup(&quot;y&quot;, eOut), Pattern_Data_args(p)).x
+	
+	
 	assert_matches(p, e, pNil		).x &apos; pNil isa Pattern_Data
 	eOut = match(p, e, pNil)
 	assert_same(lookup(&quot;x&quot;, eOut), Pattern_Data_ctor(pNil)).x

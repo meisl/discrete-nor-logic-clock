@@ -650,7 +650,7 @@ Function nameOf(x)
 	Else
 nameOf_error:
 		croak(&quot;nameOf: expected DataCtor or DataTypeCtor - got &quot; _
-			&amp; typeOf(x).str)
+			&amp; _str(typeOf(x)))
 	End If
 	nameOf = out
 End Function
@@ -744,6 +744,11 @@ Function TypeParam(Optional i As Integer)
 	TypeParam = out
 End Function
 
+Function TypeParam_index(Optional x)
+	TypeParam_index = _destructure(Tp.TType_Param, 0, x)
+End Function
+
+
 Function TypeApp(Optional tc As Object, Optional ta As Object)
 	Static cApp As Object : If isNull(cApp) Then : cApp = Tp.TType_App : End If
 	Dim out
@@ -770,7 +775,8 @@ Function TypeApp(Optional tc As Object, Optional ta As Object)
 					show(&quot;TypeApp/NYI: &quot;, tc).boom
 				End If
 			Else
-				Goto TypeApp_invalid_1st_arg
+				croak(&quot;TypeApp: cannot apply &quot; _
+					&amp; TType_toString(tc))
 			End If
 		Else
 			Goto TypeApp_invalid_1st_arg
@@ -799,7 +805,8 @@ Function TypeApp(Optional tc As Object, Optional ta As Object)
 					taStr = ta.str
 				End If
 			Else
-				Goto TypeApp_invalid_2nd_arg
+				croak(&quot;TypeApp: incomplete type arg: &quot; _
+					&amp; TType_toString(ta))
 			End If
 		Else
 			Goto TypeApp_invalid_2nd_arg
@@ -815,10 +822,9 @@ Function TypeApp(Optional tc As Object, Optional ta As Object)
 	TypeApp = out
 	Exit Function
 TypeApp_invalid_1st_arg:
-	&apos;show(&quot;TypeApp: cannot apply &quot; &amp; toString(tc))
-	Exit Function
+	croak(&quot;TypeApp: cannot apply &quot; &amp; toString(tc))
 TypeApp_invalid_2nd_arg:
-	show(&quot;TypeApp: invalid type arg &quot; &amp; toString(ta)).boom
+	croak(&quot;TypeApp: invalid type arg &quot; &amp; toString(ta))
 End Function
 
 &apos; --------------------------------------------------------------
@@ -1024,11 +1030,113 @@ End Function
 
 &apos; --------------------------------------------------------------
 
+Function Data_toString( _
+	v As DataValue, _
+	Optional ByRef seen As String _
+)
+	Dim out As String
+	Dim id_v As Long
+	id_v = _id(v)
+	If isMissing(seen) Then
+		seen = &quot;&quot;
+	End If
+	If inStr(seen, &quot; &quot; &amp; id_v) &lt;&gt; 0 Then
+		out = &quot;{ id: &quot; &amp; id_v &amp; &quot; }&quot;
+	Else
+		seen = seen &amp; &quot; &quot; &amp; id_v
+		&apos; dispatch on data type:
+		Dim tc
+		tc = typeCtorOf(_ctor(v))
+		Select Case _id(tc)
+			Case _id(TDataTypeCtor)
+				out = TDataTypeCtor_toString(v, seen)
+			Case _id(TType)
+				out = TType_toString(v, False)
+			&apos;Case _id(TDataCtor)
+			&apos;	out = TDataTypeCtor_toString(v, seen)
+			Case Else
+				croak(&quot;Data_toString/NYI: a &quot; &amp; typeStr(v))
+		End Select
+	End If
+	Data_toString = out
+End Function
+
+
+Function TDataTypeCtor_toString(v As Object, ByRef seen As String)
+	Dim out
+	out = &quot;(&quot; &amp; nameOf(v) &amp; &quot; &quot; &amp; Type_arity(v) &amp; &quot; [&quot;
+	Dim dcs     As Object  : dcs = dataCtors(v) 
+	Dim isFirst As Boolean : isFirst = True
+	Do Until(isNil(dcs))
+		If isFirst Then
+			isFirst = False
+		Else
+			out = out &amp; &quot;, &quot;
+		End If
+		out = out &amp; &quot;´&quot; &amp; nameOf(car(dcs))
+		dcs = cdr(dcs)
+	Loop
+	out = out &amp; &quot;])&quot;
+	TDataTypeCtor_toString = out
+End Function
+
+Function TType_toString( _
+	v As Object, _
+	Optional needParens As Boolean _
+)
+	Static tcType   As Object, cParam As Object, cApp As Object
+	Static tcNative As Object
+	If isNull(tcType) Then
+		tcType   = Tp.TType
+		cParam   = Tp.TType_Param
+		cApp     = Tp.TType_App
+		tcNative = Tp.TNative
+	End If
+	If isMissing(needParens) Then
+		needParens = False
+	End If
+	Dim out
+	Dim c  As Object : c  = _ctor(v)
+	Dim tc As Object : tc = typeCtorOf(c)
+	
+	If DataValue_same(tc, tcType) Then
+		If DataValue_same(c, cParam) Then
+			out = &quot;a&quot; &amp; TypeParam_index(v)
+		ElseIf DataValue_same(c, cApp) Then
+			out = TType_toString(TypeApp_typeFn(v), False) _
+				&amp; &quot; &quot; _
+				&amp; TType_toString(TypeApp_typeArg(v), True)
+			If needParens Then
+				out = &quot;(&quot; &amp; out &amp; &quot;)&quot;
+			End If
+		Else
+			croak(&quot;TType_toString/NYI: TType.&quot; &amp; nameOf(c))
+		End If
+	ElseIf isType(v) Then
+		If DataValue_same(tc, tcNative) Then
+			out = field(Ntv_shortName, v)
+		ElseIf DataValue_same(c, DataTypeCtor) Then
+			out = nameOf(v)
+		Else
+			croak(&quot;TType_toString/NYI: &quot; &amp; typeStr(v))
+		End If
+	Else
+		croak(&quot;TType_toString: not a Type: &quot; &amp; typeStr(v))
+	End If
+
+	TType_toString = out
+End Function
+
+
+
+
 Function DataValue_toString(v As DataValue)
 	Dim seen As String
 	seen = &quot;&quot;
 	DataValue_toString = _DataValue_toString(v, seen)
 End Function
+
+
 
 Function _DataValue_toString(v As DataValue, ByRef seen As String)
 	Dim out As String
@@ -1214,7 +1322,7 @@ End Function
 Function _mkDataCtor( _
 	typeCtor As Object, _
 	cName 	 As String, _
-	argTypes As Object _
+	ByVal argTypes As Object _
 )
 	Dim dc As Object : dc = Tp.DataCtor
 	Dim nl As Object : nl = Tp.List_Nil.x
@@ -1232,34 +1340,52 @@ Function _mkDataCtor( _
 	If Not(isFirst) Then
 		typeCtor.str = typeCtor.str &amp; &quot; | &quot;
 	End If
+	out.str = cName
 	If isSingle Then
 		out.x = _newDataValue(out, emptyArray)
 		out.x.str = cName
-		out.str = tcName &amp; &quot;.&quot; &amp; cName
-		typeCtor.str = typeCtor.str &amp; cName
 	Else
-		out.str = tcName &amp; &quot;.&quot; &amp; cName &amp; &quot; ...&quot;
-		typeCtor.str = typeCtor.str &amp; cName &amp; &quot; ...&quot;
+		&apos; cannot use TType_toString yet!
+		out.str = out.str &amp; &quot; ...&quot;
 	End If
+	typeCtor.str = typeCtor.str &amp; out.str
+	out.str = tcName &amp; &quot;.&quot; &amp; out.str
 	_mkDataCtor = out	
 End Function
 
 Function mkDataCtor( _
 	typeCtor As Object, _
 	cName 	 As String, _
-	argTypes As Array _
+	ByVal argTypes As Object _
 )
-	If Not(isctorOf(Tp.DataTypeCtor, typeCtor)) Then
-		croak(&quot;mkDataCtor: type error - expected TDataTypeCtor&quot; _
-			&amp; NL &amp; &quot;got: &quot; &amp; toString(typeCtor))
-	End If
-	Dim n As Integer  : n = UBound(argTypes) + 1
-	Dim ats As Object : ats = toList(argTypes)
 	Dim out
-	out = _mkDataCtor(typeCtor, cName, ats)
-	If n &gt; 0 Then
-		&apos;out.str = field(DataTypeCtor_name, typeCtor) &amp; &quot;.&quot; &amp; cName
+	out = _newDataValue(Tp.DataCtor, Array(cName, argTypes, typeCtor))
+	Dim dcs As Object
+	dcs = dataCtors(typeCtor)
+	Dim isFirst As Boolean, isSingle As Boolean
+	isFirst  = isNil(dcs)
+	isSingle = isNil(argTypes) &apos; singleton data ctor?
+	typeCtor.fields(DataTypeCtor_dataCtors, typeCtor) _
+		= cons(out, dcs)
+	Dim tcName As String
+	tcName = nameOf(typeCtor)
+	If Not(isFirst) Then
+		typeCtor.str = typeCtor.str &amp; &quot; | &quot;
 	End If
+	out.str = cName
+	If isSingle Then
+		out.x = _newDataValue(out, emptyArray)
+		out.x.str = cName
+	Else
+		&apos; can use TType_toString now:
+		Do
+			out.str = out.str _
+				&amp; &quot; &quot; &amp; TType_toString(car(argTypes), True)
+			argTypes = cdr(argTypes)
+		Loop Until(isNil(argTypes))
+	End If
+	typeCtor.str = typeCtor.str &amp; out.str
+	out.str = tcName &amp; &quot;.&quot; &amp; out.str
 	mkDataCtor = out
 End Function
 
@@ -1274,8 +1400,7 @@ Function _mkDataTypeCtor( _
 	out.str = tcName
 	Dim i As Integer, p As Object
 	For i = 0 To arity - 1
-		p = applyDC(Tp.TType_Param, i)
-		out.str = out.str &amp; &quot; &quot; &amp; p.str
+		out.str = out.str &amp; &quot; a&quot; &amp; i
 	Next i
 	out.str = out.str &amp; &quot; = &quot;
 	_mkDataTypeCtor = out
@@ -1426,6 +1551,8 @@ Function [test_Type======================================]
 	test_Type_hasType()
 	
 	test_Type_dot_str()
+	
+	test_Data_toString()
 	
 	test_Type_applyDC()
 	test_Type_destructure()
@@ -3161,6 +3288,86 @@ Function test_Type_dot_str()
 	assertEqual(t.str,	&quot;[[Str]]&quot;).x
 	
 End Function
+
+Function test_Data_toString()
+	Dim x
+	
+	&apos; -- data type ctors
+	x = TDataTypeCtor
+	assertEqual(Data_toString(x), &quot;(TDataTypeCtor 0 [´DataTypeCtor])&quot;).x
+	x = TDataCtor
+	assertEqual(Data_toString(x), &quot;(TDataCtor 0 [´DataCtor])&quot;).x
+	x = TType
+	assertEqual(Data_toString(x), &quot;(Type 0 [´App, ´Param])&quot;).x
+	x = TList
+	assertEqual(Data_toString(x), &quot;(List 1 [´Nil, ´Cons])&quot;).x
+	x = Tp.TNative
+	assertEqual(Data_toString(x), &quot;(TNative 0 [´Native])&quot;).x
+	x = TPattern
+	assertEqual(Data_toString(x), &quot;(Pattern 0 [´Data, ´Const, ´Var, ´Any])&quot;).x
+
+	Dim nInt  : nInt  = Tp.Native_Integer
+	Dim nStr  : nStr  = Tp.Native_String
+	Dim nBool : nBool = Tp.Native_Boolean
+	&apos; -- types
+	x = TypeParam(0)
+	assertEqual(Data_toString(x), &quot;a0&quot;).x
+	x = TypeParam(1)
+	assertEqual(Data_toString(x), &quot;a1&quot;).x
+	x = TList(TypeParam(2)) &apos; = TypeApp(TList, TypeParam(2))
+	assertEqual(Data_toString(x), &quot;List a2&quot;).x
+	x = TList(nInt)
+	assertEqual(Data_toString(x), &quot;List Int&quot;).x
+	x = TList(TType)
+	assertEqual(Data_toString(x), &quot;List Type&quot;).x
+	x = TList(TList(nInt))
+	assertEqual(Data_toString(x), &quot;List (List Int)&quot;).x
+	&apos; (0-arity) type ctors, viewed as Type
+	x = TDataTypeCtor
+	assertEqual(TType_toString(x), &quot;TDataTypeCtor&quot;).x
+	x = TDataCtor
+	assertEqual(TType_toString(x), &quot;TDataCtor&quot;).x
+	x = TType
+	assertEqual(TType_toString(x), &quot;Type&quot;).x
+	&apos;x = TList &apos; &lt;----------------- TODO: unapplied List really a type?
+	&apos;assertEqual(TType_toString(x), &quot;List ?&quot;).x
+	x = Tp.TNative
+	assertEqual(TType_toString(x), &quot;TNative&quot;).x
+	x = TPattern
+	assertEqual(TType_toString(x), &quot;Pattern&quot;).x
+	&apos; native types - viewed as Type, not as NativeTypeCtor
+	x = nInt
+	assertEqual(TType_toString(x), &quot;Int&quot;).x
+	x = nStr
+	assertEqual(TType_toString(x), &quot;Str&quot;).x
+	x = nBool
+	assertEqual(TType_toString(x), &quot;Bool&quot;).x
+
+	&apos; make up a type with two type parameters
+	Dim tcPair, cPair
+	tcPair = _mkDataTypeCtor(&quot;TPair&quot;, 2)
+	cPair  = mkDataCtor(tcPair, &quot;Pair&quot;, List(TypeParam(0), TypeParam(1)))
+	dim tcList : tcList = TList
+	x = tcPair
+	assertEqual(Data_toString(x), &quot;(TPair 2 [´Pair])&quot;).x
+	&apos; as Type: &apos; &lt;----------------- TODO: unapplied TPair really a type?
+	&apos;assertEqual(TType_toString(x), &quot;TPair ? ?&quot;).x
+	&apos;x = TypeApp(tcPair, nStr)
+	&apos;assertEqual(TType_toString(x), &quot;TPair Str ?&quot;).x
+
+	&apos;x = TList(TypeApp(tcPair, nStr)) &apos; should throw &quot;incomplete type arg&quot;
+
+	x = TypeApp(TypeApp(tcPair, nStr), nInt)
+	assertEqual(TType_toString(x), &quot;TPair Str Int&quot;).x
+	x = TypeApp(TypeApp(tcPair, TList(nStr)), nInt)
+	assertEqual(TType_toString(x), &quot;TPair (List Str) Int&quot;).x
+	x = TypeApp(TypeApp(tcPair, nStr), TList(nInt))
+	assertEqual(TType_toString(x), &quot;TPair Str (List Int)&quot;).x
+	x = TypeApp(TypeApp(tcPair, TList(nStr)), TList(nInt))
+	assertEqual(TType_toString(x), &quot;TPair (List Str) (List Int)&quot;).x
+
+End Function
+
 
 Function test_Type_applyDC()
 	Dim a, c
