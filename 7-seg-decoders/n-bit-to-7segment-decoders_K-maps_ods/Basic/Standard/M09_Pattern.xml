@@ -230,6 +230,16 @@ Function TPattern_toString( _
 	p As Object, _
 	Optional needParens As Boolean _
 )
+	Dim out
+	out = TPattern_toSrc(p, False)
+	out = &quot;Pattern(&quot; &amp; out &amp; &quot;)&quot;
+	TPattern_toString = out
+End Function
+
+Function TPattern_toSrc( _
+	p As Object, _
+	Optional needParens As Boolean _
+)
 	Static cAny		As Object
 	Static idAny	As Integer
 	Static idVar	As Integer
@@ -246,7 +256,7 @@ Function TPattern_toString( _
 		needParens = False
 	End If
 	Dim out As String
-	On Local Error Goto TPattern_toString_error
+	On Local Error Goto TPattern_toSrc_error
 	Select Case _id(_ctor(p))
 		Case idAny:			out = &quot;_&quot;
 		Case idVar:			out = Pattern_Var_name(p)
@@ -263,18 +273,33 @@ Function TPattern_toString( _
 			If DataValue_same(c, Tp.List_Nil) Then
 				out = &quot;[]&quot;
 			ElseIf DataValue_same(c, Tp.List_Cons) Then
-				Dim pHd : pHd = car(ps)
-				Dim pTl : pTl = cadr(ps)
-				If DataValue_same(pTl, patNil) Then
-					out = &quot;[&quot; &amp; TPattern_toString(pHd, False) &amp; &quot;]&quot;
+				Dim pHd As Object : pHd = car(ps)
+				Dim pTl As Object : pTl = cadr(ps)
+				Dim sTl As String : sTl = TPattern_toSrc(pTl, True)
+				If sTl = &quot;[]&quot; Then
+					out = &quot;[&quot; &amp; TPattern_toSrc(pHd, False) &amp; &quot;]&quot;
+				ElseIf startsWith(sTl, &quot;[&quot;) Then
+					out = TPattern_toSrc(pHd, False)
+					out = &quot;[&quot; &amp; out &amp; &quot;, &quot; &amp; Mid(sTl, 2)
 				Else
-					out = TPattern_toString(pHd, True) _
+					out = TPattern_toSrc(pHd, True) _
 						&amp; &quot;:&quot; _
-						&amp; TPattern_toString(pTl, True)
+						&amp; sTl
 					If needParens Then
 						out = &quot;(&quot; &amp; out &amp; &quot;)&quot;
 					End If
 				End If
+				
+				&apos;If DataValue_same(pTl, patNil) Then
+				&apos;	out = &quot;[&quot; &amp; TPattern_toSrc(pHd, False) &amp; &quot;]&quot;
+				&apos;Else
+				&apos;	out = TPattern_toSrc(pHd, True) _
+				&apos;		&amp; &quot;:&quot; _
+				&apos;		&amp; TPattern_toSrc(pTl, True)
+				&apos;	If needParens Then
+				&apos;		out = &quot;(&quot; &amp; out &amp; &quot;)&quot;
+				&apos;	End If
+				&apos;End If
 			Else
 				Dim q As Object
 				out = nameOf(c)
@@ -282,7 +307,7 @@ Function TPattern_toString( _
 					Do Until isNil(ps)
 						q = car(ps)
 						ps = cdr(ps)
-						out = out &amp; &quot; &quot; &amp; TPattern_toString(q, True)
+						out = out &amp; &quot; &quot; &amp; TPattern_toSrc(q, True)
 					Loop
 					If needParens Then
 						out = &quot;(&quot; &amp; out &amp; &quot;)&quot;
@@ -290,11 +315,11 @@ Function TPattern_toString( _
 				End If
 			End If
 		Case Else
-TPattern_toString_error:
+TPattern_toSrc_error:
 			On Local Error Goto 0 &apos; disable error handler
-			croak(&quot;TPattern_toString: bad pattern &quot; &amp; typeStr(p))
+			croak(&quot;TPattern_toSrc: bad pattern &quot; &amp; typeStr(p))
 	End Select
-	TPattern_toString = out
+	TPattern_toSrc = out
 End Function
 
 Function match( _
@@ -494,6 +519,11 @@ Function [test_Pattern======================================]()
 	test_Pattern_patList()
 
 	test_Pattern_isPattern()
+	test_Pattern_toSrc_Any()
+	test_Pattern_toSrc_Var()
+	test_Pattern_toSrc_Const()
+	test_Pattern_toSrc_lists()
+	
 	test_Pattern_toString()
 	
 	test_Pattern_match()
@@ -719,11 +749,95 @@ Function test_Pattern_isPattern()
 	assertEqual(apply(f, 3.1415),		False).x
 End Function
 
+Function test_Pattern_toSrc_Any()
+	Dim p : p = Pattern_Any
+	assertEqual(TPattern_toSrc(p), &quot;_&quot;).x
+End Function
+
+Function test_Pattern_toSrc_Var()
+	Dim p
+	p = Pattern_Var(&quot;x&quot;)
+	assertEqual(TPattern_toSrc(p), &quot;x&quot;).x
+	p = Pattern_Var(&quot;y&quot;)
+	assertEqual(TPattern_toSrc(p), &quot;y&quot;).x
+	p = Pattern_Var(&quot;foo&quot;)
+	assertEqual(TPattern_toSrc(p), &quot;foo&quot;).x
+	&apos; TODO: Pattern_Var(&quot;_&quot;) ?! &lt;--------------------------
+	assertEqual(TPattern_toSrc(Pattern_Var(&quot;_&quot;)), &quot;_&quot;).x
+End Function
+
+Function test_Pattern_toSrc_Const()
+	Dim p As Object
+
+	assertEqual(TPattern_toSrc(Pattern_Const(Nothing)),   toString(Nothing)).x
+	assert_toString_equals(Pattern_Const(True),	     	True).x
+	assert_toString_equals(Pattern_Const(False),	   False).x
+	assert_toString_equals(Pattern_Const(&quot;&quot;), 		      &quot;&quot;).x
+	assert_toString_equals(Pattern_Const(&quot;a&quot;), 	      	 &quot;a&quot;).x
+	assert_toString_equals(Pattern_Const(&quot;foo&quot;), 	   &quot;foo&quot;).x
+	assert_toString_equals(Pattern_Const(CR), 	  	      CR).x
+	assert_toString_equals(Pattern_Const(LF), 	  	      LF).x
+	assert_toString_equals(Pattern_Const(TAB),   	     TAB).x
+	assert_toString_equals(Pattern_Const(    0),           0).x
+	assert_toString_equals(Pattern_Const(    1),           1).x
+	assert_toString_equals(Pattern_Const(    2),           2).x
+	assert_toString_equals(Pattern_Const( 4711),        4711).x
+	assert_toString_equals(Pattern_Const(3.1415),     3.1415).x
+	assert_toString_equals(Pattern_Const(CLng(42)), CLng(42)).x
+	assert_toString_equals(Pattern_Const(CLng(42)),       42).x
+End Function
+Function test_Pattern_toSrc_lists()
+	Dim pAny As Object : pAny = Pattern_Any
+	Dim pNil As Object : pNil = patNil
+	Dim varX As Object : varX = Pattern_Var(&quot;x&quot;)
+	Dim varY As Object : varY = Pattern_Var(&quot;y&quot;)
+
+	Dim p As Object
+
+	p = pAny
+	assertEqual(TPattern_toSrc(p),	&quot;_&quot;).x
+	p = pNil
+	assertEqual(TPattern_toSrc(p),	&quot;[]&quot;).x
+	p = patList(pAny)
+	assertEqual(TPattern_toSrc(p),	&quot;[_]&quot;).x
+	p = patCons(varX, pAny)
+	assertEqual(TPattern_toSrc(p),	&quot;x:_&quot;).x
+	p = patCons(varY, patCons(varX, pAny))
+	assertEqual(TPattern_toSrc(p),	&quot;y:(x:_)&quot;).x
+	p = patCons(varX, patNil)
+	assertEqual(TPattern_toSrc(p),	&quot;[x]&quot;).x
+	p = patList(varX, pAny)
+	assertEqual(TPattern_toSrc(p),	&quot;[x, _]&quot;).x
+	p = patCons(varX, pAny)
+	assertEqual(TPattern_toSrc(p),	&quot;x:_&quot;).x
+	p = patList(varX)
+	assertEqual(TPattern_toSrc(p),	&quot;[x]&quot;).x
+	p = patCons(varY, patList(varX, pAny))
+	assertEqual(TPattern_toSrc(p),	&quot;[y, x, _]&quot;).x
+	p = patList(varY, varX, pAny)
+	assertEqual(TPattern_toSrc(p),	&quot;[y, x, _]&quot;).x
+	p = patList(varY, pNil, pAny)
+	assertEqual(TPattern_toSrc(p),	&quot;[y, [], _]&quot;).x
+	p = patList(varY, patList(varX), pAny)
+	assertEqual(TPattern_toSrc(p),	&quot;[y, [x], _]&quot;).x
+	p = patList(varY, patCons(varX, pAny), pAny)
+	assertEqual(TPattern_toSrc(p),	&quot;[y, x:_, _]&quot;).x
+	p = patList(varY, patList(varX, pAny), pAny)
+	assertEqual(TPattern_toSrc(p),	&quot;[y, [x, _], _]&quot;).x
+	p = patList(varY, patList(patCons(varX, pAny)), pAny)
+	assertEqual(TPattern_toSrc(p),	&quot;[y, [x:_], _]&quot;).x
+	p = patList(varY, patList(varY, patCons(varX, pAny)), pAny)
+	assertEqual(TPattern_toSrc(p),	&quot;[y, [y, x:_], _]&quot;).x
+	p = patList(patCons(varY, pAny), patList(varY, patCons(varX, pAny)), pAny)
+	assertEqual(TPattern_toSrc(p),	&quot;[y:_, [y, x:_], _]&quot;).x
+
+End Function
+
 Function test_Pattern_toString()
 	Dim p As Object
-	assertEqual(toString(Pattern_Any),				&quot;_&quot;).x
+	assertEqual(toString(Pattern_Any),				&quot;Pattern(_)&quot;).x
 
-	assertEqual(toString(Pattern_Const(Empty)),		&quot;()&quot;).x
+	assertEqual(toString(Pattern_Const(Empty)),		&quot;Pattern(())&quot;).x
 
 	assert_toString_equals(Pattern_Const(Nothing),   Nothing).x
 	assert_toString_equals(Pattern_Const(True),	     	True).x

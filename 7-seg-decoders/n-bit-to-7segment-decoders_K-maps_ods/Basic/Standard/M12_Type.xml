@@ -1247,6 +1247,7 @@ Function mkDataCtor( _
 	End If
 	typeCtor.str = typeCtor.str &amp; out.str
 	out.str = tcName &amp; &quot;.&quot; &amp; out.str
+	
 	mkDataCtor = out
 End Function
 
@@ -3312,7 +3313,22 @@ Function test_Data_toString()
 	x = applyDC(cPair, 5, applyDC(cPair, &quot;foo&quot;, nil))
 	assertEqual(Data_toString(x), &quot;Pair 5 (Pair &apos;foo&apos; [])&quot;).x
 
-	x = Pattern_Any
+
+
+	x = patCons(patCons(Pattern_Var(&quot;y&quot;), Pattern_Var(&quot;x&quot;)), Pattern_Var(&quot;xs&quot;))
+	&apos;assertEqual(generic_Data_toString(x), &quot;Data ´Cons [y:x, xs]&quot;).x
+	&apos;assertEqual(        Data_toString(x), &quot;(y:x):xs&quot;).x
+
+
+	Dim pAny : pAny = Pattern_Any
+	
+	
+	x = patList(pAny, pAny)
+	&apos;assertEqual(generic_Data_toString(x), &quot;Any&quot;).x
+	assertEqual(        Data_toString(x), &quot;_&quot;).x
+	
+	
+	x = pAny
 	assertEqual(generic_Data_toString(x), &quot;Any&quot;).x
 	assertEqual(        Data_toString(x), &quot;_&quot;).x
 	x = Pattern_Const(&quot;foo&quot;)
