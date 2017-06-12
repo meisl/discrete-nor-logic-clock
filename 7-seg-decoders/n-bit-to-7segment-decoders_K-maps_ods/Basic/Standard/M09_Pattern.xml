@@ -226,23 +226,9 @@ patList_0:
 End Function
 
 
-Function TPattern_toString(Optional p As Object)
-	Static oFn As Object
-	If isNull(oFn) Then
-		oFn = Fn.TPattern_toString
-	End If
-	Dim out
-	If isMissing(p) Then
-		out = oFn
-	Else
-		out = _TPattern_toString(p, False)
-	End If
-	TPattern_toString = out
-End Function
-	
-Function _TPattern_toString( _
+Function TPattern_toString( _
 	p As Object, _
-	needParens As Boolean _
+	Optional needParens As Boolean _
 )
 	Static cAny		As Object
 	Static idAny	As Integer
@@ -256,9 +242,11 @@ Function _TPattern_toString( _
 		idConst = _id(findDataCtor(TPattern, &quot;Const&quot;))
 		idData  = _id(findDataCtor(TPattern, &quot;Data&quot;))
 	End If
-	Dim out As Variant
-	&apos; TODO: specialize singleton patterns like patAny, patNil, ...
-	On Local Error Goto _TPattern_toString_error
+	If isMissing(needParens) Then
+		needParens = False
+	End If
+	Dim out As String
+	On Local Error Goto TPattern_toString_error
 	Select Case _id(_ctor(p))
 		Case idAny:			out = &quot;_&quot;
 		Case idVar:			out = Pattern_Var_name(p)
@@ -270,46 +258,43 @@ Function _TPattern_toString( _
 				out = toString(v)
 			End If
 		Case idData:
-			If DataValue_same(p, patNil) Then
+			Dim c  : c  = Pattern_Data_ctor(p)
+			Dim ps : ps = Pattern_Data_args(p)
+			If DataValue_same(c, Tp.List_Nil) Then
 				out = &quot;[]&quot;
-			Else
-				Dim c  : c  = Pattern_Data_ctor(p)
-				Dim ps : ps = Pattern_Data_args(p)
-				If DataValue_same(c, Tp.List_Cons) Then
-					Dim pHd : pHd = car(ps)
-					Dim pTl : pTl = cadr(ps)
-					If DataValue_same(pTl, patNil) Then
-						out = &quot;[&quot; &amp; _TPattern_toString(pHd, False) &amp; &quot;]&quot;
-					Else
-						out = _TPattern_toString(pHd, True) _
-							&amp; &quot;:&quot; _
-							&amp; _TPattern_toString(pTl, True)
-						If needParens Then
-							out = &quot;(&quot; &amp; out &amp; &quot;)&quot;
-						End If
-					End If
+			ElseIf DataValue_same(c, Tp.List_Cons) Then
+				Dim pHd : pHd = car(ps)
+				Dim pTl : pTl = cadr(ps)
+				If DataValue_same(pTl, patNil) Then
+					out = &quot;[&quot; &amp; TPattern_toString(pHd, False) &amp; &quot;]&quot;
 				Else
-					Dim q As Object
-					out = nameOf(c)
-					If Not(isNil(ps)) Then
-						Do Until isNil(ps)
-							q = car(ps)
-							ps = cdr(ps)
-							out = out &amp; &quot; &quot; &amp; _TPattern_toString(q, True)
-						Loop
-						If needParens Then
-							out = &quot;(&quot; &amp; out &amp; &quot;)&quot;
-						End If
+					out = TPattern_toString(pHd, True) _
+						&amp; &quot;:&quot; _
+						&amp; TPattern_toString(pTl, True)
+					If needParens Then
+						out = &quot;(&quot; &amp; out &amp; &quot;)&quot;
 					End If
 				End If
-			End If	
-
+			Else
+				Dim q As Object
+				out = nameOf(c)
+				If Not(isNil(ps)) Then
+					Do Until isNil(ps)
+						q = car(ps)
+						ps = cdr(ps)
+						out = out &amp; &quot; &quot; &amp; TPattern_toString(q, True)
+					Loop
+					If needParens Then
+						out = &quot;(&quot; &amp; out &amp; &quot;)&quot;
+					End If
+				End If
+			End If
 		Case Else
-_TPattern_toString_error:
+TPattern_toString_error:
 			On Local Error Goto 0 &apos; disable error handler
 			croak(&quot;TPattern_toString: bad pattern &quot; &amp; typeStr(p))
 	End Select
-	_TPattern_toString = out
+	TPattern_toString = out
 End Function
 
 Function match( _

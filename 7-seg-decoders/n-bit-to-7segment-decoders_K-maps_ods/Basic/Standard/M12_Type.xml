@@ -1032,62 +1032,103 @@ End Function
 
 Function Data_toString( _
 	v As DataValue, _
-	Optional ByRef seen As String _
+	Optional ByRef needParens As Boolean, _
+	Optional expandElementary As Boolean _
 )
 	Dim out As String
 	Dim id_v As Long
 	id_v = _id(v)
-	If isMissing(seen) Then
-		seen = &quot;&quot;
+	If isMissing(needParens) Then
+		needParens = False
 	End If
-	If inStr(seen, &quot; &quot; &amp; id_v) &lt;&gt; 0 Then
-		out = &quot;{ id: &quot; &amp; id_v &amp; &quot; }&quot;
-	Else
-		seen = seen &amp; &quot; &quot; &amp; id_v
-		&apos; dispatch on data type:
-		Dim tc
-		tc = typeCtorOf(_ctor(v))
-		Select Case _id(tc)
-			Case _id(TDataTypeCtor)
-				out = TDataTypeCtor_toString(v, seen)
-			Case _id(TType)
-				out = TType_toString(v, False)
-			Case _id(TDataCtor)
-				out = TDataCtor_toString(v)
-			Case Else
-				croak(&quot;Data_toString/NYI: a &quot; &amp; typeStr(v))
-		End Select
+	If isMissing(expandElementary) Then
+		expandElementary = True
 	End If
+	&apos; dispatch on data type:
+	Dim tc
+	tc = typeCtorOf(_ctor(v))
+	Select Case _id(tc)
+		Case _id(TDataCtor)
+			out = TDataCtor_toString(v, needParens, expandElementary)
+		Case _id(TDataTypeCtor)
+			If expandElementary Then
+				out = generic_Data_toString(v, needParens, True)
+			Else
+				out = &quot;´&quot; &amp; nameOf(v)
+			End If
+		Case _id(TType)
+			out = TType_toString(v, needParens)
+		Case _id(TList)
+			out = TList_toString(v, expandElementary)
+		Case _id(TPattern)
+			out = TPattern_toString(v, needParens)
+		Case Else
+			out = generic_Data_toString(v, needParens, expandElementary)
+			&apos;croak(&quot;Data_toString/NYI: a &quot; &amp; typeStr(v))
+	End Select
 	Data_toString = out
 End Function
 
-Function TDataTypeCtor_toString(v As Object, ByRef seen As String)
-	Dim out
-	out = &quot;(&quot; &amp; nameOf(v) &amp; &quot; &quot; &amp; Type_arity(v) &amp; &quot; [&quot;
-	Dim dcs     As Object  : dcs = dataCtors(v) 
-	Dim isFirst As Boolean : isFirst = True
-	Do Until(isNil(dcs))
-		If isFirst Then
-			isFirst = False
+Function generic_Data_toString( _
+	v As Object, _
+	Optional needParens       As Boolean, _
+	Optional expandElementary As Boolean _
+)
+	Dim out As String
+	If isMissing(needParens) Then
+		needParens = False
+	End If
+	If isMissing(expandElementary) Then
+		expandElementary = True
+	End If
+	Dim i As Integer, n As Integer
+	Dim f As Variant, tf As Object, fStr As String
+	out = ctorName(v)
+	n = fieldCount(v) - 1
+	For i = 0 To n
+		f = field(i, v)
+		If isDataValue(f) Then
+			fStr = Data_toString(f, True, False)
 		Else
-			out = out &amp; &quot;, &quot;
-		End If
-		out = out &amp; &quot;´&quot; &amp; nameOf(car(dcs))
-		dcs = cdr(dcs)
-	Loop
-	out = out &amp; &quot;])&quot;
-	TDataTypeCtor_toString = out
+			fStr = toString(f)
+		End If	
+		out = out &amp; &quot; &quot; &amp; fStr
+	Next i
+	If needParens And (i &gt; 0) Then
+		out = &quot;(&quot; &amp; out &amp; &quot;)&quot;
+	End If
+	generic_Data_toString = out
 End Function
 
-Function TDataCtor_toString(v As Object)
+Function TDataCtor_toString( _
+	v As Object, _
+	Optional needParens As Boolean, _
+	Optional expandElementary As Boolean _
+)
+	If isMissing(needParens) Then
+		needParens = False
+	End If
+	If isMissing(expandElementary) Then
+		expandElementary = True
+	End If
 	Dim out
-	Dim ats As Object
-	ats = argTypes(v)
-	out = typeCtorName(v) &amp; &quot;.&quot; &amp; nameOf(v)
-	Do Until isNil(ats)
-		out = out &amp; &quot; &quot; &amp; TType_toString(car(ats), True)
-		ats = cdr(ats)
-	Loop
+	out = nameOf(v)
+	If expandElementary Then
+		Dim ats As Object
+		ats = argTypes(v)
+		out = typeCtorName(v) &amp; &quot;.&quot; &amp; out
+		If Not(isNil(ats)) Then
+			Do
+				out = out &amp; &quot; &quot; &amp; TType_toString(car(ats), True)
+				ats = cdr(ats)
+			Loop Until isNil(ats)
+			If needParens Then
+				out = &quot;(&quot; &amp; out &amp; &quot;)&quot;
+			End If
+		End If
+	Else
+		out = &quot;´&quot; &amp; out
+	End If
 	TDataCtor_toString = out
 End Function
 
@@ -3348,17 +3389,23 @@ Function test_Data_toString()
 	
 	&apos; -- data type ctors
 	x = TDataTypeCtor
-	assertEqual(Data_toString(x), &quot;(TDataTypeCtor 0 [´DataTypeCtor])&quot;).x
+	assertEqual(Data_toString(x), _
+		&quot;DataTypeCtor &apos;TDataTypeCtor&apos; 0 [´DataTypeCtor]&quot;).x
 	x = TDataCtor
-	assertEqual(Data_toString(x), &quot;(TDataCtor 0 [´DataCtor])&quot;).x
+	assertEqual(Data_toString(x), _
+		&quot;DataTypeCtor &apos;TDataCtor&apos; 0 [´DataCtor]&quot;).x
 	x = TType
-	assertEqual(Data_toString(x), &quot;(Type 0 [´App, ´Param])&quot;).x
+	assertEqual(Data_toString(x), _
+		&quot;DataTypeCtor &apos;Type&apos; 0 [´App, ´Param]&quot;).x
 	x = TList
-	assertEqual(Data_toString(x), &quot;(List 1 [´Nil, ´Cons])&quot;).x
+	assertEqual(Data_toString(x), _
+		&quot;DataTypeCtor &apos;List&apos; 1 [´Nil, ´Cons]&quot;).x
 	x = Tp.TNative
-	assertEqual(Data_toString(x), &quot;(TNative 0 [´Native])&quot;).x
+	assertEqual(Data_toString(x), _
+		&quot;DataTypeCtor &apos;TNative&apos; 0 [´Native]&quot;).x
 	x = TPattern
-	assertEqual(Data_toString(x), &quot;(Pattern 0 [´Data, ´Const, ´Var, ´Any])&quot;).x
+	assertEqual(Data_toString(x), _
+		&quot;DataTypeCtor &apos;Pattern&apos; 0 [´Data, ´Const, ´Var, ´Any]&quot;).x
 
 	Dim nInt  : nInt  = Tp.Native_Integer
 	Dim nStr  : nStr  = Tp.Native_String
@@ -3403,7 +3450,7 @@ Function test_Data_toString()
 	cPair  = mkDataCtor(tcPair, &quot;Pair&quot;, List(TypeParam(0), TypeParam(1)))
 	dim tcList : tcList = TList
 	x = tcPair
-	assertEqual(Data_toString(x), &quot;(TPair 2 [´Pair])&quot;).x
+	assertEqual(Data_toString(x), &quot;DataTypeCtor &apos;TPair&apos; 2 [´Pair]&quot;).x
 	&apos; as Type: &apos; &lt;----------------- TODO: unapplied TPair really a type?
 	&apos;assertEqual(TType_toString(x), &quot;TPair ? ?&quot;).x
 	&apos;x = TypeApp(tcPair, nStr)
@@ -3439,6 +3486,52 @@ Function test_Data_toString()
 	x = cPair
 	assertEqual(Data_toString(x), &quot;TPair.Pair a0 a1&quot;).x
 
+
+	&apos; -- data values
+	x = nil
+	assertEqual(Data_toString(x), &quot;[]&quot;).x
+	x = List(1, 2, 3)
+	assertEqual(Data_toString(x), &quot;[1, 2, 3]&quot;).x
+	x = List(Tp.List_Nil, Tp.List_Cons)
+	assertEqual(Data_toString(x), &quot;[List.Nil, List.Cons a0 (List a0)]&quot;).x
+	x = List(TList, TType)
+&apos;	assertEqual(Data_toString(x), &quot;[´List, ´Type]&quot;).x
+	
+	&apos; -- generic toString
+	x = applyDC(cPair, 5, 47)
+	assertEqual(Data_toString(x), &quot;Pair 5 47&quot;).x
+	x = applyDC(cPair, 5, applyDC(cPair, &quot;foo&quot;, nil))
+	assertEqual(Data_toString(x), &quot;Pair 5 (Pair &apos;foo&apos; [])&quot;).x
+
+	x = Pattern_Any
+	assertEqual(generic_Data_toString(x), &quot;Any&quot;).x
+	assertEqual(        Data_toString(x), &quot;_&quot;).x
+	x = Pattern_Const(&quot;foo&quot;)
+	assertEqual(generic_Data_toString(x), &quot;Const &apos;foo&apos;&quot;).x
+	assertEqual(        Data_toString(x), &quot;&apos;foo&apos;&quot;).x
+	x = Pattern_Const(Empty)
+	assertEqual(generic_Data_toString(x), &quot;Const Empty&quot;).x
+	assertEqual(        Data_toString(x), &quot;()&quot;).x
+	x = Pattern_Var(&quot;foo&quot;)
+	assertEqual(generic_Data_toString(x), &quot;Var &apos;foo&apos;&quot;).x
+	assertEqual(        Data_toString(x), &quot;foo&quot;).x
+	x = patNil
+	assertEqual(generic_Data_toString(x), &quot;Data ´Nil []&quot;).x
+	assertEqual(        Data_toString(x), &quot;[]&quot;).x
+	x = Pattern_Data(Tp.List_Nil, nil)
+	assertEqual(generic_Data_toString(x), &quot;Data ´Nil []&quot;).x
+	assertEqual(        Data_toString(x), &quot;[]&quot;).x
+	x = Pattern_Data(Tp.List_Cons, List(Pattern_Var(&quot;x&quot;), Pattern_Var(&quot;xs&quot;)))
+	assertEqual(generic_Data_toString(x), &quot;Data ´Cons [x, xs]&quot;).x
+	assertEqual(        Data_toString(x), &quot;x:xs&quot;).x
+	x = patCons(Pattern_Var(&quot;y&quot;), patCons(Pattern_Var(&quot;x&quot;), Pattern_Var(&quot;xs&quot;)))
+	assertEqual(generic_Data_toString(x), &quot;Data ´Cons [y, x:xs]&quot;).x
+	assertEqual(        Data_toString(x), &quot;y:(x:xs)&quot;).x
+	x = patCons(patCons(Pattern_Var(&quot;y&quot;), Pattern_Var(&quot;x&quot;)), Pattern_Var(&quot;xs&quot;))
+	assertEqual(generic_Data_toString(x), &quot;Data ´Cons [y:x, xs]&quot;).x
+	assertEqual(        Data_toString(x), &quot;(y:x):xs&quot;).x
+	
+	
 End Function
 
 
@@ -3483,9 +3576,9 @@ Function test_Type_applyDC()
 	
 	Dim tc, cFoo, cBar
 	tc = applyDC(DataTypeCtor, &quot;TFoo&quot;, 0, nil)
-	cFoo = mkDataCtor(tc, &quot;Foo&quot;, emptyArray)
-	cBar = mkDataCtor(tc, &quot;Bar&quot;, emptyArray)
-	&apos;show(cBar.str, DataValue_toString(cBar))
+	cFoo = mkDataCtor(tc, &quot;Foo&quot;, nil)
+	cBar = mkDataCtor(tc, &quot;Bar&quot;, nil)
+	&apos;show(cBar.str, Data_toString(cBar))
 	a = applyDC(cFoo)
 	&apos;show(a.str, DataValue_toString(a))
 	&apos; should return singleton instances

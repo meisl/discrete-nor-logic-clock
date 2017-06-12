@@ -47,7 +47,6 @@ Type TFnObjs
 	TFn_toString	As Object
 	applyToList		As Object
 	
-	TList_toString	As Object
 	TList_equ		As Object
 	isList			As Object
 	isNil			As Object
@@ -94,9 +93,7 @@ Type TFnObjs
 	
 	Pattern_Data		As Object
 	isPattern			As Object
-	TPattern_toString	As Object
 	match				As Object
-	matches				As Object
 	
 	isExpr				As Object
 End Type
@@ -165,7 +162,6 @@ Function Fn
 		out.TFn_toString = mkFn(fs, &quot;TFn_toString&quot;,	1, &quot;(a -&gt; b) -&gt; Str&quot;)
 		out.applyToList	= mkFn(fs, &quot;applyToList&quot;,	2)
 		
-		out.TList_toString	= mkFn(fs, &quot;TList_toString&quot;,	1)
 		out.TList_equ		= mkFn(fs, &quot;TList_equ&quot;,			2)
 		out.isList			= mkFn(fs, &quot;isList&quot;,			1, &quot;Any -&gt; Bool&quot;)
 		out.isNil			= mkFn(fs, &quot;isNil&quot;,				1, &quot;[a] -&gt; Bool&quot;)
@@ -212,9 +208,7 @@ Function Fn
 		
 		out.Pattern_Data	= mkFn(fs, &quot;Pattern_Data&quot;,		2, &quot;TDataCtor -&gt; [Pattern] -&gt; Pattern&quot;)
 		out.isPattern		= mkFn(fs, &quot;isPattern&quot;,			1, &quot;Any -&gt; Bool&quot;)
-		out.TPattern_toString = mkFn(fs, &quot;TPattern_toString&quot;,	1, &quot;Pattern a -&gt; Str&quot;)
 		out.match			= mkFn(fs, &quot;match&quot;,				3, &quot;Pattern -&gt; Maybe Env -&gt; Any -&gt; Maybe Env&quot;)
-		out.matches			= mkFn(fs, &quot;matches&quot;,			3, &quot;Pattern a -&gt; Maybe Env -&gt; a -&gt; Maybe Env&quot;)
 		
 		out._instances = fs
 	End If
@@ -457,12 +451,10 @@ applyLast_of_one:
 		Case &quot;pZeroOrOne&quot;:			out = pZeroOrOne(			a0)
 		Case &quot;mkTypeVar&quot;:			out = mkTypeVar(			a0)
 		Case &quot;TFn_toString&quot;:		out = TFn_toString(			a0)
-		Case &quot;TList_toString&quot;:		out = TList_toString(		a0)
 		Case &quot;TParser_toString&quot;:	out = TParser_toString(		a0)
 		Case &quot;TASN_toString&quot;:		out = TASN_toString(		a0)
 		Case &quot;mkDtTerminal&quot;:		out = mkDtTerminal(			a0)
 		Case &quot;isPattern&quot;:			out = isPattern(			a0)
-		Case &quot;TPattern_toString&quot;:	out = TPattern_toString(	a0)
 		Case &quot;isExpr&quot;:				out = isExpr(				a0)
 		Case Else
 			Goto applyLast_unknownF
@@ -524,7 +516,6 @@ applyLast_of_three:
 		Case &quot;foldr&quot;:				out = foldr(		a0, a1, a2)
 		Case &quot;mkASN&quot;:				out = mkASN(		a0, a1, a2)
 		Case &quot;match&quot;:				out = match(	a0, a1, a2)
-		Case &quot;matches&quot;:				out = matches(	a0, a1, a2)
 		Case Else
 			Goto applyLast_unknownF
 	End Select

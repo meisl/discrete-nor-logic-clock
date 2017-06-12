@@ -159,33 +159,33 @@ End Function
 
 &apos; --- toString ---
 
-Function TList_toString(ByVal xs)
+Function TList_toString( _
+	ByVal xs, _
+	Optional expandElementary As Boolean _
+)
 	&apos;concat &quot;[&quot; (concat (foldl1 (\acc.(concat acc) ° (concat &quot;, &quot;))) &quot;[&quot; (map toString xs)) &quot;]&quot;
 	&apos;out = &quot;[&quot; &amp; Join(toArray(map(Fn.toString, xs)), &quot;, &quot;) &amp; &quot;]&quot;
-	
+	If isMissing(expandElementary) Then
+		expandElementary = True
+	End If
 	Dim out As String
-	If isNil(xs) Then
-		out = &quot;[]&quot;
-	Else
-		Dim x
+	Dim isFirst As Boolean, x As Variant
+	isFirst = True
+	Do Until(isNil(xs))
 		x = car(xs)
-		If isList(x) Then
-			out = TList_toString(x)
+		If isFirst Then
+			isFirst = False
 		Else
-			out = toString(x)
+			out = out &amp; &quot;, &quot;
+		End If
+		If isDataValue(x) Then
+			out = out &amp; Data_toString(x, False, expandElementary)
+		Else
+			out = out &amp; toString(x)
 		End If
 		xs = cdr(xs)
-		Do Until(isNil(xs))
-			x = car(xs)
-			xs = cdr(xs)
-			If isList(x) Then
-				out = out &amp; &quot;, &quot; &amp; TList_toString(x)
-			Else
-				out = out &amp; &quot;, &quot; &amp; toString(x)
-			End If
-		Loop
-		out = &quot;[&quot; &amp; out &amp; &quot;]&quot;
-	End If
+	Loop
+	out = &quot;[&quot; &amp; out &amp; &quot;]&quot;
 	
 	TList_toString = out
 End Function
@@ -676,8 +676,6 @@ Function test_List_TList_toString()
 	assertEqual(TList_toString(a), &quot;[[&apos;a&apos;], &apos;b&apos;, []]&quot;).x
 	a = cons(a, nil)
 	assertEqual(TList_toString(a), &quot;[[[&apos;a&apos;], &apos;b&apos;, []]]&quot;).x
-	
-	assertEqual(arity(Fn.TList_toString), 1).x
 End Function
 
 Function test_List_polymorphic_toString()

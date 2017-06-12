@@ -280,14 +280,7 @@ Function toString(ByVal v As Variant) As String
 			If IsObject(v) Then
 				Dim toStrFnName As String, toStrFn As Variant
 				If isDataValue(v) Then
-					toStrFnName = &quot;T&quot; &amp; typeCtorName(ctorOf(v)) _
-								&amp; &quot;_toString&quot;
-					toStrFn = lookupFn(toStrFnName)
-					If isEmpty(toStrFn) Then
-						result = DataValue_toString(v)
-					Else
-						result = apply(toStrFn, v)
-					End If
+					result = Data_toString(v)
 				Else &apos; Object with a .tyname field
 					Dim tyName As String
 					&apos; ATTENTION: do NOT access .tyname directly!
