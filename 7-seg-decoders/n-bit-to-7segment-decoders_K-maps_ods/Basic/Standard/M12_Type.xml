@@ -3315,13 +3315,11 @@ Function test_Data_toString()
 
 
 
-	x = patCons(patCons(Pattern_Var(&quot;y&quot;), Pattern_Var(&quot;x&quot;)), Pattern_Var(&quot;xs&quot;))
+	x = patCons(patCons(patVar(&quot;y&quot;), patVar(&quot;x&quot;)), patVar(&quot;xs&quot;))
 	&apos;assertEqual(generic_Data_toString(x), &quot;Data ´Cons [y:x, xs]&quot;).x
 	&apos;assertEqual(        Data_toString(x), &quot;(y:x):xs&quot;).x
 
 
-	Dim pAny : pAny = patAny
-	
 	x = patAny
 	assertEqual(generic_Data_toString(x), ctorName(x)).x
 	assertEqual(        Data_toString(x), TPattern_toString(x)).x

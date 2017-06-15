@@ -575,21 +575,21 @@ End Function
 
 Function test_Pattern_Any()
 	Dim cAny : cAny = findDataCtor(TPattern, &quot;Any&quot;)
-	Dim vAny : vAny = Pattern_Any()
+	Dim vAny : vAny = patAny()
 	assert_hasCtor(vAny, cAny).x
 	&apos; returns the same value again:
-	assert_same(Pattern_Any(), vAny).x
+	assert_same(patAny(), vAny).x
 End Function
 
 Function test_Pattern_Var()
 	Dim cVar : cVar = findDataCtor(TPattern, &quot;Var&quot;)
-	Dim vVar : vVar = Pattern_Var(&quot;foo&quot;)
+	Dim vVar : vVar = patVar(&quot;foo&quot;)
 	assert_hasCtor(vVar, cVar).x
 	&apos; destructure:
 	assertEqual(Pattern_Var_name(vVar), &quot;foo&quot;).x
 	
-	assertEqual(isFn(Pattern_Var()), True).x
-	&apos;assertThrows(Pattern_Var, Array(1)).x	&apos; TODO: typecheck in applyDC
+	assertEqual(isFn(patVar()), True).x
+	&apos;assertThrows(patVar, Array(1)).x	&apos; TODO: typecheck in applyDC
 End Function
 
 Function test_Pattern_Const()
@@ -669,7 +669,7 @@ Function test_Pattern_patList()
 	Dim cNil  : cNil  = Tp.List_Nil
 	Dim cCons : cCons = Tp.List_Cons
 	Dim cData : cData = _ctor(Pattern_Data(cNil, nil))
-	Dim pAny  : pAny  = Pattern_Any
+	Dim pAny  : pAny  = patAny
 	Dim pNil  : pNil  = patNil
 	Dim p, args
 	p = patList()
@@ -705,7 +705,7 @@ Function test_Pattern_patList()
 	assert_hasCtor(p, cData).x
 	assert_same(p, pNil).x
 	
-	Dim pVar : pVar = Pattern_Var(&quot;x&quot;)
+	Dim pVar : pVar = patVar(&quot;x&quot;)
 	p = patList(pAny, p1, pVar)
 	assert_hasCtor(p, cData).x
 	assert_same(Pattern_data_ctor(p), cCons).x
@@ -731,21 +731,21 @@ End Function
 
 
 Function test_Pattern_isPattern()
-	assertEqual(isPattern(Pattern_Any),		True).x
+	assertEqual(isPattern(patAny),		True).x
 	
 	assertEqual(isPattern(patConst(Empty)), 	True).x
 	assertEqual(isPattern(patConst(Nothing)), 	True).x
 	assertEqual(isPattern(patConst(&quot;&quot;)), 		True).x
 	assertEqual(isPattern(patConst(&quot;a&quot;)),		True).x
 	
-	assertEqual(isPattern(Pattern_Var(&quot;a&quot;)),		True).x
-	assertEqual(isPattern(Pattern_Var(&quot;b&quot;)),		True).x
+	assertEqual(isPattern(patVar(&quot;a&quot;)),		True).x
+	assertEqual(isPattern(patVar(&quot;b&quot;)),		True).x
 
 	assertEqual(isPattern(patNil),	True).x
 	&apos;assert_hasType(patNil,	TPattern).x
 
 	assertEqual(isPattern(Pattern_Data( _
-		Tp.List_Cons, List(Pattern_Any, Pattern_Any))),	True).x
+		Tp.List_Cons, List(patAny, patAny))),	True).x
 
 	assertEqual(isPattern(Empty),		False).x
 	assertEqual(isPattern(Nothing),		False).x
@@ -777,20 +777,20 @@ Function test_Pattern_isPattern()
 End Function
 
 Function test_Pattern_toSrc_Any()
-	Dim p : p = Pattern_Any
+	Dim p : p = patAny
 	assertEqual(TPattern_toSrc(p), &quot;_&quot;).x
 End Function
 
 Function test_Pattern_toSrc_Var()
 	Dim p
-	p = Pattern_Var(&quot;x&quot;)
+	p = patVar(&quot;x&quot;)
 	assertEqual(TPattern_toSrc(p), &quot;x&quot;).x
-	p = Pattern_Var(&quot;y&quot;)
+	p = patVar(&quot;y&quot;)
 	assertEqual(TPattern_toSrc(p), &quot;y&quot;).x
-	p = Pattern_Var(&quot;foo&quot;)
+	p = patVar(&quot;foo&quot;)
 	assertEqual(TPattern_toSrc(p), &quot;foo&quot;).x
-	&apos; TODO: Pattern_Var(&quot;_&quot;) ?! &lt;--------------------------
-	assertEqual(TPattern_toSrc(Pattern_Var(&quot;_&quot;)), &quot;_&quot;).x
+	&apos; TODO: patVar(&quot;_&quot;) ?! &lt;--------------------------
+	assertEqual(TPattern_toSrc(patVar(&quot;_&quot;)), &quot;_&quot;).x
 End Function
 
 Function test_Pattern_toSrc_Const()
@@ -816,10 +816,10 @@ Function test_Pattern_toSrc_Const()
 End Function
 
 Function test_Pattern_toSrc_lists()
-	Dim pAny As Object : pAny = Pattern_Any
+	Dim pAny As Object : pAny = patAny
 	Dim pNil As Object : pNil = patNil
-	Dim varX As Object : varX = Pattern_Var(&quot;x&quot;)
-	Dim varY As Object : varY = Pattern_Var(&quot;y&quot;)
+	Dim varX As Object : varX = patVar(&quot;x&quot;)
+	Dim varY As Object : varY = patVar(&quot;y&quot;)
 
 	Dim p As Object
 
@@ -867,8 +867,8 @@ Function test_Pattern_toSrc_lists()
 End Function
 
 Function test_Pattern_toSrc_patterns()
-	Dim cAny   : cAny = _ctor(Pattern_Any)
-	Dim cVar   : cVar = _ctor(Pattern_Var(&quot;x&quot;))
+	Dim cAny   : cAny = _ctor(patAny)
+	Dim cVar   : cVar = _ctor(patVar(&quot;x&quot;))
 	Dim cConst : cConst = findDataCtor(TPattern, &quot;Const&quot;)
 	Dim cData  : cData = findDataCtor(TPattern, &quot;Data&quot;)
 	Dim p As Object
@@ -879,7 +879,7 @@ Function test_Pattern_toSrc_patterns()
 	
 	p = Pattern_Data(cVar, List(patConst(&quot;x&quot;)))
 	assertEqual(TPattern_toSrc(p), &quot;Var &apos;x&apos;&quot;).x
-	p = Pattern_Data(cVar, List(Pattern_Var(&quot;x&quot;)))
+	p = Pattern_Data(cVar, List(patVar(&quot;x&quot;)))
 	assertEqual(TPattern_toSrc(p), &quot;Var x&quot;).x
 	
 	&apos; pattern that matches a list of two Var patterns having the same varname:
@@ -891,7 +891,7 @@ Function test_Pattern_toSrc_patterns()
 	assertEqual(TPattern_toSrc(p), &quot;Const 42&quot;).x
 
 	&apos; pattern that matches a Data pattern
-	p = Pattern_Data(cData, List(Pattern_Var(&quot;ctor&quot;), Pattern_Var(&quot;args&quot;))
+	p = Pattern_Data(cData, List(patVar(&quot;ctor&quot;), patVar(&quot;args&quot;))
 	assertEqual(TPattern_toSrc(p), &quot;Data ctor args&quot;).x
 
 	&apos; pattern to match a particular data ctor (as opposed to a value *of* that ctor)
@@ -899,20 +899,20 @@ Function test_Pattern_toSrc_patterns()
 	Dim cNil      : cNil = Tp.List_Nil
 	p = Pattern_Data(cDataCtor, List( _
 		patConst(nameOf(cNil)), _
-		Pattern_Var(&quot;argTypes&quot;), _
-		Pattern_Var(&quot;typeCtor&quot;) _
+		patVar(&quot;argTypes&quot;), _
+		patVar(&quot;typeCtor&quot;) _
 	))
 	assertEqual(TPattern_toSrc(p), &quot;DataCtor &apos;Nil&apos; argTypes typeCtor&quot;).x
 
 	&apos; pattern that matches a pattern that matches the empty list
-	p = Pattern_Data(cData, List(p, Pattern_Any))
+	p = Pattern_Data(cData, List(p, patAny))
 	assertEqual(TPattern_toSrc(p), _
 		&quot;Data (DataCtor &apos;Nil&apos; argTypes typeCtor) _&quot;).x
 End Function
 
 Function test_Pattern_toString()
-	Dim cAny   : cAny = _ctor(Pattern_Any)
-	Dim cVar   : cVar = _ctor(Pattern_Var(&quot;x&quot;))
+	Dim cAny   : cAny = _ctor(patAny)
+	Dim cVar   : cVar = _ctor(patVar(&quot;x&quot;))
 	Dim cConst : cConst = findDataCtor(TPattern, &quot;Const&quot;)
 	Dim cData  : cData = findDataCtor(TPattern, &quot;Data&quot;)
 	Dim p As Object
@@ -1011,7 +1011,7 @@ Function test_Pattern_match()
 	assertEqual(arity(f), 3).x
 	assertThrows(f, Array(Empty, Empty, Empty)).x
 	
-	f = match(Pattern_Any)
+	f = match(patAny)
 	assertEqual(arity(f), 2).x
 	apply(f, Empty, Empty) &apos; should not throw
 	apply(f, envEmpty, Empty) &apos; should not throw
@@ -1027,7 +1027,7 @@ Function test_Pattern_matches_Any()
 	f = match
 	assertEqual(arity(f), 3).x
 
-	p = Pattern_Any
+	p = patAny
 
 	&apos; under env = Empty (None) it does not match anything:
 	e = Empty
@@ -1168,7 +1168,7 @@ End Function
 Function test_Pattern_matches_Var()
 	Dim p As Object, f As Object, e As Variant
 	
-	p = Pattern_Var(&quot;a&quot;)
+	p = patVar(&quot;a&quot;)
 	&apos; under env = Empty (None) it does not match anything:
 	e = Empty
 	refute_matches(p, e, Array( _
@@ -1228,11 +1228,11 @@ Function test_Pattern_matches_List()
 	&apos; throws if x isn&apos;t a List:
 	assertThrows(f, Array(&quot;foo&quot;))
 	&apos; Pattern_Any is a Pattern, NOT a List!
-	assertThrows(f, Array(Pattern_Any))
+	assertThrows(f, Array(patAny))
 	
 	&apos; pattern of a non-empty list
-	Dim varX  : varX  = Pattern_Var(&quot;x&quot;)
-	Dim varXs : varXs = Pattern_Var(&quot;xs&quot;)
+	Dim varX  : varX  = patVar(&quot;x&quot;)
+	Dim varXs : varXs = patVar(&quot;xs&quot;)
 	Dim v
 	p = patCons(varX, varXs)
 	refute_matches(p, e, nil).x
@@ -1271,7 +1271,7 @@ Function test_Pattern_matches_List()
 	refute_matches(p, e, List(&quot;a&quot;, &quot;b&quot;, &quot;c&quot;)	).x
 	
 	&apos; pattern of a list with first two elems equal
-	p = patCons(varX, patCons(varX, Pattern_Any))
+	p = patCons(varX, patCons(varX, patAny))
 	refute_matches(p, e, nil).x
 	refute_matches(p, e, List(nil)				).x
 	assert_matches(p, e, List(nil, nil)			).x
@@ -1285,10 +1285,10 @@ End Function
 	
 Function test_Pattern_matches_Pattern()
 	Dim p As Object, f As Object, e As Variant, eOut As Variant
-	Dim pAny      : pAny      = Pattern_Any
+	Dim pAny      : pAny      = patAny
 	Dim cpAny     : cpAny     = _ctor(pAny)
-	Dim pVarX     : pVarX     = Pattern_Var(&quot;x&quot;)
-	Dim pVarY     : pVarY     = Pattern_Var(&quot;y&quot;)
+	Dim pVarX     : pVarX     = patVar(&quot;x&quot;)
+	Dim pVarY     : pVarY     = patVar(&quot;y&quot;)
 	Dim cpVar     : cpVar     = _ctor(pVarX)
 	Dim pConst42  : pConst42  = patConst(42)
 	Dim pConstFoo : pConstFoo = patConst(&quot;Foo&quot;)
