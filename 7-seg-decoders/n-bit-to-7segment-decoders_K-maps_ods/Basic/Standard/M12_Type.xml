@@ -3320,43 +3320,30 @@ Function test_Data_toString()
 	&apos;assertEqual(        Data_toString(x), &quot;(y:x):xs&quot;).x
 
 
-	Dim pAny : pAny = Pattern_Any
+	Dim pAny : pAny = patAny
 	
-	
-	x = patList(pAny, pAny)
-	&apos;assertEqual(generic_Data_toString(x), &quot;Any&quot;).x
-	assertEqual(        Data_toString(x), &quot;_&quot;).x
-	
-	
-	x = pAny
-	assertEqual(generic_Data_toString(x), &quot;Any&quot;).x
-	assertEqual(        Data_toString(x), &quot;_&quot;).x
-	x = Pattern_Const(&quot;foo&quot;)
-	assertEqual(generic_Data_toString(x), &quot;Const &apos;foo&apos;&quot;).x
-	assertEqual(        Data_toString(x), &quot;&apos;foo&apos;&quot;).x
-	x = Pattern_Const(Empty)
-	assertEqual(generic_Data_toString(x), &quot;Const Empty&quot;).x
-	assertEqual(        Data_toString(x), &quot;()&quot;).x
-	x = Pattern_Var(&quot;foo&quot;)
-	assertEqual(generic_Data_toString(x), &quot;Var &apos;foo&apos;&quot;).x
-	assertEqual(        Data_toString(x), &quot;foo&quot;).x
+	x = patAny
+	assertEqual(generic_Data_toString(x), ctorName(x)).x
+	assertEqual(        Data_toString(x), TPattern_toString(x)).x
+	x = patConst(&quot;foo&quot;)
+	assertEqual(generic_Data_toString(x), ctorName(x) &amp; &quot; &quot; &amp; toString(&quot;foo&quot;)).x
+	assertEqual(        Data_toString(x), TPattern_toString(x)).x
+	x = patConst(Empty)
+	assertEqual(generic_Data_toString(x), ctorName(x) &amp; &quot; &quot; &amp; toString(Empty)).x
+	assertEqual(        Data_toString(x), TPattern_toString(x)).x
+	x = patVar(&quot;foo&quot;)
+	assertEqual(generic_Data_toString(x), ctorName(x) &amp; &quot; &quot; &amp; toString(&quot;foo&quot;)).x
+	assertEqual(        Data_toString(x), TPattern_toString(x)).x
 	x = patNil
 	assertEqual(generic_Data_toString(x), &quot;Data ´Nil []&quot;).x
-	assertEqual(        Data_toString(x), &quot;[]&quot;).x
+	assertEqual(        Data_toString(x), TPattern_toString(x)).x
 	x = Pattern_Data(Tp.List_Nil, nil)
 	assertEqual(generic_Data_toString(x), &quot;Data ´Nil []&quot;).x
-	assertEqual(        Data_toString(x), &quot;[]&quot;).x
-	x = Pattern_Data(Tp.List_Cons, List(Pattern_Var(&quot;x&quot;), Pattern_Var(&quot;xs&quot;)))
-	assertEqual(generic_Data_toString(x), &quot;Data ´Cons [x, xs]&quot;).x
-	assertEqual(        Data_toString(x), &quot;x:xs&quot;).x
-	x = patCons(Pattern_Var(&quot;y&quot;), patCons(Pattern_Var(&quot;x&quot;), Pattern_Var(&quot;xs&quot;)))
-	assertEqual(generic_Data_toString(x), &quot;Data ´Cons [y, x:xs]&quot;).x
-	assertEqual(        Data_toString(x), &quot;y:(x:xs)&quot;).x
-	x = patCons(patCons(Pattern_Var(&quot;y&quot;), Pattern_Var(&quot;x&quot;)), Pattern_Var(&quot;xs&quot;))
-	assertEqual(generic_Data_toString(x), &quot;Data ´Cons [y:x, xs]&quot;).x
-	assertEqual(        Data_toString(x), &quot;(y:x):xs&quot;).x
-	
-	
+	assertEqual(        Data_toString(x), TPattern_toString(x)).x
+	x = Pattern_Data(Tp.List_Cons, List(patVar(&quot;x&quot;), patVar(&quot;xs&quot;)))
+	assertEqual(generic_Data_toString(x), _
+		&quot;Data ´Cons [Pattern(x), Pattern(xs)]&quot;).x
+	assertEqual(        Data_toString(x), TPattern_toString(x)).x
 End Function
 
 
