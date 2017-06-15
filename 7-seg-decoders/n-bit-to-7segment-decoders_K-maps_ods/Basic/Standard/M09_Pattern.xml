@@ -73,11 +73,11 @@ Function patVar(Optional nm)
 	patVar = out
 End Function
 
-Function Pattern_Var_name(Optional x)
+Function patVar_name(Optional x)
 	Static c As Object : If isNull(c) Then
 		c = findDataCtor(TPattern, &quot;Var&quot;)
 	End If
-	Pattern_Var_name = _destructure(c, 0, x)
+	patVar_name = _destructure(c, 0, x)
 End Function
 
 Function Pattern_Const(Optional val)
@@ -108,11 +108,11 @@ Function patConst(Optional val)
 	patConst = out
 End Function
 
-Function Pattern_Const_value(Optional x)
+Function patConst_value(Optional x)
 	Static c As Object : If isNull(c) Then
 		c = findDataCtor(TPattern, &quot;Const&quot;)
 	End If
-	Pattern_Const_value = _destructure(c, 0, x)
+	patConst_value = _destructure(c, 0, x)
 End Function
 
 Function Pattern_Data(Optional dc, Optional argPatterns)
@@ -297,9 +297,9 @@ Function TPattern_toSrc( _
 		Case idAny
 			out = &quot;_&quot;
 		Case idVar
-			out = Pattern_Var_name(p)
+			out = patVar_name(p)
 		Case idConst
-			Dim v : v = Pattern_Const_value(p)
+			Dim v : v = patConst_value(p)
 			If isEmpty(v) Then
 				out = &quot;()&quot;
 			Else
@@ -438,7 +438,7 @@ Function _match( _
 				
 			Select Case _id(_ctor(p))
 				Case id_cpConst
-					v = Pattern_Const_value(p)
+					v = patConst_value(p)
 _match_equ_test:			
 					If equ(x, v) Then
 						out = e
@@ -446,7 +446,7 @@ _match_equ_test:
 						out = Empty
 					End If
 				Case id_cpVar
-					nm = Pattern_Var_name(p)
+					nm = patVar_name(p)
 					v = lookup(nm, e)
 					If isEmpty(v) Then
 						&apos; TODO: what if var was bound to value Empty?!
@@ -586,7 +586,7 @@ Function test_Pattern_Var()
 	Dim vVar : vVar = patVar(&quot;foo&quot;)
 	assert_hasCtor(vVar, cVar).x
 	&apos; destructure:
-	assertEqual(Pattern_Var_name(vVar), &quot;foo&quot;).x
+	assertEqual(patVar_name(vVar), &quot;foo&quot;).x
 	
 	assertEqual(isFn(patVar()), True).x
 	&apos;assertThrows(patVar, Array(1)).x	&apos; TODO: typecheck in applyDC
@@ -597,11 +597,11 @@ Function test_Pattern_Const()
 	Dim vConst : vConst = patConst(42)
 	assert_hasCtor(vConst, cConst).x
 	&apos; destructure:
-	assertEqual(Pattern_Const_value(vConst), 42).x
+	assertEqual(patConst_value(vConst), 42).x
 
-	assertEqual(Pattern_Const_value(patConst(Nothing)), Nothing).x
-	assertEqual(Pattern_Const_value(patConst(Empty)), 	 Empty).x
-	assertEqual(Pattern_Const_value(patConst(&quot;qmbl&quot;)),  &quot;qmbl&quot;).x
+	assertEqual(patConst_value(patConst(Nothing)), Nothing).x
+	assertEqual(patConst_value(patConst(Empty)), 	 Empty).x
+	assertEqual(patConst_value(patConst(&quot;qmbl&quot;)),  &quot;qmbl&quot;).x
 	
 	assertEqual(isFn(patConst()), True).x
 End Function
