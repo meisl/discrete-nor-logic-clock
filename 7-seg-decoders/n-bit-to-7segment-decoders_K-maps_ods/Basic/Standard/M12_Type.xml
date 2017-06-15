@@ -3335,10 +3335,10 @@ Function test_Data_toString()
 	x = patNil
 	assertEqual(generic_Data_toString(x), &quot;Data ´Nil []&quot;).x
 	assertEqual(        Data_toString(x), TPattern_toString(x)).x
-	x = Pattern_Data(Tp.List_Nil, nil)
+	x = patData(Tp.List_Nil, nil)
 	assertEqual(generic_Data_toString(x), &quot;Data ´Nil []&quot;).x
 	assertEqual(        Data_toString(x), TPattern_toString(x)).x
-	x = Pattern_Data(Tp.List_Cons, List(patVar(&quot;x&quot;), patVar(&quot;xs&quot;)))
+	x = patData(Tp.List_Cons, List(patVar(&quot;x&quot;), patVar(&quot;xs&quot;)))
 	assertEqual(generic_Data_toString(x), _
 		&quot;Data ´Cons [Pattern(x), Pattern(xs)]&quot;).x
 	assertEqual(        Data_toString(x), TPattern_toString(x)).x

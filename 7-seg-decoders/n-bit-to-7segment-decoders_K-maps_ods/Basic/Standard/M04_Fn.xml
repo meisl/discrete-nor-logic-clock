@@ -91,7 +91,7 @@ Type TFnObjs
 	mkDtNonterminal		As Object
 	mkDtMult			As Object
 	
-	Pattern_Data		As Object
+	patData				As Object
 	isPattern			As Object
 	match				As Object
 	
@@ -206,7 +206,7 @@ Function Fn
 		out.mkDtNonterminal	= mkFn(fs, &quot;mkDtNonterminal&quot;,	2, &quot;Str -&gt; [ASN] -&gt; ASN&quot;)
 		out.mkDtMult		= mkFn(fs, &quot;mkDtMult&quot;,			2, &quot;Str -&gt; [ASN] -&gt; ASN&quot;)
 		
-		out.Pattern_Data	= mkFn(fs, &quot;Pattern_Data&quot;,		2, &quot;TDataCtor -&gt; [Pattern] -&gt; Pattern&quot;)
+		out.patData			= mkFn(fs, &quot;patData&quot;,			2, &quot;TDataCtor -&gt; [Pattern] -&gt; Pattern&quot;)
 		out.isPattern		= mkFn(fs, &quot;isPattern&quot;,			1, &quot;Any -&gt; Bool&quot;)
 		out.match			= mkFn(fs, &quot;match&quot;,				3, &quot;Pattern -&gt; Maybe Env -&gt; Any -&gt; Maybe Env&quot;)
 		
@@ -495,7 +495,7 @@ applyLast_of_two:
 		Case &quot;mkDtCClass&quot;:			out = mkDtCClass(		a0, a1)
 		Case &quot;mkDtNonterminal&quot;:		out = mkDtNonterminal(	a0, a1)
 		Case &quot;mkDtMult&quot;:			out = mkDtMult(			a0, a1)
-		Case &quot;Pattern_Data&quot;:		out = Pattern_Data(		a0, a1)
+		Case &quot;patData&quot;:				out = patData(			a0, a1)
 		Case Else
 			Goto applyLast_unknownF
 	End Select
