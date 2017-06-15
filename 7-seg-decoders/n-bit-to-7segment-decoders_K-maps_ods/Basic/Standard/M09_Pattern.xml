@@ -25,44 +25,47 @@ Function TPattern()
 		cVar   = mkDataCtor(tcPat, &quot;Var&quot;,	List(Tp.Native_String))
 		cConst = mkDataCtor(tcPat, &quot;Const&quot;,	List(Tp.Native_Variant))
 		cData  = mkDataCtor(tcPat, &quot;Data&quot;,	List(TDataCtor, TList(tcPat)))
+		Tp.TPattern = tcPat
+		Tp.TPattern_Any   = cAny
+		Tp.TPattern_Var   = cVar
+		Tp.TPattern_Const = cConst
+		Tp.TPattern_Data  = cData
 	End If
 	TPattern = out
 End Function
 
-Function Pattern_Any()
-	Static out As Object : If isNull(out) Then
-		out = singletonVal(findDataCtor(TPattern, &quot;Any&quot;))
-		out.str = TPattern_toString(out)
-	End If
-	Pattern_Any = out
+
+Function TPattern_Any()
+	Static c As Object : If isNull(c) Then : c = Tp.TPattern_Any : End If
+	TPattern_Any = c
 End Function
+
+Function TPattern_Var()
+	Static c As Object : If isNull(c) Then : c = Tp.TPattern_Var : End If
+	TPattern_Var = c
+End Function
+
+Function TPattern_Const()
+	Static c As Object : If isNull(c) Then : c = Tp.TPattern_Const : End If
+	TPattern_Const = c
+End Function
+
+Function TPattern_Data()
+	Static c As Object : If isNull(c) Then : c = Tp.TPattern_Data : End If
+	TPattern_Data = c
+End Function
+
 
 Function patAny()
 	Static out As Object : If isNull(out) Then
-		out = singletonVal(findDataCtor(TPattern, &quot;Any&quot;))
+		out = singletonVal(TPattern_Any)
 		out.str = TPattern_toString(out)
 	End If
 	patAny = out
 End Function
 
-Function Pattern_Var(Optional nm)
-	Static c As Object : If isNull(c) Then
-		c = findDataCtor(TPattern, &quot;Var&quot;)
-	End If
-	Dim out
-	If isMissing(nm) Then
-		out = applyDC(c)
-	Else
-		out = applyDC(c, nm)
-		out.str = TPattern_toString(out)
-	End If
-	Pattern_Var = out
-End Function
-
 Function patVar(Optional nm)
-	Static c As Object : If isNull(c) Then
-		c = findDataCtor(TPattern, &quot;Var&quot;)
-	End If
+	Static c As Object : If isNull(c) Then : c = TPattern_Var : End If
 	Dim out
 	If isMissing(nm) Then
 		out = applyDC(c)
@@ -74,30 +77,12 @@ Function patVar(Optional nm)
 End Function
 
 Function patVar_name(Optional x)
-	Static c As Object : If isNull(c) Then
-		c = findDataCtor(TPattern, &quot;Var&quot;)
-	End If
+	Static c As Object : If isNull(c) Then : c = TPattern_Var : End If
 	patVar_name = _destructure(c, 0, x)
 End Function
 
-Function Pattern_Const(Optional val)
-	Static c As Object : If isNull(c) Then
-		c = findDataCtor(TPattern, &quot;Const&quot;)
-	End If
-	Dim out
-	If isMissing(val) Then
-		out = applyDC(c)
-	Else
-		out = applyDC(c, val)
-		out.str = TPattern_toString(out)
-	End If
-	Pattern_Const = out
-End Function
-
 Function patConst(Optional val)
-	Static c As Object : If isNull(c) Then
-		c = findDataCtor(TPattern, &quot;Const&quot;)
-	End If
+	Static c As Object : If isNull(c) Then : c = TPattern_Const : End If
 	Dim out
 	If isMissing(val) Then
 		out = applyDC(c)
@@ -109,9 +94,7 @@ Function patConst(Optional val)
 End Function
 
 Function patConst_value(Optional x)
-	Static c As Object : If isNull(c) Then
-		c = findDataCtor(TPattern, &quot;Const&quot;)
-	End If
+	Static c As Object : If isNull(c) Then : c = TPattern_Const : End If
 	patConst_value = _destructure(c, 0, x)
 End Function
 
@@ -120,7 +103,7 @@ Function patData(Optional dc, Optional argPatterns)
 	If isNull(oFn) Then
 		oFn = Fn.patData
 		tcPat = TPattern
-		cDat = findDataCtor(tcPat, &quot;Data&quot;)
+		cDat = TPattern_Data
 	End If
 	Dim out
 	If isMissing(dc) Then
@@ -172,16 +155,12 @@ patData_2nd_arg_wrong_count:
 End Function
 
 Function patData_ctor(Optional x)
-	Static c As Object : If isNull(c) Then
-		c = findDataCtor(TPattern, &quot;Data&quot;)
-	End If
+	Static c As Object : If isNull(c) Then : c = TPattern_Data : End If
 	patData_ctor = _destructure(c, 0, x)
 End Function
 
 Function patData_args(Optional x)
-	Static c As Object : If isNull(c) Then
-		c = findDataCtor(TPattern, &quot;Data&quot;)
-	End If
+	Static c As Object : If isNull(c) Then : c = TPattern_Data : End If
 	patData_args = _destructure(c, 1, x)
 End Function
 
@@ -279,11 +258,11 @@ Function TPattern_toSrc( _
 	Static idConst	As Integer
 	Static idData	As Integer
 	If isNull(cAny) Then
-		cAny = findDataCtor(TPattern, &quot;Any&quot;)
+		cAny = TPattern_Any
 		idAny   = _id(cAny)
-		idVar   = _id(findDataCtor(TPattern, &quot;Var&quot;))
-		idConst = _id(findDataCtor(TPattern, &quot;Const&quot;))
-		idData  = _id(findDataCtor(TPattern, &quot;Data&quot;))
+		idVar   = _id(TPattern_Var)
+		idConst = _id(TPattern_Const)
+		idData  = _id(TPattern_Data)
 	End If
 	If isMissing(needParens) Then
 		needParens = False
@@ -398,10 +377,10 @@ Function _match( _
 		&apos; Let&apos;s avoid mentioning the actual name strings of the ctors!
 		pAny	   = patAny
 		id_pAny    = _id(pAny)
-		cpAny 	   = _ctor(pAny)
+		cpAny 	   = TPattern_Any
 		id_cpAny   = _id(cpAny)
-		id_cpVar   = _id(_ctor(patVar(&quot;x&quot;)))
-		id_cpConst = _id(_ctor(patConst(42)))
+		id_cpVar   = _id(TPattern_Var)
+		id_cpConst = _id(TPattern_Const)
 		pNil       = patNil
 		id_pNil    = _id(pNil)
 		vNil       = nil
@@ -409,8 +388,7 @@ Function _match( _
 		cNil       = _ctor(vNil)
 		tcList     = typeCtorOf(cNil)
 		assert_same(tcList, TList).x
-		cpData     = _ctor(pNil)
-		&apos;assert_same(cpData, findDataCtor(TPattern, &quot;Data&quot;)).x
+		cpData     = TPattern_Data
 		id_cpData  = _id(cpData)
 	End If
 	Dim out
@@ -574,7 +552,7 @@ Function test_Pattern_TPattern()
 End Function
 
 Function test_Pattern_Any()
-	Dim cAny : cAny = findDataCtor(TPattern, &quot;Any&quot;)
+	Dim cAny : cAny = TPattern_Any
 	Dim vAny : vAny = patAny()
 	assert_hasCtor(vAny, cAny).x
 	&apos; returns the same value again:
@@ -582,7 +560,7 @@ Function test_Pattern_Any()
 End Function
 
 Function test_Pattern_Var()
-	Dim cVar : cVar = findDataCtor(TPattern, &quot;Var&quot;)
+	Dim cVar : cVar = TPattern_Var
 	Dim vVar : vVar = patVar(&quot;foo&quot;)
 	assert_hasCtor(vVar, cVar).x
 	&apos; destructure:
@@ -593,7 +571,7 @@ Function test_Pattern_Var()
 End Function
 
 Function test_Pattern_Const()
-	Dim cConst : cConst = findDataCtor(TPattern, &quot;Const&quot;)
+	Dim cConst : cConst = TPattern_Const
 	Dim vConst : vConst = patConst(42)
 	assert_hasCtor(vConst, cConst).x
 	&apos; destructure:
@@ -607,7 +585,7 @@ Function test_Pattern_Const()
 End Function
 
 Function test_Pattern_Data()
-	Dim cDat : cDat = findDataCtor(TPattern, &quot;Data&quot;)
+	Dim cDat : cDat = TPattern_Data
 	Dim cNil : cNil = Tp.List_Nil
 	Dim vNil : vNil = nil
 	Dim pNil : pNil = patData(cNil, vNil)
@@ -644,8 +622,8 @@ Function test_Pattern_Data()
 End Function
 
 Function test_Pattern_singletonPat()
-	Dim cNil  : cNil  = _ctor(nil)
-	Dim cData : cData = _ctor(patData(cNil, nil))
+	Dim cNil  : cNil  = Tp.List_Nil
+	Dim cData : cData = TPattern_Data
 	Dim p
 	p = singletonPat(nil)
 	assert_hasCtor(p, cData).x
@@ -655,7 +633,7 @@ End Function
 
 Function test_Pattern_patNil()
 	Dim cNil  : cNil  = Tp.List_Nil
-	Dim cData : cData = _ctor(patData(cNil, nil))
+	Dim cData : cData = TPattern_Data
 	Dim p
 	p = patNil
 	assert_hasCtor(p, cData).x
@@ -668,7 +646,7 @@ End Function
 Function test_Pattern_patList()
 	Dim cNil  : cNil  = Tp.List_Nil
 	Dim cCons : cCons = Tp.List_Cons
-	Dim cData : cData = _ctor(patData(cNil, nil))
+	Dim cData : cData = TPattern_Data
 	Dim pAny  : pAny  = patAny
 	Dim pNil  : pNil  = patNil
 	Dim p, args
@@ -705,8 +683,8 @@ Function test_Pattern_patList()
 	assert_hasCtor(p, cData).x
 	assert_same(p, pNil).x
 	
-	Dim pVar : pVar = patVar(&quot;x&quot;)
-	p = patList(pAny, p1, pVar)
+	Dim pVarX : pVarX = patVar(&quot;x&quot;)
+	p = patList(pAny, p1, pVarX)
 	assert_hasCtor(p, cData).x
 	assert_same(patData_ctor(p), cCons).x
 	args = patData_args(p)
@@ -723,7 +701,7 @@ Function test_Pattern_patList()
 	assert_same(patData_ctor(p), cCons).x
 	args = patData_args(p)
 	assertEqual(length(args), 2).x
-	assert_same(car(args), pVar).x
+	assert_same(car(args), pVarX).x
 	p = cadr(args)
 	assert_hasCtor(p, cData).x
 	assert_same(p, pNil).x
@@ -867,10 +845,10 @@ Function test_Pattern_toSrc_lists()
 End Function
 
 Function test_Pattern_toSrc_patterns()
-	Dim cAny   : cAny = _ctor(patAny)
-	Dim cVar   : cVar = _ctor(patVar(&quot;x&quot;))
-	Dim cConst : cConst = findDataCtor(TPattern, &quot;Const&quot;)
-	Dim cData  : cData = findDataCtor(TPattern, &quot;Data&quot;)
+	Dim cAny   : cAny = TPattern_Any
+	Dim cVar   : cVar = TPattern_Var
+	Dim cConst : cConst = TPattern_Const
+	Dim cData  : cData  = TPattern_Data
 	Dim p As Object
 	
 	&apos; patterns that match a pattern (patterns for a pattern)
@@ -911,10 +889,10 @@ Function test_Pattern_toSrc_patterns()
 End Function
 
 Function test_Pattern_toString()
-	Dim cAny   : cAny = _ctor(patAny)
-	Dim cVar   : cVar = _ctor(patVar(&quot;x&quot;))
-	Dim cConst : cConst = findDataCtor(TPattern, &quot;Const&quot;)
-	Dim cData  : cData = findDataCtor(TPattern, &quot;Data&quot;)
+	Dim cAny   : cAny   = TPattern_Any
+	Dim cVar   : cVar   = TPattern_Var
+	Dim cConst : cConst = TPattern_Const
+	Dim cData  : cData  = TPattern_Data
 	Dim p As Object
 	
 	p = patAny
@@ -1286,24 +1264,23 @@ End Function
 Function test_Pattern_matches_Pattern()
 	Dim p As Object, f As Object, e As Variant, eOut As Variant
 	Dim pAny      : pAny      = patAny
-	Dim cpAny     : cpAny     = _ctor(pAny)
+	Dim cpAny     : cpAny     = TPattern_Any
 	Dim pVarX     : pVarX     = patVar(&quot;x&quot;)
 	Dim pVarY     : pVarY     = patVar(&quot;y&quot;)
-	Dim cpVar     : cpVar     = _ctor(pVarX)
+	Dim cpVar     : cpVar     = TPattern_Var
 	Dim pConst42  : pConst42  = patConst(42)
 	Dim pConstFoo : pConstFoo = patConst(&quot;Foo&quot;)
-	Dim cpConst   : cpConst   = _ctor(pConst42)
+	Dim cpConst   : cpConst   = TPattern_Const
 	Dim pNil      : pNil      = patNil
-	Dim cpNil     : cpNil     = _ctor(pNil)
 	Dim vNil      : vNil      = nil
-	Dim cNil      : cNil	  = _ctor(vNil)
+	Dim cNil      : cNil	  = Tp.List_Nil
 	Dim cCons     : cCons     = Tp.List_Cons
 	Dim cDataCtor : cDataCtor = Tp.DataCtor
 	
 	e = envEmpty
 	
 	p = patData(cpAny, nil)
-	Dim cpData : cpData = _ctor(p)
+	Dim cpData : cpData = TPattern_Data
 	
 	assert_matches(p, e, pAny		).x
 	refute_matches(p, e, pVarX		).x

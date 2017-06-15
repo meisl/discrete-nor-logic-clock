@@ -42,6 +42,12 @@ Type Tp
 	Native_Date		As Object
 	Native_Array	As Object
 	Native_Variant	As Object
+	
+	TPattern		As Object
+	TPattern_Any	As Object
+	TPattern_Var	As Object
+	TPattern_Const	As Object
+	TPattern_Data	As Object
 End Type
 
 
