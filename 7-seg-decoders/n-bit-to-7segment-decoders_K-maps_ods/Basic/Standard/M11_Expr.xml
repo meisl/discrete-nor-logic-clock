@@ -168,6 +168,7 @@ _evalX_descend_Apps:
 				Goto _evalX_descend_Apps
 			Else
 				f = evalX(f, env)
+				&apos; tail-call:
 				out = _applyX(f, env, cons(a, argXs))
 			End If
 		Case &quot;Err&quot;

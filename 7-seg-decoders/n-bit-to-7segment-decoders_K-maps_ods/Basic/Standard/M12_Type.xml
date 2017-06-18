@@ -26,8 +26,8 @@ Type Tp
 	Native			As Object
 	
 	TType			As Object
-	TType_Param		As Object
-	TType_App		As Object
+	TType_TyParam	As Object
+	TType_TyApp		As Object
 	
 	Native_Boolean	As Object
 	Native_Byte		As Object
@@ -221,19 +221,19 @@ Function Tp() &apos; bootstrap TType and data types
 		out.TType = tcType
 				
 		Dim cParam
-		cParam = _mkDataCtor(tcType, &quot;Param&quot;, _
+		cParam = _mkDataCtor(tcType, &quot;TyParam&quot;, _
 			_newDataValue(cCons, Array(nInt, _
 								 vNil _
 		)))
-		out.TType_Param = cParam
+		out.TType_TyParam = cParam
 		
 		Dim cApp
-		cApp = _mkDataCtor(tcType, &quot;App&quot;, _
+		cApp = _mkDataCtor(tcType, &quot;TyApp&quot;, _
 			_newDataValue(cCons, Array(tcType, _
 			_newDataValue(cCons, Array(tcType, _
 								 vNil _
 		)))))
-		out.TType_App = cApp
+		out.TType_TyApp = cApp
 		
 		
 		&apos; With cApp we can fix field argTypes of cons 
@@ -265,8 +265,8 @@ Function Tp() &apos; bootstrap TType and data types
 		out.Native.str			= &quot;Native&quot;
 
 		out.TType.str			= &quot;Type&quot;
-		out.TType_Param.str		= &quot;Param :: Int -&gt; Type&quot;
-		out.TType_App.str		= &quot;App :: Type -&gt; Type -&gt; Type&quot;
+		out.TType_TyParam.str	= &quot;TyParam :: Int -&gt; Type&quot;
+		out.TType_TyApp.str		= &quot;TyApp :: Type -&gt; Type -&gt; Type&quot;
 		
 		nStr.str 				= cNtv.str &amp; &quot;_Str&quot;
 		nInt.str 				= cNtv.str &amp; &quot;_Int&quot;
@@ -738,7 +738,7 @@ Function DataTypeCtor( _
 End Function
 
 Function TypeParam(Optional i As Integer)
-	Static c As Object : If isNull(c) Then : c = Tp.TType_Param : End If
+	Static c As Object : If isNull(c) Then : c = Tp.TType_TyParam : End If
 	Dim out
 	If isMissing(i) Then
 		out = c
@@ -751,12 +751,12 @@ Function TypeParam(Optional i As Integer)
 End Function
 
 Function TypeParam_index(Optional x)
-	TypeParam_index = _destructure(Tp.TType_Param, 0, x)
+	TypeParam_index = _destructure(Tp.TType_TyParam, 0, x)
 End Function
 
 
 Function TypeApp(Optional tc As Object, Optional ta As Object)
-	Static cApp As Object : If isNull(cApp) Then : cApp = Tp.TType_App : End If
+	Static cApp As Object : If isNull(cApp) Then : cApp = Tp.TType_TyApp : End If
 	Dim out
 	If isMissing(tc) Then
 		out = cApp
@@ -836,11 +836,11 @@ End Function
 &apos; --------------------------------------------------------------
 
 Function TypeApp_typeFn(Optional x)
-	TypeApp_typeFn = _destructure(Tp.TType_App, 0, x)
+	TypeApp_typeFn = _destructure(Tp.TType_TyApp, 0, x)
 End Function
 
 Function TypeApp_typeArg(Optional x)
-	TypeApp_typeArg = _destructure(Tp.TType_App, 1, x)
+	TypeApp_typeArg = _destructure(Tp.TType_TyApp, 1, x)
 End Function
 
 Function Type_arity(x)
@@ -849,7 +849,7 @@ Function Type_arity(x)
 	Dim ct : ct = _ctor(x)
 	If DataValue_same(ct, Tp.DataTypeCtor) Then
 		out = field(DataTypeCtor_arity, x)
-	ElseIf DataValue_same(ct, Tp.TType_App) Then
+	ElseIf DataValue_same(ct, Tp.TType_TyApp) Then
 		out = CInt(Type_arity(TypeApp_typeFn(x)) - 1)
 	ElseIf isType(x) Then
 		out = 0
@@ -893,8 +893,8 @@ Function hasType(Optional v As Variant, Optional t As Object)
 			cDataTypeCtor = Tp.DataTypeCtor
 			cNative = Tp.Native
 			nVariant = Tp.Native_Variant
-			cParam = Tp.TType_Param
-			cApp = Tp.TType_App
+			cParam = Tp.TType_TyParam
+			cApp = Tp.TType_TyApp
 		End If
 		If DataValue_same(t, tcType) Then
 			out = isType(v)
@@ -1146,8 +1146,8 @@ Function TType_toString( _
 	Static tcNative As Object
 	If isNull(tcType) Then
 		tcType   = Tp.TType
-		cParam   = Tp.TType_Param
-		cApp     = Tp.TType_App
+		cParam   = Tp.TType_TyParam
+		cApp     = Tp.TType_TyApp
 		tcNative = Tp.TNative
 	End If
 	If isMissing(needParens) Then
@@ -2542,8 +2542,8 @@ Function test_bootstrapTypes()
 
 	dataCtors = field(DataTypeCtor_dataCtors, tcType)
 	assertEqual(length(dataCtors), 2).x
-	Dim cParam	: cParam = Tp.TType_Param
-	Dim cApp	: cApp	 = Tp.TType_App
+	Dim cParam	: cParam = Tp.TType_TyParam
+	Dim cApp	: cApp	 = Tp.TType_TyApp
 	assert_same(nth(0, dataCtors), cApp).x
 	assert_same(nth(1, dataCtors), cParam).x
 	
@@ -2571,7 +2571,7 @@ Function test_bootstrapTypes()
 	assertEqual( fieldCount(cParam), 3			).x
 	assert_hasTypeCtor(     cParam,  tcType		).x
 	assert_hasCtor(			cParam,  cDataCtor	).x
-	assertEqual(field(DataCtor_name,     cParam),  &quot;Param&quot;).x
+	assertEqual(field(DataCtor_name,     cParam),  &quot;TyParam&quot;).x
 	argTypes =  field(DataCtor_argTypes, cParam)
 	assertEqual(length(argTypes), 1).x
 	assert_same(nth(0, argTypes), nInt).x
@@ -2589,7 +2589,7 @@ Function test_bootstrapTypes()
 	assertEqual( fieldCount(cApp), 3			).x
 	assert_hasTypeCtor(     cApp,  tcType		).x
 	assert_hasCtor(			cApp,  cDataCtor	).x
-	assertEqual(field(DataCtor_name,     cApp),  &quot;App&quot;).x
+	assertEqual(field(DataCtor_name,     cApp),  &quot;TyApp&quot;).x
 	argTypes =  field(DataCtor_argTypes, cApp)
 	assertEqual(length(argTypes), 2).x
 	assert_same(nth(0, argTypes), tcType).x
@@ -2770,9 +2770,9 @@ Function test_Type_typeOf(Optional missing)
 	assert_same(typeOf(Tp.DataCtor),		Tp.TDataCtor).x
 	assert_same(typeOf(Tp.TDataCtor),		Tp.TDataTypeCtor).x
 	
-	assert_same(typeOf(Tp.TType),		Tp.TDataTypeCtor).x
-	assert_same(typeOf(Tp.TType_App),	Tp.TDataCtor).x
-	assert_same(typeOf(Tp.TType_Param),	Tp.TDataCtor).x
+	assert_same(typeOf(Tp.TType),			Tp.TDataTypeCtor).x
+	assert_same(typeOf(Tp.TType_TyApp),		Tp.TDataCtor).x
+	assert_same(typeOf(Tp.TType_TyParam),	Tp.TDataCtor).x
 		
 	assert_same(typeOf(Tp.Native),		Tp.TDataCtor).x
 	assert_same(typeOf(Tp.TNative),		Tp.TDataTypeCtor).x
@@ -2859,8 +2859,8 @@ Function test_Type_typeStr()
 	assertEqual(typeStr(Tp.TDataCtor),		&quot;Data/TDataTypeCtor&quot;).x
 		
 	assertEqual(typeStr(Tp.TType),			&quot;Data/TDataTypeCtor&quot;).x
-	assertEqual(typeStr(Tp.TType_App),		&quot;Data/TDataCtor&quot;).x
-	assertEqual(typeStr(Tp.TType_Param),	&quot;Data/TDataCtor&quot;).x
+	assertEqual(typeStr(Tp.TType_TyApp),	&quot;Data/TDataCtor&quot;).x
+	assertEqual(typeStr(Tp.TType_TyParam),	&quot;Data/TDataCtor&quot;).x
 		
 	assertEqual(typeStr(Tp.Native),			&quot;Data/TDataCtor&quot;).x
 	assertEqual(typeStr(Tp.TNative),		&quot;Data/TDataTypeCtor&quot;).x
@@ -2912,9 +2912,9 @@ Function test_Type_isType
 	assertEqual(isType(Tp.TNative),					True).x
 	assertEqual(isType(Tp.Native),					False).x
 	assertEqual(isType(Tp.TType),					True).x
-	assertEqual(isType(Tp.TType_Param),				False).x
+	assertEqual(isType(Tp.TType_TyParam),			False).x
 	assertEqual(isType(TypeParam(0)),				True).x
-	assertEqual(isType(Tp.TType_App),				False).x
+	assertEqual(isType(Tp.TType_TyApp),				False).x
 	assertEqual(isType(TypeApp(TList, Tp.TType)),	True).x
 	
 	assertEqual(isType(Tp.Native_Boolean),	True).x
@@ -3177,7 +3177,7 @@ Function test_Type_dot_str()
 	assertEqual(nVar.str,	cNtv.str &amp; &quot;_Variant&quot;).x
 	
 	&apos;assertEqual(TypeParam.str,		&quot;Type.Param&quot;).x
-	assertEqual(TypeParam.str,		&quot;Param :: Int -&gt; Type&quot;).x
+	assertEqual(TypeParam.str,		&quot;TyParam :: Int -&gt; Type&quot;).x
 	assertEqual(TypeParam(0).str,	&quot;a0&quot;).x
 	assertEqual(TypeParam(1).str,	&quot;a1&quot;).x
 	assertEqual(TypeParam(2).str,	&quot;a2&quot;).x
@@ -3188,7 +3188,7 @@ Function test_Type_dot_str()
 	&apos;assertEqual(TList(nInt).str,			&quot;List Int&quot;).x
 	&apos;assertEqual(TList(TType).str,			&quot;List Type&quot;).x
 	
-	assertEqual(TypeApp.str,				&quot;App :: Type -&gt; Type -&gt; Type&quot;).x
+	assertEqual(TypeApp.str,				&quot;TyApp :: Type -&gt; Type -&gt; Type&quot;).x
 	assertEqual(TList(TypeParam(0)).str,	&quot;[a0]&quot;).x
 	assertEqual(TList(nStr).str,			&quot;[Str]&quot;).x
 	assertEqual(TList(nInt).str,			&quot;[Int]&quot;).x
@@ -3212,7 +3212,7 @@ Function test_Data_toString()
 		&quot;DataTypeCtor &apos;TDataCtor&apos; 0 [´DataCtor]&quot;).x
 	x = TType
 	assertEqual(Data_toString(x), _
-		&quot;DataTypeCtor &apos;Type&apos; 0 [´App, ´Param]&quot;).x
+		&quot;DataTypeCtor &apos;Type&apos; 0 [´TyApp, ´TyParam]&quot;).x
 	x = TList
 	assertEqual(Data_toString(x), _
 		&quot;DataTypeCtor &apos;List&apos; 1 [´Nil, ´Cons]&quot;).x
@@ -3291,10 +3291,10 @@ Function test_Data_toString()
 	x = Tp.DataTypeCtor
 	assertEqual(Data_toString(x), _
 		&quot;TDataTypeCtor.DataTypeCtor Str Int (List TDataCtor)&quot;).x
-	x = Tp.TType_Param
-	assertEqual(Data_toString(x), &quot;Type.Param Int&quot;).x
-	x = Tp.TType_App
-	assertEqual(Data_toString(x), &quot;Type.App Type Type&quot;).x
+	x = Tp.TType_TyParam
+	assertEqual(Data_toString(x), &quot;Type.TyParam Int&quot;).x
+	x = Tp.TType_TyApp
+	assertEqual(Data_toString(x), &quot;Type.TyApp Type Type&quot;).x
 	x = Tp.List_Nil
 	assertEqual(Data_toString(x), &quot;List.Nil&quot;).x
 	x = Tp.List_Cons
@@ -3354,7 +3354,7 @@ End Function
 Function test_Type_applyDC()
 	Dim a, c
 
-	c = Tp.TType_Param
+	c = Tp.TType_TyParam
 	a = applyDC(c, 0)
 	assert_hasCtor(a, c).x
 	
@@ -3364,7 +3364,7 @@ Function test_Type_applyDC()
 	a = apply(applyDC(c), 0)
 	assert_hasCtor(a, c).x
 	
-	c = Tp.TType_App
+	c = Tp.TType_TyApp
 	a = applyDC(c, TList)
 	assertEqual(isFn(a), True).x
 	a = apply(a, TypeParam(0))
@@ -3474,17 +3474,17 @@ Function test_Type_destructure()
 	Dim vA : vA = TypeApp(TList, vP)
 	Dim f
 	
-	f = _destructure(Tp.TType_Param, 0)
+	f = _destructure(Tp.TType_TyParam, 0)
 	assertEqual(isFn(f), True).x
 	assertThrows(f, Array(vA)).x
 	assertEqual(apply(f, vP), 42).x
 	
-	f = _destructure(Tp.TType_App, 0)
+	f = _destructure(Tp.TType_TyApp, 0)
 	assertEqual(isFn(f), True).x
 	assertThrows(f, Array(vP)).x
 	assert_same(apply(f, vA), TList).x
 	
-	f = _destructure(Tp.TType_App, 1)
+	f = _destructure(Tp.TType_TyApp, 1)
 	assertEqual(isFn(f), True).x
 	assertThrows(f, Array(vP)).x
 	assert_same(apply(f, vA), vP).x
@@ -3516,8 +3516,8 @@ Function test_Type_dataCtors()
 	assertThrows(dataCtors, Array(Tp.DataTypeCtor)).x
 	assertThrows(dataCtors, Array(Tp.DataCtor)).x
 	assertThrows(dataCtors, Array(Tp.Native)).x
-	assertThrows(dataCtors, Array(Tp.TType_Param)).x
-	assertThrows(dataCtors, Array(Tp.TType_App)).x
+	assertThrows(dataCtors, Array(Tp.TType_TyParam)).x
+	assertThrows(dataCtors, Array(Tp.TType_TyApp)).x
 	assertThrows(dataCtors, Array(Tp.List_Nil)).x
 	assertThrows(dataCtors, Array(Tp.List_Cons)).x
 	assertThrows(dataCtors, Array(nil)).x
@@ -3528,8 +3528,8 @@ Function test_Type_findDataCtor()
 	assert_same(findDataCtor(Tp.TDataTypeCtor, &quot;DataTypeCtor&quot;), Tp.DataTypeCtor).x
 	assert_same(findDataCtor(Tp.TDataCtor, &quot;DataCtor&quot;), Tp.DataCtor).x
 	assert_same(findDataCtor(Tp.TNative, &quot;Native&quot;), Tp.Native).x
-	assert_same(findDataCtor(Tp.TType, &quot;Param&quot;), Tp.TType_Param).x
-	assert_same(findDataCtor(Tp.TType, &quot;App&quot;), Tp.TType_App).x
+	assert_same(findDataCtor(Tp.TType, &quot;TyParam&quot;), Tp.TType_TyParam).x
+	assert_same(findDataCtor(Tp.TType, &quot;TyApp&quot;), Tp.TType_TyApp).x
 	assert_same(findDataCtor(Tp.List, &quot;Nil&quot;), Tp.List_Nil).x
 	assert_same(findDataCtor(Tp.List, &quot;Cons&quot;), Tp.List_Cons).x
 End Function
@@ -3556,7 +3556,7 @@ Function test_Type_Type_arity()
 
 	&apos; don&apos;t use applyDC, nor TypeApp(..)
 	Dim cApp, nStr, vApp
-	cApp = Tp.TType_App : nStr = Tp.Native_String
+	cApp = Tp.TType_TyApp : nStr = Tp.Native_String
 	vApp = _newDataValue(cApp, Array(Tp.List, nStr))
 	assertEqual(Type_arity(vApp),				0).x
 	
