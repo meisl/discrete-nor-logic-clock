@@ -3,7 +3,7 @@
 <script:module xmlns:script="http://openoffice.org/2000/script" script:name="M11_Expr" script:language="StarBasic">REM  *****  BASIC  *****
 Option Explicit
 
-&apos; data Expr = Val Any
+&apos; data Expr = Const TNative
 &apos;           | Var Str
 &apos;           | Lam Str Expr
 &apos;           | App Expr Expr
@@ -23,6 +23,47 @@ End Type
 Sub Main
 	[test_Expr======================================]()
 End Sub
+
+
+Function TExpr()
+	Static out As Object
+	If isNull(out) Then
+		Dim tcExpr
+		tcExpr = _mkDataTypeCtor(&quot;Expr&quot;, 0)
+		Dim cConst, cVar, cLam, cApp
+		cConst = mkDataCtor(tcExpr, &quot;Const&quot;,	List(Tp.Native_Variant))
+		cVar   = mkDataCtor(tcExpr, &quot;Var&quot;,		List(Tp.Native_String))
+		cLam   = mkDataCtor(tcExpr, &quot;Lam&quot;,		List(Tp.Native_String, tcExpr))
+		cApp   = mkDataCtor(tcExpr, &quot;App&quot;,		List(tcExpr, tcExpr))
+		Tp.TExpr = tcExpr
+		Tp.TExpr_Const = cConst
+		Tp.TExpr_Var   = cVar
+		Tp.TExpr_Lam   = cLam
+		Tp.TExpr_App   = cApp
+		out = tcExpr
+	End If
+	TExpr = out
+End Function
+
+
+Function expConst(Optional val)
+	Static c As Object : If isNull(c) Then : c = Tp.TExpr_Const : End If
+	Dim out
+	If isMissing(val) Then
+		out = applyDC(c)
+	Else
+		out = applyDC(c, val)
+		&apos;out.str = TExpr_toString(out)
+	End If
+	expConst = out
+End Function
+
+Function expConst_value(Optional x)
+	Static c As Object : If isNull(c) Then : c = Tp.TExpr_Const : End If
+	expConst_value = _destructure(c, 0, x)
+End Function
+
+
 
 
 Function newExpr(which As String, a0 As Variant, a1 As Variant)
@@ -226,14 +267,47 @@ _applyX_begin:
 End Function
 
 Function [test_Expr======================================]
-	test_Expr_isExpr()
-	&apos; TODO: test TExpr_same
+	test_Expr_TExpr()
+	test_Expr_Const()
+
+	&apos;test_Expr_isExpr()
 	&apos; TODO: test TExpr_equ
-	test_Expr_eval_Val()
+	
+	&apos;test_Expr_eval_Const()
+	
 	test_Expr_eval_Var()
 	test_Expr_eval_Builtin() &apos; App (Builtin ...) ... tested here
 	test_Expr_eval_Lam() &apos; App (Lam ...) ... tested here
 End Function
+
+
+
+Function test_Expr_TExpr()
+	Dim tc : tc = TExpr
+	Dim dcs
+	assert_hasCtor(tc, Tp.DataTypeCtor).x
+	dcs = dataCtors(tc)
+	assertEqual(isList(dcs), True).x
+	assertEqual(isNil(dcs), False).x
+End Function
+
+Function test_Expr_Const()
+	Dim cConst : cConst = Tp.TExpr_Const
+	Dim vConst : vConst = expConst(47)
+	assert_hasCtor(vConst, cConst).x
+	refute_same(expConst(&quot;47&quot;), vConst).x
+
+	&apos; destructure:
+	assertEqual(expConst_value(vConst), 47).x
+	assertEqual(expConst_value(expConst(Nothing)), Nothing).x
+	assertEqual(expConst_value(expConst(Empty)), 	 Empty).x
+	assertEqual(expConst_value(expConst(&quot;qmbl&quot;)),  &quot;qmbl&quot;).x
+	
+	assertEqual(isFn(expConst()), True).x
+	assertThrows(expConst, Array(cConst)).x
+End Function
+
+
 
 Function test_Expr_isExpr()
 	Dim x As Object
@@ -243,10 +317,10 @@ Function test_Expr_isExpr()
 	assertEqual(isExpr(xpApp(xpVar(&quot;a&quot;), xpVal(False))), True).x
 End Function
 
-Function test_Expr_eval_Val()
+Function test_Expr_eval_Const()
 	Dim x As Object, e As Object, v As Variant
 	e = envEmpty
-	v = &quot;foo&quot; :	x = xpVal(v)
+	v = &quot;foo&quot; :	x = expConst(v)
 	assertEqual(evalX(x, e), v).x
 	v = &quot;bar&quot;
 	assertEqual(evalX(x, e), &quot;foo&quot;).x
@@ -259,7 +333,7 @@ Function test_Expr_eval_Var()
 	e = envEmpty
 	x = xpVar(&quot;a&quot;)
 	v = &quot;foo&quot;
-	e = extend(e, &quot;a&quot;, v) &apos; must wrap it in a Val
+	e = extend(e, &quot;a&quot;, v)
 	assertEqual(evalX(x, e), v).x
 	
 	e = extend(e, &quot;b&quot;, v)

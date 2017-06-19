@@ -48,6 +48,12 @@ Type Tp
 	TPattern_Var	As Object
 	TPattern_Const	As Object
 	TPattern_Data	As Object
+	
+	TExpr			As Object
+	TExpr_Var		As Object
+	TExpr_Const		As Object
+	TExpr_Lam		As Object
+	TExpr_App		As Object
 End Type
 
 
@@ -285,7 +291,10 @@ Function Tp() &apos; bootstrap TType and data types
 		out.Native_Date		= _mkNative(&quot;Date&quot;,		Date)
 		Dim aVariant As Variant
 		out.Native_Variant	= _mkNative(&quot;Variant&quot;,	aVariant)
-						
+		
+		&apos; -- init other data types
+		out.TPattern = TPattern
+		out.TExpr    = TExpr
 	End If
 	Tp = out
 End Function
@@ -1026,9 +1035,8 @@ applyDC_too_many_args:
 	applyDC = out
 	Exit Function
 applyDC_typeError:
-	dim foo : foo = hasType(a, t)	
 	croak(&quot;applyDC &quot; &amp; cName &amp; &quot;: type error: expected &quot; _
-		&amp; _DataValue_toString_Type(t) _
+		&amp; TType_toString(t) _
 		&amp; &quot;, not a &quot; &amp; typeof(a).str _
 	)
 End Function

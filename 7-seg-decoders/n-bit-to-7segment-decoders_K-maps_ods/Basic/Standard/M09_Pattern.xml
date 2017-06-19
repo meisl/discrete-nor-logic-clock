@@ -9,7 +9,7 @@ Option Explicit
 &apos;              | Data TDataCtor [Pattern]
 
 Sub Main
-	TPattern
+	&apos;TPattern
 	[test_Pattern======================================]()
 End Sub
 
@@ -19,7 +19,6 @@ Function TPattern()
 	If isNull(out) Then
 		Dim tcPat
 		tcPat = _mkDataTypeCtor(&quot;Pattern&quot;, 0)
-		out = tcPat
 		Dim cAny, cVar, cConst, cData
 		cAny   = mkDataCtor(tcPat, &quot;Any&quot;,	nil)
 		cVar   = mkDataCtor(tcPat, &quot;Var&quot;,	List(Tp.Native_String))
@@ -30,6 +29,7 @@ Function TPattern()
 		Tp.TPattern_Var   = cVar
 		Tp.TPattern_Const = cConst
 		Tp.TPattern_Data  = cData
+		out = tcPat
 	End If
 	TPattern = out
 End Function
@@ -552,7 +552,7 @@ Function test_Pattern_TPattern()
 End Function
 
 Function test_Pattern_Any()
-	Dim cAny : cAny = TPattern_Any
+	Dim cAny : cAny = Tp.TPattern_Any
 	Dim vAny : vAny = patAny()
 	assert_hasCtor(vAny, cAny).x
 	&apos; returns the same value again:
@@ -582,6 +582,7 @@ Function test_Pattern_Const()
 	assertEqual(patConst_value(patConst(&quot;qmbl&quot;)),  &quot;qmbl&quot;).x
 	
 	assertEqual(isFn(patConst()), True).x
+	assertThrows(patConst, Array(cConst)).x
 End Function
 
 Function test_Pattern_Data()
